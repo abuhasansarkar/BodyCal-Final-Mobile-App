@@ -1,0 +1,58 @@
+import { router, Tabs } from "expo-router";
+import { useTranslation } from "react-i18next";
+import type { ColorValue } from "react-native";
+
+import { AppIcon, type AppIconName } from "@/components/app-icon";
+import { Image, Text, View } from "@/tw";
+
+const brandLogo = require("@/../assets/images/BodyCal-Black-Logo.png");
+
+export default function TabsLayout() {
+  const { t } = useTranslation();
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: true,
+        tabBarActiveTintColor: "#111111",
+        tabBarInactiveTintColor: "#737373",
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarStyle: { backgroundColor: "#FFFFFF", borderTopColor: "#E8E8E8", height: 74, paddingBottom: 7, paddingTop: 7 },
+      }}
+    >
+      <Tabs.Screen name="today" options={{ headerRightContainerStyle: { paddingRight: 12 }, headerShadowVisible: false, headerTitle: () => <BrandTitle />, headerTitleAlign: "left", title: t("tabs.home"), tabBarIcon: ({ color }) => <TabIcon color={color} name="home" /> }} />
+      <Tabs.Screen name="progress" options={{ title: t("tabs.progress"), tabBarIcon: ({ color }) => <TabIcon color={color} name="progress" /> }} />
+      <Tabs.Screen
+        name="scan"
+        listeners={{ tabPress: (event) => { event.preventDefault(); router.push("/(app)/scan/camera"); } }}
+        options={{
+          headerShown: false,
+          title: t("tabs.scan"),
+          tabBarIcon: () => <ScanTabIcon />,
+          tabBarIconStyle: { marginTop: -25 },
+          tabBarLabel: () => null,
+        }}
+      />
+      <Tabs.Screen name="foods" options={{ title: t("tabs.foods"), tabBarIcon: ({ color }) => <TabIcon color={color} name="foods" /> }} />
+      <Tabs.Screen name="profile" options={{ title: t("tabs.profile"), tabBarIcon: ({ color }) => <TabIcon color={color} name="profile" /> }} />
+    </Tabs>
+  );
+}
+
+function BrandTitle() {
+  return <View className="flex-row items-center gap-2"><Image accessibilityLabel="BodyCal" className="h-11 w-11" contentFit="contain" source={brandLogo} /><Text className="text-[26px] font-bold tracking-[-0.5px] text-app-text">BodyCal</Text></View>;
+}
+
+function TabIcon({ color, name }: { color: ColorValue; name: AppIconName }) {
+  return <AppIcon color={color} name={name} size={25} weight="semibold" />;
+}
+
+function ScanTabIcon() {
+  return (
+    <View
+      className="h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-[#111111]"
+      style={{ boxShadow: "0 5px 16px rgba(0, 0, 0, 0.22)" }}
+    >
+      <AppIcon color="#FFFFFF" name="camera" size={29} weight="semibold" />
+    </View>
+  );
+}

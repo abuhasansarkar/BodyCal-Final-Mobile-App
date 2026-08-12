@@ -1,56 +1,45 @@
-# Welcome to your Expo app 👋
+# BodyCal
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+BodyCal is an Expo SDK 57 nutrition-tracking application for iOS and Android. The repository contains the native route shell, calculation engine, authentication flows, Convex backend, manual and AI-assisted logging, weight tracking, RevenueCat paywall state, notifications, offline retries, localization bootstrap, observability, and account lifecycle jobs.
 
-## Get started
+## Local setup
 
-1. Install dependencies
+1. Install dependencies with `npm install`.
+2. Copy `.env.example` to `.env.local` and provide the public client values.
+3. Link or create a Convex deployment, configure the server-only variables from `.env.example`, and run `npx convex dev`.
+4. Configure Clerk JWT integration for Convex, Apple/Google credentials, and the app scheme.
+5. Configure the RevenueCat `default` offering, `pro` entitlement, and monthly/annual products.
+6. Start a development build with `npm run start:dev-client`.
 
-   ```bash
-   npm install
-   ```
+Expo Go is not sufficient for native social authentication, RevenueCat, or Android remote notifications. Use EAS development builds on physical devices for those flows.
 
-2. Start the app
+## Verification
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+npm run lint
+npm run typecheck
+npm test
+npx expo-doctor
+npx expo export --platform android --output-dir .expo/build-check
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Backend contracts
 
-### Other setup steps
+- Convex trusts the Clerk `subject`; public functions never accept another user's ID as authority.
+- RevenueCat is authoritative for `pro`. The app uses Clerk IDs as RevenueCat customer IDs, and every AI request performs fresh server-side verification.
+- AI model selection lives in `AI_MODEL`; UI and persisted domain code do not depend on a model name.
+- Food and weight writes use client idempotency keys. Offline manual writes use an AsyncStorage outbox.
+- Scan images expire after 24 hours unless attached to a log, when retention becomes 30 days.
+- Account export jobs expire after seven days. Deletion is a reverified, idempotent server workflow.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## External completion gates
 
-## Learn more
+- Add real screenshots/source assets to `design/` before visual acceptance. No product-specific visual tokens were invented.
+- Replace starter icon and splash assets after the design audit.
+- Supply Clerk, Convex, RevenueCat, OpenAI, Sentry, analytics, Expo push, and EAS credentials.
+- Supply final support, privacy, and terms URLs and approved localized legal copy.
+- Import reviewed localized food-catalog content.
+- Run the purchase lifecycle matrix, push-notification tests, accessibility/localization QA, and deletion checks on physical iOS and Android devices.
+- Complete App Store Connect and Play Console metadata, privacy declarations, and reviewer access.
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The current screen copy is an implementation baseline. Full eight-language copy coverage remains part of the design/content pass because the supplied `design/` directory has no assets or approved strings.

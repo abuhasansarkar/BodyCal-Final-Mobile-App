@@ -1,18 +1,40 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from "expo-router/stack";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import "@/global.css";
+import { AppProviders } from "@/providers/app-providers";
+import { Sentry } from "@/lib/sentry";
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({
+  duration: 250,
+  fade: true,
+});
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <AppProviders>
+      <StatusBar style="auto" />
+      <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(public)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="(auth)"
+          options={{
+            contentStyle: { backgroundColor: "#FFFFFF" },
+            headerShown: false,
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.56, 0.92],
+            sheetCornerRadius: 28,
+            sheetGrabberVisible: true,
+            sheetInitialDetentIndex: 0,
+          }}
+        />
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      </Stack>
+    </AppProviders>
   );
 }
+
+export default Sentry.wrap(RootLayout);
