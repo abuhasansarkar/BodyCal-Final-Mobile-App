@@ -52,7 +52,7 @@ export function ChoiceScreen<T extends string>({ description = "", nextHref, onC
             </View>
             <View className="min-w-0 flex-1 gap-1 py-4">
               <Text className="text-[17px] font-semibold leading-[22px] text-[#111111]">{option.label}</Text>
-              {option.description ? <Text className="text-[13px] leading-[18px] text-[#737373]">{option.description}</Text> : null}
+              {option.description ? <Text className="text-[14px] font-medium leading-[20px] text-[#525252]">{option.description}</Text> : null}
             </View>
             {option.image ? <Image contentFit="cover" source={option.image} style={{ alignSelf: "stretch", width: 98 }} transition={150} /> : (
               <View className={`mr-5 h-7 w-7 items-center justify-center rounded-full border ${value === option.value ? "border-[#111111] bg-[#111111]" : "border-[#D4D4D4] bg-white"}`}>

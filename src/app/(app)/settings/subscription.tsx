@@ -1,2 +1,5 @@
-import { Redirect } from "expo-router";
-export default function Route() { return <Redirect href="/(app)/paywall" />; }
+import { SettingsSubscriptionScreen } from "@/screens/settings-subscription-screen";
+
+export default function SubscriptionRoute() {
+  return <SettingsSubscriptionScreen />;
+}

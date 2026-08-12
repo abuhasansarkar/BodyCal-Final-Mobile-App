@@ -12,25 +12,21 @@
 
 :root {
   --app-background: light-dark(rgb(255 255 255), rgb(0 0 0));
-  --app-surface: light-dark(rgb(242 242 247), rgb(28 28 30));
-  --app-text: light-dark(rgb(0 0 0), rgb(255 255 255));
-  --app-muted: light-dark(rgb(60 60 67 / 0.68), rgb(235 235 245 / 0.68));
-  --app-border: light-dark(rgb(60 60 67 / 0.22), rgb(84 84 88 / 0.65));
+  --app-surface: light-dark(rgb(245 245 245), rgb(28 28 30));
+  --app-text: light-dark(rgb(17 17 17), rgb(255 255 255));
+  --app-muted: light-dark(rgb(82 82 82), rgb(180 180 180));
+  --app-border: light-dark(rgb(232 232 232), rgb(38 38 38));
   --app-accent: light-dark(rgb(0 122 255), rgb(10 132 255));
-  --app-error: light-dark(rgb(255 59 48), rgb(255 69 58));
+  --app-error: light-dark(rgb(220 38 38), rgb(248 113 113));
 }
 
 @media ios {
   :root {
     --font-sans: system-ui;
     --font-rounded: ui-rounded;
-    --app-background: platformColor(systemBackground);
-    --app-surface: platformColor(secondarySystemBackground);
-    --app-text: platformColor(label);
-    --app-muted: platformColor(secondaryLabel);
-    --app-border: platformColor(separator);
-    --app-accent: platformColor(systemBlue);
-    --app-error: platformColor(systemRed);
+    --app-background: #FFFFFF;
+    --app-surface: #F7F7F7;
+    --app-border: #E8E8E8;
   }
 }
 
@@ -38,6 +34,9 @@
   :root {
     --font-sans: normal;
     --font-rounded: normal;
+    --app-background: #FFFFFF;
+    --app-surface: #F7F7F7;
+    --app-border: #E8E8E8;
   }
 }
 

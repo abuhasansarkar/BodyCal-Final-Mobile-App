@@ -68,7 +68,7 @@ export function DashboardWeekCarousel({ locale, onSelectDate, selectedDate }: { 
                   className="min-h-16 min-w-10 items-center gap-2"
                   onPress={() => onSelectDate(day)}
                 >
-                  <Text className={selected ? "text-xs font-semibold text-app-text" : "text-xs text-app-muted"} selectable>{new Intl.DateTimeFormat(locale, { weekday: "short" }).format(day)}</Text>
+                  <Text className={selected ? "text-xs font-bold text-app-text" : "text-xs font-medium text-app-muted"} selectable>{new Intl.DateTimeFormat(locale, { weekday: "short" }).format(day)}</Text>
                   <View className={selected ? "h-11 w-11 items-center justify-center rounded-full bg-[#111111]" : "h-11 w-11 items-center justify-center rounded-full border border-dashed border-app-border bg-white"}>
                     <Text className={selected ? "text-base font-bold text-white" : "text-base font-semibold text-app-text"} selectable style={{ fontVariant: ["tabular-nums"] }}>{day.getDate()}</Text>
                   </View>

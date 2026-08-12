@@ -41,7 +41,7 @@ export function StageChoiceScreen<T extends string>({ buttonLabel, description, 
               </View>
               <View className="min-w-0 flex-1 gap-1">
                 <Text className="text-[17px] font-semibold leading-[22px] text-[#111111]">{option.label}</Text>
-                <Text className="text-[13px] leading-[18px] text-[#737373]">{option.description}</Text>
+                <Text className="text-[14px] font-medium leading-[20px] text-[#525252]">{option.description}</Text>
               </View>
               <View className={`h-7 w-7 items-center justify-center rounded-full border ${selected ? "border-[#111111] bg-[#111111]" : "border-[#D4D4D4] bg-white"}`}>
                 {selected ? <View className="h-2.5 w-2.5 rounded-full bg-white" /> : null}

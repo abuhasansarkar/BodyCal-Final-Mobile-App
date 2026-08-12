@@ -8,6 +8,12 @@ import {
 } from "@/features/auth/auth-destination";
 
 describe("authentication destinations", () => {
+  it("resumes onboarding authentication at the remaining onboarding steps", () => {
+    expect(resolveAuthDestination("onboarding")).toBe(authDestinations.onboarding);
+    expect(getAuthDestinationKey(authDestinations.onboarding)).toBe("onboarding");
+    expect(getAuthDismissRoute(authDestinations.onboarding)).toBe("/(onboarding)/result");
+  });
+
   it("resolves paywall authentication without falling back to Today", () => {
     expect(resolveAuthDestination("paywall")).toBe(authDestinations.paywall);
     expect(getAuthDestinationKey(authDestinations.paywall)).toBe("paywall");

@@ -16,7 +16,7 @@ export function SelectionCard({ description, label, onPress, selected }: Props) 
       onPress={onPress}
     >
       <Text className="text-base font-semibold text-app-text">{label}</Text>
-      {description ? <Text className="text-sm text-app-muted">{description}</Text> : null}
+      {description ? <Text className="text-sm font-medium text-app-muted">{description}</Text> : null}
     </Pressable>
   );
 }

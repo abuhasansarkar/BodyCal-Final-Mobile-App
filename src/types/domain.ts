@@ -36,6 +36,8 @@ export interface OnboardingDraft {
   pace: GoalPace;
   weightUnit: WeightUnit;
   heightUnit: HeightUnit;
+  /** Populated by the AI plan generation action during the calculating step. */
+  aiPlan?: AiNutritionPlan;
 }
 
 export interface NutritionPlan extends NutritionValues {
@@ -45,4 +47,13 @@ export interface NutritionPlan extends NutritionValues {
   appliedAdjustment: number;
   paceWasCapped: boolean;
   formulaVersion: "mifflin-st-jeor-v1";
+}
+
+/** Result from the server-side OpenAI plan generation action. */
+export interface AiNutritionPlan extends NutritionValues {
+  goalTitle: string;
+  goalDescription: string;
+  reasoning: string;
+  paceWasCapped: boolean;
+  formulaVersion: "openai-v1" | "mifflin-st-jeor-v1";
 }

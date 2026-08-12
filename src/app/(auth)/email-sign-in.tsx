@@ -1,7 +1,5 @@
 import { useAuth } from "@clerk/expo";
 import { Redirect, useLocalSearchParams } from "expo-router";
-import { Stack } from "expo-router/stack";
-import { useTranslation } from "react-i18next";
 
 import { hasBackendConfiguration } from "@/config/env";
 import { resolveAuthDestination } from "@/features/auth/auth-destination";
@@ -13,18 +11,13 @@ function ConfiguredEmailSignInRoute({ destination }: { destination: ReturnType<t
 
   if (!isLoaded) return null;
   if (isSignedIn) return <Redirect href={destination} />;
-  return <EmailSignInScreen destination={destination} />;
+  return <EmailSignInScreen destination={destination} initialMode="signIn" />;
 }
 
 export default function EmailSignInRoute() {
-  const { t } = useTranslation();
   const { destination } = useLocalSearchParams<{ destination?: string }>();
   const authDestination = resolveAuthDestination(destination);
 
-  return (
-    <>
-      <Stack.Screen options={{ headerTransparent: false, title: t("auth.emailSignIn") }} />
-      {hasBackendConfiguration ? <ConfiguredEmailSignInRoute destination={authDestination} /> : <ConfigRequiredScreen />}
-    </>
-  );
+  return hasBackendConfiguration ? <ConfiguredEmailSignInRoute destination={authDestination} /> : <ConfigRequiredScreen />;
 }
+

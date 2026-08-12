@@ -49,7 +49,7 @@ function BenefitRow({ description, icon, title }: { description: string; icon: A
       <AppIcon name={icon} size={27} />
       <View className="min-w-0 flex-1 gap-0.5">
         <Text className="text-[15px] font-semibold text-[#111111]" selectable>{title}</Text>
-        <Text className="text-[14px] leading-[19px] text-[#737373]" selectable>{description}</Text>
+        <Text className="text-[14px] font-medium leading-[20px] text-[#525252]" selectable>{description}</Text>
       </View>
     </View>
   );
@@ -61,7 +61,7 @@ function StepOne({ cta, disclosure, onContinue }: { cta: string; disclosure: str
     <View className="flex-1 gap-4">
       <View className="items-center gap-2 px-4">
         <Text accessibilityRole="header" className="text-center text-[29px] font-bold leading-[35px] tracking-[-0.7px] text-[#111111]" selectable>{t("paywall.title")}</Text>
-        <Text className="text-center text-[15px] leading-[21px] text-[#737373]" selectable>{t("paywallFlow.benefitsSubtitle")}</Text>
+        <Text className="text-center text-[15px] font-medium leading-[22px] text-[#525252]" selectable>{t("paywallFlow.benefitsSubtitle")}</Text>
       </View>
       <View className="gap-2">
         <BenefitRow description={t("paywallFlow.nutritionDescription")} icon="nutrition" title={t("paywallFlow.nutritionTitle")} />
@@ -72,7 +72,7 @@ function StepOne({ cta, disclosure, onContinue }: { cta: string; disclosure: str
       <View className="items-center gap-3">
         <View className="flex-row items-center gap-2 rounded-full bg-[#F5F5F5] px-4 py-2"><AppIcon name="motivation" size={17} /><Text className="text-sm font-semibold text-[#111111]">{t("paywallFlow.flexibleBadge")}</Text></View>
         <PrimaryButton className="min-h-[60px] w-full rounded-2xl" label={cta} labelClassName="text-[18px]" onPress={onContinue} />
-        <Text className="text-center text-[13px] leading-[18px] text-[#737373]" selectable>{disclosure}</Text>
+        <Text className="text-center text-[14px] font-medium leading-[20px] text-[#525252]" selectable>{disclosure}</Text>
       </View>
     </View>
   );
@@ -86,7 +86,7 @@ function TimelineRow({ active, description, icon, title }: { active?: boolean; d
       </View>
       <View className="min-h-[68px] min-w-0 flex-1 justify-center rounded-2xl border border-[#E8E8E8] bg-white px-4 py-3" style={{ borderCurve: "continuous" }}>
         <Text className="text-[15px] font-bold text-[#111111]" selectable>{title}</Text>
-        <Text className="text-[14px] leading-[19px] text-[#737373]" selectable>{description}</Text>
+        <Text className="text-[14px] font-medium leading-[20px] text-[#525252]" selectable>{description}</Text>
       </View>
     </View>
   );
@@ -98,7 +98,7 @@ function StepTwo({ hasTrial, onContinue, trialDays }: { hasTrial: boolean; onCon
     <View className="flex-1 gap-5">
       <View className="items-center gap-2 px-4">
         <Text accessibilityRole="header" className="text-center text-[29px] font-bold leading-[34px] tracking-[-0.7px] text-[#111111]" selectable>{hasTrial ? t("paywallFlow.reminderTitle") : t("paywallFlow.accessTitle")}</Text>
-        <Text className="text-center text-[15px] leading-[21px] text-[#737373]" selectable>{hasTrial ? t("paywallFlow.reminderSubtitle") : t("paywallFlow.accessSubtitle")}</Text>
+        <Text className="text-center text-[15px] font-medium leading-[21px] text-[#525252]" selectable>{hasTrial ? t("paywallFlow.reminderSubtitle") : t("paywallFlow.accessSubtitle")}</Text>
       </View>
       <View className="items-center py-1">
         <View className="h-28 w-28 items-center justify-center rounded-full border-[9px] border-[#F0F0F0]"><AppIcon name={hasTrial ? "notification" : "unlock"} size={52} /></View>
@@ -109,7 +109,7 @@ function StepTwo({ hasTrial, onContinue, trialDays }: { hasTrial: boolean; onCon
         <TimelineRow description={hasTrial ? t("paywallFlow.finalReminder", { count: trialDays ?? 0 }) : t("paywallFlow.manageDescription")} icon={hasTrial ? "notification" : "settings"} title={hasTrial ? t("paywallFlow.finalDay", { count: trialDays ?? 0 }) : t("paywallFlow.manageTitle")} />
       </View>
       <View className="mt-auto gap-4">
-        <View className="flex-row items-center gap-3 rounded-2xl border border-[#E8E8E8] bg-[#FAFAFA] p-4"><AppIcon name="privacy" size={22} /><Text className="min-w-0 flex-1 text-[13px] leading-[18px] text-[#737373]">{hasTrial ? t("paywallFlow.noChargeUntilEnd") : t("paywallFlow.cancelAnytime")}</Text></View>
+        <View className="flex-row items-center gap-3 rounded-2xl border border-[#E8E8E8] bg-[#FAFAFA] p-4"><AppIcon name="privacy" size={22} /><Text className="min-w-0 flex-1 text-[14px] font-medium leading-[20px] text-[#525252]">{hasTrial ? t("paywallFlow.noChargeUntilEnd") : t("paywallFlow.cancelAnytime")}</Text></View>
         <PrimaryButton className="min-h-[60px] rounded-2xl" label={t("common.continue")} labelClassName="text-[18px]" onPress={onContinue} />
         <View className="flex-row justify-center gap-3"><View className="h-2 w-2 rounded-full bg-[#BDBDBD]" /><View className="h-2 w-2 rounded-full bg-[#111111]" /><View className="h-2 w-2 rounded-full bg-[#D8D8D8]" /></View>
       </View>
@@ -121,7 +121,7 @@ function PlanOption({ description, disabled, label, onPress, price, selected }: 
   return (
     <Pressable accessibilityRole="radio" accessibilityState={{ disabled, selected }} className={`min-h-[92px] flex-row items-center gap-3 rounded-[22px] border-2 bg-white px-4 py-4 ${selected ? "border-[#111111]" : "border-[#E1E1E1]"}`} disabled={disabled} onPress={onPress} style={{ borderCurve: "continuous" }}>
       <View className={`h-7 w-7 items-center justify-center rounded-full border-2 ${selected ? "border-[#111111]" : "border-[#CFCFCF]"}`}>{selected ? <View className="h-4 w-4 rounded-full bg-[#111111]" /> : null}</View>
-      <View className="min-w-0 flex-1 gap-1"><Text className="text-[17px] font-bold text-[#111111]">{label}</Text><Text className="text-[22px] font-bold text-[#111111]" selectable>{price}</Text>{description ? <Text className="text-[13px] text-[#737373]" selectable>{description}</Text> : null}</View>
+      <View className="min-w-0 flex-1 gap-1"><Text className="text-[17px] font-bold text-[#111111]">{label}</Text><Text className="text-[22px] font-bold text-[#111111]" selectable>{price}</Text>{description ? <Text className="text-[14px] font-semibold text-[#525252]" selectable>{description}</Text> : null}</View>
       {selected ? <View className="h-8 w-8 items-center justify-center rounded-full bg-[#111111]"><AppIcon color="#FFFFFF" name="check" size={19} weight="semibold" /></View> : null}
     </Pressable>
   );

@@ -8,7 +8,7 @@ import { hasBackendConfiguration } from "@/config/env";
 import { useOnboarding } from "@/features/onboarding/onboarding-provider";
 import { OnboardingStageScreen } from "@/screens/onboarding/onboarding-stage-screen";
 import { Text, View } from "@/tw";
-import type { GoalType } from "@/types/domain";
+import type { AiNutritionPlan, GoalType } from "@/types/domain";
 
 type MacroTileProps = {
   color: string;
@@ -31,6 +31,7 @@ function MacroTile({ color, icon, label, value }: MacroTileProps) {
   );
 }
 
+// Fallback copy when AI didn't return localised titles
 const goalCopyKeys: Record<GoalType, { description: string; title: string }> = {
   lose: { title: "onboarding.result.goal.lose.title", description: "onboarding.result.goal.lose.description" },
   maintain: { title: "onboarding.result.goal.maintain.title", description: "onboarding.result.goal.maintain.description" },
@@ -45,27 +46,42 @@ type ResultContentProps = {
 function ResultContent({ isAuthLoaded, isSignedIn }: ResultContentProps) {
   const { draft } = useOnboarding();
   const { i18n, t } = useTranslation();
-  const plan = calculateNutritionPlan(draft);
+
+  // Use AI plan if available, otherwise fall back to local calculator
+  const aiPlan: AiNutritionPlan | undefined = draft.aiPlan;
+  const localPlan = calculateNutritionPlan(draft);
+
+  const calories = aiPlan?.calories ?? localPlan.calories;
+  const proteinGrams = aiPlan?.proteinGrams ?? localPlan.proteinGrams;
+  const carbsGrams = aiPlan?.carbsGrams ?? localPlan.carbsGrams;
+  const fatGrams = aiPlan?.fatGrams ?? localPlan.fatGrams;
+  const paceWasCapped = aiPlan?.paceWasCapped ?? localPlan.paceWasCapped;
+
+  // AI returns localised title/description; fall back to i18n keys
+  const goalCopy = goalCopyKeys[draft.goal];
+  const titleText = aiPlan?.goalTitle ?? t(goalCopy.title);
+  const descriptionText = aiPlan?.goalDescription ?? t(goalCopy.description);
+
   const numberFormatter = new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 1 });
   const weightValue = draft.weightUnit === "lb"
     ? `${numberFormatter.format(kilogramsToPounds(draft.currentWeightKg))} ${t("onboarding.units.lb")}`
     : `${numberFormatter.format(draft.currentWeightKg)} ${t("onboarding.units.kg")}`;
   const activityLabel = t(`onboarding.activity.${draft.activityLevel}.title`);
-  const goalCopy = goalCopyKeys[draft.goal];
+
   const continueToPaywall = () => {
     if (!isAuthLoaded) return;
-    if (isSignedIn) router.push("/(app)/paywall");
-    else router.push({ pathname: "/(auth)/sign-in", params: { destination: "paywall" } });
+    if (isSignedIn) router.push("/(onboarding)/ai-introduction");
+    else router.push({ pathname: "/(auth)/sign-in", params: { destination: "onboarding" } });
   };
 
   return (
     <OnboardingStageScreen
-      description={t(goalCopy.description)}
+      description={descriptionText}
       disabled={!isAuthLoaded}
       footerLabel={t("common.continue")}
       onContinue={continueToPaywall}
       progressStep={10}
-      title={t(goalCopy.title)}
+      title={titleText}
       titleAccessory={(
         <View className="mb-1 h-14 w-14 items-center justify-center rounded-full bg-[#111111]">
           <AppIcon color="#FFFFFF" name="check" size={30} weight="semibold" />
@@ -82,16 +98,16 @@ function ResultContent({ isAuthLoaded, isSignedIn }: ResultContentProps) {
             </View>
             <View className="min-w-0 flex-1">
               <Text className="text-[46px] font-bold leading-[50px] tracking-[-1.2px] text-[#111111]" selectable style={{ fontVariant: ["tabular-nums"] }}>
-                {new Intl.NumberFormat(i18n.resolvedLanguage).format(plan.calories)}
+                {new Intl.NumberFormat(i18n.resolvedLanguage).format(calories)}
               </Text>
               <Text className="text-[16px] text-[#737373]" selectable>{t("onboarding.result.calories")}</Text>
             </View>
           </View>
 
           <View className="flex-row gap-2.5">
-            <MacroTile color="#2F80ED" icon="protein" label={t("onboarding.result.protein")} value={`${plan.proteinGrams}g`} />
-            <MacroTile color="#F97316" icon="carbs" label={t("onboarding.result.carbs")} value={`${plan.carbsGrams}g`} />
-            <MacroTile color="#8B5CF6" icon="fat" label={t("onboarding.result.fat")} value={`${plan.fatGrams}g`} />
+            <MacroTile color="#2F80ED" icon="protein" label={t("onboarding.result.protein")} value={`${proteinGrams}g`} />
+            <MacroTile color="#F97316" icon="carbs" label={t("onboarding.result.carbs")} value={`${carbsGrams}g`} />
+            <MacroTile color="#8B5CF6" icon="fat" label={t("onboarding.result.fat")} value={`${fatGrams}g`} />
           </View>
         </View>
 
@@ -112,8 +128,18 @@ function ResultContent({ isAuthLoaded, isSignedIn }: ResultContentProps) {
             </View>
           </View>
           <Text className="text-center text-[13px] leading-[18px] text-[#737373]" selectable>
-            {t("onboarding.result.estimate")}{plan.paceWasCapped ? ` ${t("onboarding.result.safetyLimited")}` : ""}
+            {t("onboarding.result.estimate")}{paceWasCapped ? ` ${t("onboarding.result.safetyLimited")}` : ""}
           </Text>
+
+          {/* Show AI badge when plan was generated by OpenAI */}
+          {aiPlan?.formulaVersion === "openai-v1" ? (
+            <View className="flex-row items-center justify-center gap-1.5">
+              <AppIcon color="#737373" name="analysis" size={14} />
+              <Text className="text-center text-[12px] text-[#737373]" selectable>
+                {t("onboarding.result.aiGenerated")}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </OnboardingStageScreen>

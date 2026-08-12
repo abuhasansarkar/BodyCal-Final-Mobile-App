@@ -1,2 +1,5 @@
-import { FeatureScreen } from "@/screens/feature-screen";
-export default function Route() { return <FeatureScreen title="Goal settings" description="Change goal type, goal weight, activity, and pace without rewriting historical targets." />; }
+import { SettingsGoalScreen } from "@/screens/settings-goal-screen";
+
+export default function GoalRoute() {
+  return <SettingsGoalScreen />;
+}

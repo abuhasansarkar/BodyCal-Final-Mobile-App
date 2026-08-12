@@ -23,7 +23,7 @@ export function SignInScreen({ destination = "/(app)/(tabs)/today" }: Props) {
     <SafeAreaView edges={["right", "bottom", "left"]} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <ScrollView
         className="flex-1 bg-white"
-        contentContainerClassName="flex-grow gap-5 px-5 pb-5 pt-3"
+        contentContainerClassName="flex-grow gap-6 px-6 pb-6 pt-6"
         contentInsetAdjustmentBehavior="automatic"
       >
         <View className="flex-row items-center justify-between">
@@ -80,15 +80,6 @@ export function SignInScreen({ destination = "/(app)/(tabs)/today" }: Props) {
           </Link>
         </View>
 
-        <View className="mt-auto min-h-11 flex-row flex-wrap items-center justify-center gap-1 pt-1">
-          <Text className="text-center text-sm text-[#737373]">{t("auth.noAccount")}</Text>
-          <Link
-            className="py-3 text-sm font-semibold text-[#111111] underline"
-            href={{ pathname: "/(auth)/sign-up", params: { destination: getAuthDestinationKey(destination) } }}
-          >
-            {t("auth.createOne")}
-          </Link>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

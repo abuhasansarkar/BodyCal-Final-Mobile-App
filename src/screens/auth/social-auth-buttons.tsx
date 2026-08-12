@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
+import { AppIcon } from "@/components/app-icon";
 import type { AuthDestination } from "@/features/auth/auth-destination";
 import { Image } from "@/tw/image";
 import { Pressable, Text } from "@/tw";
@@ -21,7 +22,10 @@ export function SocialAuthButtons({ destination }: { destination: AuthDestinatio
       if (result.authSessionResult?.type === "cancel" || result.authSessionResult?.type === "dismiss") return;
       if (!result.createdSessionId || !result.setActive) throw new Error(t("auth.authenticationFailed"));
       await result.setActive({ session: result.createdSessionId });
-      router.replace(destination);
+      const targetDestination = result.signUp?.status === "complete"
+        ? "/(onboarding)/goal" as const
+        : destination;
+      router.replace(targetDestination);
     } catch {
       setError(t("auth.authenticationFailed"));
     } finally {
@@ -33,17 +37,12 @@ export function SocialAuthButtons({ destination }: { destination: AuthDestinatio
     <>
       <Pressable
         accessibilityRole="button"
-        className="min-h-14 flex-row items-center justify-center gap-3 rounded-2xl border border-[#E8E8E8] bg-white px-5 active:opacity-70 disabled:opacity-45"
+        className="min-h-14 flex-row items-center justify-center gap-3 rounded-2xl bg-[#111111] px-5 active:opacity-75 disabled:opacity-45"
         disabled={activeProvider !== null}
         onPress={() => void complete("apple")}
       >
-        <Image
-          accessibilityIgnoresInvertColors
-          className="h-7 w-7"
-          contentFit="contain"
-          source={require("@/../assets/images/apple-sign-in-logo.png")}
-        />
-        <Text className="text-base font-semibold text-[#111111]">
+        <AppIcon color="#FFFFFF" name="apple" size={22} weight="semibold" />
+        <Text className="text-base font-semibold text-white">
           {activeProvider === "apple" ? t("auth.signingIn") : t("auth.apple")}
         </Text>
       </Pressable>

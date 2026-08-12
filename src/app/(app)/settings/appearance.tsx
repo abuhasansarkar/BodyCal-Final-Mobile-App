@@ -1,2 +1,6 @@
-import { FeatureScreen } from "@/screens/feature-screen";
-export default function Route() { return <FeatureScreen title="Appearance" description="Follow the system theme. Final theme controls depend on the missing design source." />; }
+import { SettingsAppearanceScreen } from "@/screens/settings-appearance-screen";
+
+export default function AppearanceRoute() {
+  return <SettingsAppearanceScreen />;
+}
+

@@ -1,3 +1,4 @@
+import { useAction } from "convex/react";
 import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -5,9 +6,12 @@ import { AccessibilityInfo, ActivityIndicator } from "react-native";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { OnboardingStageScreen } from "@/screens/onboarding/onboarding-stage-screen";
+import { api } from "@/lib/convex-api";
+import { useOnboarding } from "@/features/onboarding/onboarding-provider";
+import { i18n } from "@/locales/i18n";
 import { Text, View } from "@/tw";
 
-const GENERATION_DURATION_MS = 4_800;
+const ANIMATION_DURATION_MS = 5_200;
 
 type GenerationStep = {
   complete: boolean;
@@ -18,44 +22,74 @@ type GenerationStep = {
 
 export default function CalculatingRoute() {
   const { t } = useTranslation();
+  const { draft, update } = useOnboarding();
+  const generatePlan = useAction(api.planGeneration.generate);
   const [progress, setProgress] = React.useState(0);
+  const [aiDone, setAiDone] = React.useState(false);
 
+  // ── 1. Fire AI request immediately on mount ──────────────────────────────
+  React.useEffect(() => {
+    let mounted = true;
+    void generatePlan({
+      calculationBasis: draft.calculationBasis,
+      age: draft.age,
+      heightCm: draft.heightCm,
+      currentWeightKg: draft.currentWeightKg,
+      goalWeightKg: draft.goalWeightKg,
+      activityLevel: draft.activityLevel,
+      goal: draft.goal,
+      pace: draft.pace,
+      locale: i18n.resolvedLanguage ?? "en",
+    })
+      .then((plan) => {
+        if (mounted) update({ aiPlan: plan });
+      })
+      .catch(() => {
+        // Failure is handled: result.tsx falls back to the local calculator
+      })
+      .finally(() => {
+        if (mounted) setAiDone(true);
+      });
+    return () => { mounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── 2. Run progress animation; stall at 95% until AI finishes ───────────
   React.useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    let navigationTimer: ReturnType<typeof setTimeout> | undefined;
     let mounted = true;
 
-    const completeGeneration = () => {
-      setProgress(100);
-      navigationTimer = setTimeout(() => router.replace("/(onboarding)/result"), 450);
-    };
-
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotionEnabled) => {
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
       if (!mounted) return;
-
-      if (reduceMotionEnabled) {
-        completeGeneration();
+      if (reduceMotion) {
+        setProgress(95); // hold until AI done
         return;
       }
-
       const startedAt = Date.now();
       interval = setInterval(() => {
-        const nextProgress = Math.min(100, Math.round(((Date.now() - startedAt) / GENERATION_DURATION_MS) * 100));
-        setProgress(nextProgress);
-
-        if (nextProgress === 100) {
-          if (interval) clearInterval(interval);
-          completeGeneration();
-        }
+        if (!mounted) return;
+        const natural = Math.min(95, Math.round(((Date.now() - startedAt) / ANIMATION_DURATION_MS) * 100));
+        setProgress(natural);
+        if (natural >= 95 && interval) clearInterval(interval);
       }, 80);
     });
 
     return () => {
       mounted = false;
       if (interval) clearInterval(interval);
-      if (navigationTimer) clearTimeout(navigationTimer);
     };
   }, []);
+
+  // ── 3. When AI finishes, snap to 100% then navigate ─────────────────────
+  React.useEffect(() => {
+    if (!aiDone) return;
+    const timer = setTimeout(() => {
+      setProgress(100);
+      // Give React a tick to render 100%, then navigate
+      setTimeout(() => router.replace("/(onboarding)/result"), 400);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [aiDone]);
 
   const steps: GenerationStep[] = [
     { icon: "calories", title: t("onboarding.calculating.calories"), complete: progress >= 34, inProgress: progress < 34 },

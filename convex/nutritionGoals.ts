@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { requireCurrentUser } from "./lib/auth";
 
 const nutritionGoal = v.object({
@@ -46,5 +46,37 @@ export const getActive = query({
       )
       .order("desc")
       .first();
+  },
+});
+
+export const createGoal = mutation({
+  args: {
+    calories: v.number(),
+    proteinGrams: v.number(),
+    carbsGrams: v.number(),
+    fatGrams: v.number(),
+    effectiveFrom: v.string(),
+    isManualOverride: v.boolean(),
+    formulaVersion: v.optional(v.string()),
+    calculationMetadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    if (!isValidLocalDate(args.effectiveFrom)) throw new ConvexError("Invalid effectiveFrom date");
+    if (args.calories < 1200 || args.calories > 6000) throw new ConvexError("Calories must be between 1,200 and 6,000");
+
+    const now = Date.now();
+    return ctx.db.insert("nutritionGoals", {
+      userId: user._id,
+      calories: Math.round(args.calories),
+      proteinGrams: Math.round(args.proteinGrams),
+      carbsGrams: Math.round(args.carbsGrams),
+      fatGrams: Math.round(args.fatGrams),
+      effectiveFrom: args.effectiveFrom,
+      isManualOverride: args.isManualOverride,
+      formulaVersion: args.formulaVersion ?? "mifflin-st-jeor-v1",
+      calculationMetadata: args.calculationMetadata ?? {},
+      createdAt: now,
+    });
   },
 });

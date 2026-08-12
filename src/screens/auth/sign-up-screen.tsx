@@ -38,11 +38,16 @@ export function SignUpScreen({ destination }: Props) {
         lastName,
         password,
       });
-      if (error) return;
+      if (error) {
+        setFormError(error.message ?? t("auth.authenticationFailed"));
+        return;
+      }
       const { error: verificationError } = await signUp.verifications.sendEmailCode();
-      if (verificationError) setFormError(t("auth.authenticationFailed"));
-    } catch {
-      setFormError(t("auth.authenticationFailed"));
+      if (verificationError) {
+        setFormError(verificationError.message ?? t("auth.authenticationFailed"));
+      }
+    } catch (err: any) {
+      setFormError(err?.message ?? t("auth.authenticationFailed"));
     }
   };
 
@@ -50,14 +55,17 @@ export function SignUpScreen({ destination }: Props) {
     setFormError(null);
     try {
       const { error } = await signUp.verifications.verifyEmailCode({ code: code.trim() });
-      if (error) return;
+      if (error) {
+        setFormError(error.message ?? t("auth.authenticationFailed"));
+        return;
+      }
       if (signUp.status !== "complete") {
         setFormError(t("auth.additionalVerification"));
         return;
       }
-      await signUp.finalize({ navigate: () => router.replace(destination) });
-    } catch {
-      setFormError(t("auth.authenticationFailed"));
+      await signUp.finalize({ navigate: () => router.replace("/(onboarding)/goal") });
+    } catch (err: any) {
+      setFormError(err?.message ?? t("auth.authenticationFailed"));
     }
   };
 
@@ -65,9 +73,11 @@ export function SignUpScreen({ destination }: Props) {
     setFormError(null);
     try {
       const { error } = await signUp.verifications.sendEmailCode();
-      if (error) setFormError(t("auth.authenticationFailed"));
-    } catch {
-      setFormError(t("auth.authenticationFailed"));
+      if (error) {
+        setFormError(error.message ?? t("auth.authenticationFailed"));
+      }
+    } catch (err: any) {
+      setFormError(err?.message ?? t("auth.authenticationFailed"));
     }
   };
 
@@ -77,15 +87,15 @@ export function SignUpScreen({ destination }: Props) {
     && signUp.missingFields.length === 0;
 
   if (signUp.status === "complete") {
-    return <AppScreen><Text className="text-base text-app-muted">{t("common.loading")}</Text></AppScreen>;
+    return <AppScreen><Text className="text-base text-[#737373]">{t("common.loading")}</Text></AppScreen>;
   }
 
   if (needsCode) {
     return (
       <AppScreen>
         <View className="gap-2">
-          <Text className="text-3xl font-bold text-app-text" selectable>{t("auth.verifyTitle")}</Text>
-          <Text className="text-base leading-6 text-app-muted" selectable>{t("auth.verifyBody")}</Text>
+          <Text className="text-3xl font-bold text-[#111111]" selectable>{t("auth.verifyTitle")}</Text>
+          <Text className="text-base leading-6 text-[#737373]" selectable>{t("auth.verifyBody")}</Text>
         </View>
         <AuthField
           autoComplete="one-time-code"
@@ -98,9 +108,11 @@ export function SignUpScreen({ destination }: Props) {
           textContentType="oneTimeCode"
           value={code}
         />
-        {formError ? <Text accessibilityLiveRegion="polite" className="text-sm text-app-error" selectable>{formError}</Text> : null}
-        <PrimaryButton disabled={!code.trim() || isSubmitting} label={isSubmitting ? t("auth.verifying") : t("auth.verify")} onPress={() => void verify()} />
-        <PrimaryButton disabled={isSubmitting} label={t("auth.resendCode")} onPress={() => void resend()} />
+        {formError ? <Text accessibilityLiveRegion="polite" className="text-sm text-[#EF4444]" selectable>{formError}</Text> : null}
+        <View className="gap-3 pt-2">
+          <PrimaryButton disabled={!code.trim() || isSubmitting} label={isSubmitting ? t("auth.verifying") : t("auth.verify")} onPress={() => void verify()} />
+          <PrimaryButton disabled={isSubmitting} label={t("auth.resendCode")} onPress={() => void resend()} />
+        </View>
       </AppScreen>
     );
   }
@@ -108,53 +120,62 @@ export function SignUpScreen({ destination }: Props) {
   return (
     <AppScreen>
       <View className="gap-2">
-        <Text className="text-3xl font-bold text-app-text" selectable>{t("auth.createAccountTitle")}</Text>
-        <Text className="text-base leading-6 text-app-muted" selectable>{t("auth.createAccountSubtitle")}</Text>
+        <Text className="text-3xl font-bold text-[#111111]" selectable>{t("auth.createAccountTitle")}</Text>
+        <Text className="text-base leading-6 text-[#737373]" selectable>{t("auth.createAccountSubtitle")}</Text>
       </View>
-      <AuthField
-        autoCapitalize="words"
-        autoComplete="name"
-        error={errors.fields.firstName?.message ?? errors.fields.lastName?.message}
-        label={t("auth.name")}
-        onChangeText={setFullName}
-        returnKeyType="next"
-        textContentType="name"
-        value={fullName}
-      />
-      <AuthField
-        autoCapitalize="none"
-        autoComplete="email"
-        error={errors.fields.emailAddress?.message}
-        keyboardType="email-address"
-        label={t("auth.email")}
-        onChangeText={setEmailAddress}
-        returnKeyType="next"
-        textContentType="emailAddress"
-        value={emailAddress}
-      />
-      <AuthField
-        autoComplete="new-password"
-        error={errors.fields.password?.message}
-        label={t("auth.password")}
-        onChangeText={setPassword}
-        onSubmitEditing={() => void submit()}
-        returnKeyType="done"
-        secureTextEntry
-        textContentType="newPassword"
-        value={password}
-      />
+
+      <View className="gap-4">
+        <AuthField
+          autoCapitalize="words"
+          autoComplete="name"
+          error={errors.fields.firstName?.message ?? errors.fields.lastName?.message}
+          label={t("auth.name")}
+          onChangeText={setFullName}
+          returnKeyType="next"
+          textContentType="name"
+          value={fullName}
+        />
+        <AuthField
+          autoCapitalize="none"
+          autoComplete="email"
+          error={errors.fields.emailAddress?.message}
+          keyboardType="email-address"
+          label={t("auth.email")}
+          onChangeText={setEmailAddress}
+          returnKeyType="next"
+          textContentType="emailAddress"
+          value={emailAddress}
+        />
+        <AuthField
+          autoComplete="new-password"
+          error={errors.fields.password?.message}
+          label={t("auth.password")}
+          onChangeText={setPassword}
+          onSubmitEditing={() => void submit()}
+          returnKeyType="done"
+          secureTextEntry
+          textContentType="newPassword"
+          value={password}
+        />
+      </View>
+
       <View nativeID="clerk-captcha" />
-      {formError ? <Text accessibilityLiveRegion="polite" className="text-sm text-app-error" selectable>{formError}</Text> : null}
-      <PrimaryButton
-        disabled={!fullName.trim() || !emailAddress.trim() || !password || isSubmitting}
-        label={isSubmitting ? t("auth.creatingAccount") : t("auth.createAccount")}
-        onPress={() => void submit()}
-      />
-      <View className="min-h-11 flex-row flex-wrap items-center justify-center gap-1">
-        <Text className="text-sm text-app-muted">{t("auth.haveAccount")}</Text>
+
+      {formError ? <Text accessibilityLiveRegion="polite" className="text-sm text-[#EF4444]" selectable>{formError}</Text> : null}
+
+      <View className="pt-2">
+        <PrimaryButton
+          disabled={!fullName.trim() || !emailAddress.trim() || !password || isSubmitting}
+          label={isSubmitting ? t("auth.creatingAccount") : t("auth.createAccount")}
+          onPress={() => void submit()}
+        />
+      </View>
+
+      <View className="mt-auto min-h-11 flex-row flex-wrap items-center justify-center gap-1 pt-6">
+        <Text className="text-sm text-[#737373]">{t("auth.haveAccount")}</Text>
         <Link
           className="py-3 text-sm font-semibold text-[#111111] underline"
-          href={{ pathname: "/(auth)/sign-in", params: { destination: getAuthDestinationKey(destination) } }}
+          href={{ pathname: "/(auth)/email-sign-in", params: { destination: getAuthDestinationKey(destination) } }}
         >
           {t("auth.signInAction")}
         </Link>
@@ -162,3 +183,4 @@ export function SignUpScreen({ destination }: Props) {
     </AppScreen>
   );
 }
+

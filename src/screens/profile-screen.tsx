@@ -105,7 +105,7 @@ function ProfileContent({ identity, latestWeightKg, profile }: { identity: { ema
           {identity.email ? <Text className="text-sm text-app-muted" numberOfLines={1} selectable>{identity.email}</Text> : null}
           <View className={isPremium ? "flex-row items-center gap-1.5 rounded-full bg-[#111111] px-3 py-1.5" : "flex-row items-center gap-1.5 rounded-full bg-app-surface px-3 py-1.5"}>
             <AppIcon color={isPremium ? "#FFFFFF" : "#737373"} name={isPremium ? "subscription" : "profile"} size={15} weight="semibold" />
-            <Text className={isPremium ? "text-xs font-semibold text-white" : "text-xs font-semibold text-app-muted"} selectable>{isPremium ? t("profile.premium") : t("profile.freePlan")}</Text>
+            <Text className={isPremium ? "text-sm font-semibold text-white" : "text-sm font-semibold text-app-muted"} selectable>{isPremium ? t("profile.premium") : t("profile.freePlan")}</Text>
           </View>
         </View>
         <Link href="/(app)/settings/personal-details" asChild>
@@ -150,9 +150,9 @@ function ProfileContent({ identity, latestWeightKg, profile }: { identity: { ema
 function SummaryValue({ label, supporting, value }: { label: string; supporting: string; value: string }) {
   return (
     <View className="min-w-0 flex-1 items-center gap-2 px-2">
-      <Text className="text-center text-xs leading-4 text-app-muted" selectable>{label}</Text>
+      <Text className="text-center text-sm font-semibold text-app-muted" selectable>{label}</Text>
       <Text className="text-center text-base font-bold leading-5 text-app-text" selectable>{value}</Text>
-      <Text className="text-center text-[11px] leading-4 text-app-muted" selectable>{supporting}</Text>
+      <Text className="text-center text-xs font-medium leading-4 text-app-muted" selectable>{supporting}</Text>
     </View>
   );
 }
@@ -161,7 +161,7 @@ function SettingsSection({ items, title }: { items: Setting[]; title?: string })
   const { t } = useTranslation();
   return (
     <View className="gap-3">
-      {title ? <Text accessibilityRole="header" className="px-1 text-lg font-semibold text-app-muted" selectable>{title}</Text> : null}
+      {title ? <Text accessibilityRole="header" className="px-1 text-lg font-bold text-app-text" selectable>{title}</Text> : null}
       <View className="overflow-hidden rounded-3xl border border-app-border bg-white" style={{ borderCurve: "continuous" }}>
         {items.map((item, index) => {
           const color = item.destructive ? "#DC2626" : "#111111";

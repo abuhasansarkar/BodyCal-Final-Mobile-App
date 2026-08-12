@@ -41,7 +41,13 @@ function ConfiguredNotificationRoute() {
       const hasEnabledReminder = Object.values(selection).some(Boolean);
       const permission = hasEnabledReminder ? await requestNotificationPermission() : null;
       await sync({ email: user.primaryEmailAddress?.emailAddress ?? "", name: user.fullName ?? undefined, avatarUrl: user.imageUrl ?? undefined });
-      const plan = calculateNutritionPlan(draft);
+
+      // Prefer AI plan if it was successfully generated; fall back to local calculator
+      const localPlan = calculateNutritionPlan(draft);
+      const plan = draft.aiPlan ?? localPlan;
+      const formulaVersion: "openai-v1" | "mifflin-st-jeor-v1" =
+        draft.aiPlan?.formulaVersion === "openai-v1" ? "openai-v1" : "mifflin-st-jeor-v1";
+
       const now = new Date();
       await updatePreferences({
         categories: selection,
@@ -68,7 +74,14 @@ function ConfiguredNotificationRoute() {
         carbsGrams: plan.carbsGrams,
         fatGrams: plan.fatGrams,
         effectiveFrom: now.toISOString().slice(0, 10),
-        calculationMetadata: { ...draft, bmr: plan.bmr, tdee: plan.tdee, formulaVersion: plan.formulaVersion },
+        formulaVersion,
+        calculationMetadata: {
+          ...draft,
+          bmr: "bmr" in localPlan ? localPlan.bmr : undefined,
+          tdee: "tdee" in localPlan ? localPlan.tdee : undefined,
+          formulaVersion,
+          aiGenerated: formulaVersion === "openai-v1",
+        },
       });
       await clear();
       router.replace("/(app)/paywall");

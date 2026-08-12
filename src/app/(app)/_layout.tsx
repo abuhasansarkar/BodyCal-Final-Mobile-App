@@ -1,19 +1,34 @@
 import { useAuth } from "@clerk/expo";
+import { useConvexAuth, useQuery } from "convex/react";
 import { Redirect } from "expo-router";
 import { Stack } from "expo-router/stack";
 
 import { hasBackendConfiguration } from "@/config/env";
+import { appAccessDestinations, resolveAppAccess } from "@/features/auth/app-access-gate";
+import { api } from "@/lib/convex-api";
+import { StartupScreen } from "@/screens/startup-screen";
 
 function ProtectedAppLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return null;
-  if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
+  const { isAuthenticated, isLoading: convexLoading } = useConvexAuth();
+  const current = useQuery(api.users.getCurrent, isAuthenticated ? {} : "skip");
+  const decision = resolveAppAccess({
+    currentUser: current,
+    isAuthLoaded: isLoaded,
+    isConvexAuthenticated: isAuthenticated,
+    isConvexLoading: convexLoading,
+    isSignedIn: isSignedIn ?? false,
+  });
+
+  if (decision === appAccessDestinations.loading) return <StartupScreen />;
+  if (decision === appAccessDestinations.signIn) return <Redirect href={appAccessDestinations.signIn} />;
+  if (decision === appAccessDestinations.onboarding) return <Redirect href={appAccessDestinations.onboarding} />;
   return <AppStack />;
 }
 
 function AppStack() {
   return (
-    <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
+    <Stack screenOptions={{ contentStyle: { backgroundColor: "#FFFFFF" }, headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="add-food" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5, 1], title: "Add food" }} />
       <Stack.Screen name="paywall" options={{ presentation: "fullScreenModal", headerShown: false }} />

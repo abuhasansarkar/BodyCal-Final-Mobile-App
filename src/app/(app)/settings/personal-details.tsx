@@ -1,2 +1,5 @@
-import { FeatureScreen } from "@/screens/feature-screen";
-export default function Route() { return <FeatureScreen title="Personal details" description="Update the name and inputs used by your calorie estimate." />; }
+import { SettingsPersonalDetailsScreen } from "@/screens/settings-personal-details-screen";
+
+export default function PersonalDetailsRoute() {
+  return <SettingsPersonalDetailsScreen />;
+}

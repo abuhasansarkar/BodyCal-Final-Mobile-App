@@ -13,6 +13,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: true,
+        sceneStyle: { backgroundColor: "#FFFFFF" },
         tabBarActiveTintColor: "#111111",
         tabBarInactiveTintColor: "#737373",
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
@@ -20,7 +21,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="today" options={{ headerRightContainerStyle: { paddingRight: 12 }, headerShadowVisible: false, headerTitle: () => <BrandTitle />, headerTitleAlign: "left", title: t("tabs.home"), tabBarIcon: ({ color }) => <TabIcon color={color} name="home" /> }} />
-      <Tabs.Screen name="progress" options={{ title: t("tabs.progress"), tabBarIcon: ({ color }) => <TabIcon color={color} name="progress" /> }} />
+      <Tabs.Screen name="progress" options={{ headerShown: false, title: t("tabs.progress"), tabBarIcon: ({ color }) => <TabIcon color={color} name="progress" /> }} />
       <Tabs.Screen
         name="scan"
         listeners={{ tabPress: (event) => { event.preventDefault(); router.push("/(app)/scan/camera"); } }}
@@ -32,7 +33,7 @@ export default function TabsLayout() {
           tabBarLabel: () => null,
         }}
       />
-      <Tabs.Screen name="foods" options={{ title: t("tabs.foods"), tabBarIcon: ({ color }) => <TabIcon color={color} name="foods" /> }} />
+      <Tabs.Screen name="foods" options={{ headerShown: false, title: t("tabs.foods"), tabBarIcon: ({ color }) => <TabIcon color={color} name="foods" /> }} />
       <Tabs.Screen name="profile" options={{ title: t("tabs.profile"), tabBarIcon: ({ color }) => <TabIcon color={color} name="profile" /> }} />
     </Tabs>
   );

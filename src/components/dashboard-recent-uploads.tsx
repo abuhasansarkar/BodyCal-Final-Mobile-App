@@ -74,8 +74,8 @@ export function DashboardRecentUploads({ items }: { items: RecentUpload[] }) {
               )}
               <View className="min-w-0 flex-1 gap-1">
                 <Text className="text-base font-semibold text-app-text" numberOfLines={1} selectable>{item.foodName}</Text>
-                <Text className="text-xs text-app-muted" numberOfLines={1} selectable>{dateTime.format(new Date(item.createdAt))}</Text>
-                <Text className="text-xs text-app-muted" numberOfLines={1} selectable>
+                <Text className="text-sm font-medium text-app-muted" numberOfLines={1} selectable>{dateTime.format(new Date(item.createdAt))}</Text>
+                <Text className="text-sm font-medium text-app-muted" numberOfLines={1} selectable>
                   {t("dashboard.recentNutrition", {
                     protein: number.format(item.proteinGrams),
                     carbs: number.format(item.carbsGrams),
@@ -85,7 +85,7 @@ export function DashboardRecentUploads({ items }: { items: RecentUpload[] }) {
               </View>
               <View className="items-end gap-2">
                 <Text className="text-sm font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>{number.format(item.calories)}</Text>
-                <Text className="text-xs text-app-muted" selectable>{t("dashboard.kcal")}</Text>
+                <Text className="text-sm font-medium text-app-muted" selectable>{t("dashboard.kcal")}</Text>
               </View>
               <AppIcon color="#737373" name="chevronRight" size={18} />
             </Pressable>

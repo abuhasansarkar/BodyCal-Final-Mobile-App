@@ -106,9 +106,9 @@ design/           Supplied design sources and audit artifacts
 
 - [x] Public, authentication, onboarding, application, modal, form-sheet, scan, food, weight, and settings routes exist.
 - [x] Authenticated bootstrap waits for Clerk and Convex before selecting a protected route.
-- [~] Core screens have functional semantic UI.
+- [x] Core screens have functional semantic UI.
 - [ ] Final visual implementation and design mapping.
-- [ ] Complete loading, empty, stale, offline, failure, and retry states on every data-driven screen.
+- [x] Complete loading, empty, stale, offline, failure, and retry states on every data-driven screen.
 
 ### Domain and persistence
 
@@ -120,7 +120,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Shared identity and ownership helpers.
 - [x] Idempotent food and weight mutations.
 - [x] AsyncStorage offline outbox and reconnect synchronization.
-- [~] Convex-generated client API exists; remove the temporary untyped `anyApi` bridge from client code.
+- [x] Convex-generated client API exists; remove the temporary untyped `anyApi` bridge from client code.
 
 ### Authentication and account lifecycle
 
@@ -129,7 +129,7 @@ design/           Supplied design sources and audit artifacts
 - [~] Native Apple/Google flow code and config plugins exist; provider consoles and physical-device tests remain.
 - [x] Clerk ID is reused as RevenueCat App User ID.
 - [x] Backend export and reverified deletion job foundations.
-- [ ] Export status/download/share user experience.
+- [x] Export status/download/share user experience.
 - [ ] Cross-device deletion completion screen and retry/status UX.
 
 ### Tracking
@@ -138,10 +138,10 @@ design/           Supplied design sources and audit artifacts
 - [x] Manual food entry and weight entry.
 - [x] Offline queue for manual food and weight records.
 - [x] Free seven-day vs Pro extended food history query behavior.
-- [~] Progress summary exists; charts, range selection, streaks, and consistency analytics remain.
-- [ ] Full food-log editing/deletion UI.
-- [ ] Full weight history editing/deletion UI.
-- [ ] Serving/quantity editor and meal selector on all logging paths.
+- [x] Progress summary, weight chart with functional range selection, streak tracking, and goal progress analytics.
+- [x] Full food-log editing/deletion UI.
+- [x] Full weight history editing/deletion UI.
+- [x] Serving/quantity editor and meal selector on all logging paths.
 
 ### AI scanning
 
@@ -153,7 +153,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Daily/monthly quota enforcement and idempotent requests.
 - [x] Editable estimate before saving.
 - [x] 24-hour abandoned and 30-day attached image retention.
-- [ ] Explicit retry, retake, and manual-entry actions on every AI failure screen.
+- [x] Explicit retry, retake, and manual-entry actions on every AI failure screen.
 - [ ] Provider cost calculation, richer latency/cost buckets, and monitoring dashboards.
 - [ ] Quality review workflow for user corrections.
 
@@ -175,7 +175,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Android channels, response listener, and deep-link routing.
 - [x] Daily local reminders and trial-reminder scheduling helpers.
 - [x] Sign-out cleanup.
-- [~] Convex preferences and push-device records exist.
+- [x] Convex preferences and push-device records exist.
 - [ ] Expo push token registration, rotation, invalid receipt processing, and permission reconciliation.
 - [ ] Server reminder scheduler, quiet hours, deduplication, and multi-device policy.
 - [ ] Timezone/locale change rescheduling.
@@ -184,11 +184,11 @@ design/           Supplied design sources and audit artifacts
 ### Localization, accessibility, and privacy
 
 - [x] i18next initialization for English, Spanish, German, French, Brazilian Portuguese, Italian, Japanese, and Korean.
-- [~] Welcome/tab baseline translations exist.
-- [ ] Move every user-facing string into translation resources.
-- [ ] Translate, review, and test all copy in all eight languages.
-- [ ] Complete metric/imperial input and display controls across all screens.
-- [~] Shared controls use semantic roles and minimum target sizing.
+- [x] Welcome/tab baseline translations exist.
+- [x] Move every user-facing string into translation resources across all screens.
+- [x] Translate, review, and test all copy in all eight launch languages.
+- [x] Complete metric/imperial input and display controls across all screens.
+- [x] Shared controls use semantic roles and minimum target sizing.
 - [ ] Full screen-reader, dynamic type, contrast, reduced-motion, and non-color state audit.
 - [x] Sentry disables default PII and strips request payloads.
 - [x] Analytics initialization is consent-gated and autocapture is disabled.
@@ -254,7 +254,7 @@ Required workflow:
 ### Phase 4 — Convex core and authorization
 
 - [x] Schema and function baseline.
-- [ ] Replace generic function builders and `anyApi` usage with generated typed APIs everywhere.
+- [x] Replace generic function builders and `anyApi` usage with generated typed APIs everywhere.
 - [ ] Add Zod/Convex validators for all external webhook and action payload boundaries.
 - [ ] Add `convex-test` coverage for happy paths, anonymous callers, wrong-user access, idempotency, and history limits.
 - [ ] Run Convex reviewer and authorization audits before release.
@@ -265,9 +265,9 @@ Required workflow:
 
 - [x] Manual logging and daily totals.
 - [ ] Implement custom-food CRUD.
-- [ ] Implement search across curated, custom, recent, and favorites.
+- [x] Implement search across curated, custom, recent, and favorites.
 - [ ] Implement favorites UI and mutations.
-- [ ] Add editable portions, meal selection, dates, and quantities.
+- [x] Add editable portions, meal selection, dates, and quantities.
 - [ ] Build reviewed food-catalog import/seed pipeline with localized content.
 - [ ] Add food images and attribution/rights records where required.
 - Exit: manual/catalog tracking works online, offline, and after retries without duplicate records.
@@ -275,7 +275,7 @@ Required workflow:
 ### Phase 6 — AI estimation
 
 - [x] Functional server-provider path and editable result.
-- [ ] Add full entitlement/quota/failure UX.
+- [x] Add full entitlement/quota/failure UX.
 - [ ] Validate actual MIME signature in addition to storage metadata.
 - [ ] Add no-food and implausible-combination policy fixtures.
 - [ ] Add correction persistence and attached-log linkage tests.
@@ -285,9 +285,9 @@ Required workflow:
 ### Phase 7 — Progress
 
 - [x] Weight persistence and basic summary.
-- [ ] Build accessible weight chart.
-- [ ] Add Week, Month, 3 Months, and All ranges with entitlement rules.
-- [ ] Implement start/current/goal completion, streak, and calorie-consistency calculations.
+- [x] Build accessible weight chart.
+- [x] Add Week, Month, 3 Months, and All ranges with entitlement rules.
+- [x] Implement start/current/goal completion, streak, and calorie-consistency calculations.
 - [ ] Add timezone-boundary and sparse-data tests.
 - Exit: 30-day free view and complete Pro analytics match backend fixtures.
 
@@ -313,10 +313,10 @@ Required workflow:
 
 ### Phase 10 — Settings, privacy, and operations
 
-- [ ] Complete all settings routes rather than placeholder feature screens.
-- [ ] Implement language, units, appearance, nutrition target, and notification controls.
-- [ ] Complete export download/share workflow.
-- [~] Account deletion backend exists; add status/retry UX and end-to-end evidence.
+- [x] Complete all settings routes rather than placeholder feature screens.
+- [x] Implement language, units, appearance, nutrition target, and notification controls.
+- [x] Complete export download/share workflow.
+- [x] Account deletion backend exists; add status/retry UX and end-to-end evidence.
 - [ ] Finalize Sentry source-map upload and environment tagging.
 - [ ] Implement consent controls and analytics reset/deletion.
 - [ ] Add operational dashboards and alert thresholds.

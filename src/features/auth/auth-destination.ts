@@ -1,6 +1,6 @@
 export const authDestinations = {
   app: "/(app)/(tabs)/today",
-  onboarding: "/(onboarding)/ai-introduction",
+  onboarding: "/(onboarding)/goal",
   paywall: "/(app)/paywall",
 } as const;
 
