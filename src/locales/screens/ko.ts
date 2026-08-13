@@ -328,6 +328,8 @@ export const ko: ScreenTranslations = {
     clear: "검색 지우기",
     emptyTitle: "결과 없음",
     emptyDescription: "다른 단어로 검색하거나 직접 입력해 추가하세요.",
+    recommendationsEmptyTitle: "아직 음식이 없어요",
+    recommendationsEmptyDescription: "음식을 직접 추가하여 식사 기록을 시작하세요.",
     addManually: "직접 입력해 추가",
     catalogSection: "목표에 맞는 추천",
     recentSection: "최근 기록",

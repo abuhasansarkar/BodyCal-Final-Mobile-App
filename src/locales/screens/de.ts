@@ -334,6 +334,8 @@ export const de: ScreenTranslations = {
     clear: "Suche löschen",
     emptyTitle: "Keine Treffer",
     emptyDescription: "Versuche ein anderes Wort oder füge dieses Lebensmittel manuell hinzu.",
+    recommendationsEmptyTitle: "Noch keine Lebensmittel",
+    recommendationsEmptyDescription: "Füge ein Lebensmittel manuell hinzu, um deine Mahlzeiten zu erfassen.",
     addManually: "Manuell hinzufügen",
     catalogSection: "Vorschläge für dein Ziel",
     recentSection: "Kürzlich erfasst",

@@ -332,6 +332,8 @@ export const ptBR: ScreenTranslations = {
     clear: "Limpar busca",
     emptyTitle: "Nenhum resultado",
     emptyDescription: "Tente outra palavra ou adicione este alimento manualmente.",
+    recommendationsEmptyTitle: "Nenhum alimento ainda",
+    recommendationsEmptyDescription: "Adicione um alimento manualmente para começar a registrar suas refeições.",
     addManually: "Adicionar manualmente",
     catalogSection: "Sugestões para sua meta",
     recentSection: "Registrado recentemente",

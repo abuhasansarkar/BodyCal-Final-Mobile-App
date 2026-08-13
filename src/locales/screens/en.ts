@@ -332,6 +332,8 @@ export const en = {
     clear: "Clear search",
     emptyTitle: "No matches",
     emptyDescription: "Try another word, or add this food manually.",
+    recommendationsEmptyTitle: "No foods yet",
+    recommendationsEmptyDescription: "Add a food manually to start logging your meals.",
     addManually: "Add manually",
     catalogSection: "Suggested for your goal",
     recentSection: "Recently logged",

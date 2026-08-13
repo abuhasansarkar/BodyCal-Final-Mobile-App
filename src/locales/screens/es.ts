@@ -332,6 +332,8 @@ export const es: ScreenTranslations = {
     clear: "Borrar búsqueda",
     emptyTitle: "Sin resultados",
     emptyDescription: "Prueba otra palabra o añade este alimento manualmente.",
+    recommendationsEmptyTitle: "Aún no hay alimentos",
+    recommendationsEmptyDescription: "Añade un alimento manualmente para empezar a registrar tus comidas.",
     addManually: "Añadir manualmente",
     catalogSection: "Sugerencias para tu objetivo",
     recentSection: "Registrado recientemente",

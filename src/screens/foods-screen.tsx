@@ -73,7 +73,7 @@ function ConfiguredFoodsScreen() {
   );
   const recommended = useQuery(
     api.foods.getRecommendations,
-    searching ? "skip" : { goalType: goal, locale },
+    searching || profile === undefined ? "skip" : { goalType: goal, locale },
   );
 
   const foods = searching ? results : recommended;
@@ -185,32 +185,45 @@ function ConfiguredFoodsScreen() {
       ) : visible.length === 0 ? (
         <EmptyState
           action={t("foodSearch.addManually")}
-          description={t("foodSearch.emptyDescription")}
-          icon="search"
+          description={
+            searching
+              ? t("foodSearch.emptyDescription")
+              : t("foodSearch.recommendationsEmptyDescription")
+          }
+          icon={searching ? "search" : "foods"}
           onAction={() => router.push("/(app)/food/manual")}
-          title={t("foodSearch.emptyTitle")}
+          title={
+            searching ? t("foodSearch.emptyTitle") : t("foodSearch.recommendationsEmptyTitle")
+          }
         />
       ) : (
         <View className="gap-4">
+          {!searching ? (
+            <Text accessibilityRole="header" className="text-lg font-bold text-app-text">
+              {t("foodSearch.catalogSection")}
+            </Text>
+          ) : null}
           {visible.map((food) => (
             <FoodCard food={food} key={food._id} />
           ))}
         </View>
       )}
 
-      <View className="items-center gap-3 pb-4 pt-2">
-        <Text className="text-center text-xs text-app-muted" selectable>
-          {t("nutritionTargets.estimateNote")}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-app-border bg-white px-5 active:bg-app-surface"
-          onPress={() => router.push("/(app)/food/manual")}
-        >
-          <AppIcon color={colors.text} name="add" size={19} weight="semibold" />
-          <Text className="text-sm font-semibold text-app-text">{t("foodSearch.addManually")}</Text>
-        </Pressable>
-      </View>
+      {visible && visible.length > 0 ? (
+        <View className="items-center gap-3 pb-4 pt-2">
+          <Text className="text-center text-xs text-app-muted" selectable>
+            {t("nutritionTargets.estimateNote")}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            className="min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-app-border bg-white px-5 active:bg-app-surface"
+            onPress={() => router.push("/(app)/food/manual")}
+          >
+            <AppIcon color={colors.text} name="add" size={19} weight="semibold" />
+            <Text className="text-sm font-semibold text-app-text">{t("foodSearch.addManually")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </AppScreen>
   );
 }
@@ -223,22 +236,22 @@ function FoodCard({ food }: { food: CatalogItem }) {
     <Pressable
       accessibilityLabel={food.title}
       accessibilityRole="button"
-      className="min-h-[148px] overflow-hidden rounded-3xl border border-app-border bg-white active:bg-app-surface"
+      className="overflow-hidden rounded-3xl border border-app-border bg-white active:bg-app-surface"
       onPress={() => router.push({ pathname: "/(app)/food/[id]", params: { id: food._id } })}
       style={{ borderCurve: "continuous", boxShadow: shadows.card }}
     >
-      <View className="flex-row">
+      <View className="min-h-[148px] flex-row items-stretch">
         {food.imageUrl ? (
           <Image
             accessibilityLabel={food.title}
             cachePolicy="memory"
-            className="h-full w-[130px] bg-app-surface"
+            className="w-[120px] bg-app-surface"
             contentFit="cover"
             source={{ uri: food.imageUrl }}
             transition={200}
           />
         ) : (
-          <View className="h-full w-[130px] items-center justify-center bg-app-surface">
+          <View className="min-h-[148px] w-[120px] items-center justify-center self-stretch bg-app-surface">
             <AppIcon color={colors.muted} name="foods" size={30} />
           </View>
         )}

@@ -328,6 +328,8 @@ export const ja: ScreenTranslations = {
     clear: "検索をクリア",
     emptyTitle: "該当なし",
     emptyDescription: "別の語で検索するか、手入力で追加してください。",
+    recommendationsEmptyTitle: "食品はまだありません",
+    recommendationsEmptyDescription: "食品を手入力で追加して、食事の記録を始めましょう。",
     addManually: "手入力で追加",
     catalogSection: "目標に合わせたおすすめ",
     recentSection: "最近の記録",
