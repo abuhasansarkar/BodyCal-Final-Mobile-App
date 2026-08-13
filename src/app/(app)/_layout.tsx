@@ -30,15 +30,28 @@ function ProtectedAppLayout() {
 function AppStack() {
   const { t } = useTranslation();
   return (
-    <Stack screenOptions={{ contentStyle: { backgroundColor: "#FFFFFF" }, headerBackButtonDisplayMode: "minimal" }}>
+    <Stack
+      screenOptions={{
+        contentStyle: { backgroundColor: "#FFFFFF" },
+        headerBackButtonDisplayMode: "minimal",
+        /*
+          Every screen in this group draws its own heading, and an undeclared
+          route falls back to its file path for the header title — which is why
+          headers read "food/log/[id]" and "settings/nutrition-targets". Blanking
+          it leaves the back chevron and lets each screen's own title stand.
+          Sheets below opt back in with `headerTitle`.
+        */
+        headerTitle: "",
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="add-food" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5, 1], title: t("authFlow.addSheetTitle") }} />
+      <Stack.Screen name="add-food" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5, 1], headerTitle: t("authFlow.addSheetTitle") }} />
       <Stack.Screen name="paywall" options={{ presentation: "fullScreenModal", headerShown: false }} />
       <Stack.Screen name="benefits" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="review" options={{ headerShown: false }} />
       <Stack.Screen name="thank-you" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="scan/camera" options={{ headerShown: false }} />
-      <Stack.Screen name="weight/add" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5], title: t("weight.addTitle") }} />
+      <Stack.Screen name="weight/add" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5], headerTitle: t("weight.addTitle") }} />
     </Stack>
   );
 }

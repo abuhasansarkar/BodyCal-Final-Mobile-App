@@ -1,6 +1,6 @@
 import { useClerk, useUser } from "@clerk/expo";
 import { useQuery } from "convex/react";
-import { Link, Tabs } from "expo-router";
+import { Link } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
@@ -77,20 +77,18 @@ function ProfileContent({ identity, latestWeightKg, profile }: { identity: { ema
   const toGo = currentKg !== null && profile ? Math.abs(currentKg - profile.goalWeightKg) : null;
 
   return (
-    <AppScreen>
-      <Tabs.Screen
-        options={{
-          headerRight: () => (
-            <Link href="/(app)/settings/notifications" asChild>
-              <Pressable accessibilityLabel={t("profile.settings.notifications")} accessibilityRole="button" className="h-11 w-11 items-center justify-center rounded-full active:bg-app-surface">
-                <AppIcon name="notification" size={23} />
-              </Pressable>
-            </Link>
-          ),
-          headerShadowVisible: false,
-          title: t("profile.title"),
-        }}
-      />
+    <AppScreen edges={["top", "left", "right"]}>
+      {/* Native tabs render no header, so the title and its action live here. */}
+      <View className="flex-row items-center justify-between gap-3">
+        <Text accessibilityRole="header" className="min-w-0 flex-1 text-[28px] font-bold tracking-[-0.6px] text-app-text" numberOfLines={1} selectable>
+          {t("profile.title")}
+        </Text>
+        <Link href="/(app)/settings/notifications" asChild>
+          <Pressable accessibilityLabel={t("profile.settings.notifications")} accessibilityRole="button" className="h-11 w-11 items-center justify-center rounded-full active:bg-app-surface">
+            <AppIcon name="notification" size={23} />
+          </Pressable>
+        </Link>
+      </View>
 
       <View className="flex-row items-center gap-4 px-1 py-2">
         {identity.imageUrl ? (

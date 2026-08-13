@@ -2,7 +2,8 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
-import { Image, Link, Pressable, Text, View } from "@/tw";
+import { FoodThumbnail } from "@/components/food-thumbnail";
+import { Link, Pressable, Text, View } from "@/tw";
 
 export type RecentUpload = {
   _id: string;
@@ -58,20 +59,7 @@ export function DashboardRecentUploads({ items }: { items: RecentUpload[] }) {
               className={index === items.length - 1 ? "min-h-24 flex-row items-center gap-3 p-3 active:bg-app-surface" : "min-h-24 flex-row items-center gap-3 border-b border-app-border p-3 active:bg-app-surface"}
               onPress={() => router.push({ pathname: "/(app)/food/log/[id]", params: { id: item._id } })}
             >
-              {item.imageUrl ? (
-                <Image
-                  accessibilityLabel={t("dashboard.mealPhoto", { name: item.foodName })}
-                  cachePolicy="memory"
-                  className="h-[76px] w-[76px] rounded-2xl bg-app-surface"
-                  contentFit="cover"
-                  source={{ uri: item.imageUrl }}
-                  transition={150}
-                />
-              ) : (
-                <View accessibilityLabel={t("dashboard.noMealPhoto")} className="h-[76px] w-[76px] items-center justify-center rounded-2xl bg-app-surface">
-                  <AppIcon color="#737373" name="foods" size={28} />
-                </View>
-              )}
+              <FoodThumbnail className="h-19 w-19 rounded-2xl bg-app-surface" imageUrl={item.imageUrl} name={item.foodName} />
               <View className="min-w-0 flex-1 gap-1">
                 <Text className="text-base font-semibold text-app-text" numberOfLines={1} selectable>{item.foodName}</Text>
                 <Text className="text-sm font-medium text-app-muted" numberOfLines={1} selectable>{dateTime.format(new Date(item.createdAt))}</Text>

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { FoodThumbnail } from "@/components/food-thumbnail";
 import { PrimaryButton } from "@/components/primary-button";
 import { hasBackendConfiguration } from "@/config/env";
 import { api } from "@/lib/convex-api";
@@ -147,6 +148,14 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
 
   return (
     <AppScreen>
+      {/*
+        `getById` returns the stored document, which carries `imageStorageId` but
+        no resolved URL, so this is always the generic placeholder for now.
+        Showing the entry's own photo needs the storage URL resolving in the
+        query, the way `dashboard.getRecentUploads` already does.
+      */}
+      <FoodThumbnail className="h-52 w-full rounded-3xl bg-app-surface" imageUrl={null} name={foodName} />
+
       <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">
         {t("foodLogEdit.title")}
       </Text>

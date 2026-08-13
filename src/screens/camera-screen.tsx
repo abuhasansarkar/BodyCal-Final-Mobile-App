@@ -1,5 +1,4 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React from "react";
@@ -9,7 +8,10 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { PrimaryButton } from "@/components/primary-button";
-import { Pressable, ScrollView, Text, View } from "@/tw";
+// `Image` comes from the tw wrapper, not expo-image directly: only the wrapper
+// pipes `className` through to a style. Imported bare, the hero's sizing classes
+// were dropped and it collapsed to zero height.
+import { Image, Pressable, ScrollView, Text, View } from "@/tw";
 
 const scanHero = require("@/../assets/images/welcome-food-scan-hero.png");
 
@@ -65,11 +67,13 @@ function CameraEducation({ canAskAgain, onBack, onContinue }: { canAskAgain: boo
 
         <View className="gap-1 rounded-[28px] border border-[#EEEEEE] bg-white p-5" style={{ borderCurve: "continuous", boxShadow: "0 8px 28px rgba(0, 0, 0, 0.06)" }}>
           <Text accessibilityRole="header" className="pb-2 text-[28px] font-bold tracking-[-0.6px] text-[#111111]" selectable>{t("camera.bestScan")}</Text>
+          {/* Icons follow camera-open-before.png: viewfinder, sun, eye. */}
           <TipRow icon="scan" label={t("camera.holdStill")} />
-          <TipRow icon="appearance" label={t("camera.useLight")} />
-          <TipRow icon="analysis" label={t("camera.showIngredients")} />
+          <TipRow icon="light" label={t("camera.useLight")} />
+          <TipRow icon="eye" label={t("camera.showIngredients")} />
           {!canAskAgain ? <Text accessibilityRole="alert" className="px-1 pb-2 pt-3 text-center text-sm leading-5 text-[#737373]" selectable>{t("camera.settingsDescription")}</Text> : null}
-          <PrimaryButton className="mt-3 min-h-[60px] rounded-2xl" icon={canAskAgain ? "camera" : "settings"} label={canAskAgain ? t("camera.gotIt") : t("camera.openSettings")} labelClassName="text-[18px]" onPress={onContinue} />
+          {/* The reference CTA carries no icon; the settings variant is an adaptation. */}
+          <PrimaryButton className="mt-3 min-h-[60px] rounded-2xl" icon={canAskAgain ? undefined : "settings"} label={canAskAgain ? t("camera.gotIt") : t("camera.openSettings")} labelClassName="text-[18px]" onPress={onContinue} />
         </View>
       </ScrollView>
     </SafeAreaView>

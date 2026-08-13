@@ -1,6 +1,6 @@
 import { useUser } from "@clerk/expo";
 import { useConvexConnectionState, useQuery } from "convex/react";
-import { router, Tabs } from "expo-router";
+import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,7 @@ import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
 import { DashboardRecentUploads, type RecentUpload } from "@/components/dashboard-recent-uploads";
 import { DashboardWeekCarousel } from "@/components/dashboard-week-carousel";
+import { FoodThumbnail } from "@/components/food-thumbnail";
 import { hasBackendConfiguration } from "@/config/env";
 import { atLocalNoon } from "@/features/dashboard/week-range";
 import { api } from "@/lib/convex-api";
@@ -15,9 +16,10 @@ import { currentLocalDate } from "@/lib/local-day";
 import { Image, Link, Pressable, Text, View } from "@/tw";
 
 const scanHero = require("@/../assets/images/welcome-food-scan-hero.png");
-const proteinFoodImage = require("@/../assets/images/food (2).png");
-const carbsFoodImage = require("@/../assets/images/food (3).png");
-const fatFoodImage = require("@/../assets/images/food (1).png");
+const brandLogo = require("@/../assets/images/BodyCal-Black-Logo.png");
+const proteinFoodImage = require("@/../assets/images/food-protein.png");
+const carbsFoodImage = require("@/../assets/images/food-carbs.png");
+const fatFoodImage = require("@/../assets/images/food-fat.png");
 
 type Nutrition = { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number };
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -154,8 +156,16 @@ function TodayContent({
   const calorieProgress = goal?.calories ? Math.min(100, Math.round((summary.calories / goal.calories) * 100)) : 0;
 
   return (
-    <AppScreen>
-      <Tabs.Screen options={{ headerRight: () => <LoggingStreakBadge value={loggingStreak} /> }} />
+    <AppScreen edges={["top", "left", "right"]}>
+      {/*
+        The brand lockup and streak used to be the navigator's header. Native
+        tabs render no header, so they live in the screen now — which also
+        matches `main-dashbaord.png`, where both sit above the week strip.
+      */}
+      <View className="flex-row items-center justify-between gap-3">
+        <BrandTitle />
+        <LoggingStreakBadge value={loggingStreak} />
+      </View>
       {isOffline ? (
         <View accessibilityLiveRegion="polite" className="flex-row items-center gap-2 rounded-2xl bg-app-surface px-4 py-3">
           <AppIcon color="#737373" name="warning" size={18} />
@@ -277,17 +287,31 @@ function MacroCard({ color, goal, image, label, value }: { color: string; goal?:
       </View>
       {/*
         `main-dashbaord.png` seats each macro photo in a circular tinted well at
-        the card's lower-left, not floating centred. `overflow-hidden` with a
-        cover fit keeps the circle clean whatever the source aspect ratio.
+        the card's lower-left.
+
+        The image needs a concrete size: `h-full` resolved to nothing here and the
+        well rendered empty. Every image that renders in this app is sized with
+        fixed classes, so this follows that. `contain` at 48pt inside the 56pt
+        well suits the sources, which are transparent cut-outs with padding — a
+        cover fit would crop into the middle of the food.
       */}
-      <View className="mt-auto h-14 w-14 overflow-hidden rounded-full bg-app-surface">
+      <View className="mt-auto h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-app-surface">
         <Image
           accessible={false}
-          className="h-full w-full"
-          contentFit="cover"
+          className="h-12 w-12"
+          contentFit="contain"
           source={image}
         />
       </View>
+    </View>
+  );
+}
+
+function BrandTitle() {
+  return (
+    <View className="min-w-0 flex-1 flex-row items-center gap-2">
+      <Image accessibilityLabel="BodyCal" className="h-11 w-11" contentFit="contain" source={brandLogo} />
+      <Text className="text-[26px] font-bold tracking-[-0.5px] text-app-text" numberOfLines={1}>BodyCal</Text>
     </View>
   );
 }
@@ -352,13 +376,7 @@ function MealSection({ canAdd, logs, meal, recentUploads }: { canAdd: boolean; l
   const firstPhoto = logs.length ? recentUploads.find((item) => item._id === logs[0]._id)?.imageUrl : null;
   return (
     <View className="min-h-24 flex-row items-start gap-3 rounded-3xl border border-app-border bg-white p-3.5" style={{ borderCurve: "continuous", boxShadow: "0 4px 18px rgba(0, 0, 0, 0.035)" }}>
-      {firstPhoto ? (
-        <Image accessibilityLabel={t("dashboard.mealPhoto", { name: logs[0].foodName })} cachePolicy="memory" className="h-[72px] w-[72px] rounded-2xl bg-app-surface" contentFit="cover" source={{ uri: firstPhoto }} transition={150} />
-      ) : (
-        <View className="h-[72px] w-[72px] items-center justify-center rounded-2xl bg-app-surface">
-          <AppIcon color="#737373" name="foods" size={24} />
-        </View>
-      )}
+      <FoodThumbnail className="h-18 w-18 rounded-2xl bg-app-surface" imageUrl={firstPhoto ?? null} name={logs[0]?.foodName ?? ""} />
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-sm font-semibold text-app-muted" selectable>
           {t(`dashboard.meals.${meal}`)}

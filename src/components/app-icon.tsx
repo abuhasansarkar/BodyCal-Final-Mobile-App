@@ -36,9 +36,12 @@ const appSymbols = {
   history: { ios: "clock.arrow.circlepath", android: "history", web: "history" },
   heart: { ios: "heart.fill", android: "favorite", web: "favorite" },
   home: { ios: "house.fill", android: "home", web: "home" },
+  /** Unselected tab-bar variant. Selected tabs use the filled symbol. */
+  homeOutline: { ios: "house", android: "home", web: "home" },
   hydration: { ios: "drop.fill", android: "water_drop", web: "water_drop" },
   info: { ios: "info.circle.fill", android: "info", web: "info" },
   language: { ios: "globe", android: "language", web: "language" },
+  light: { ios: "sun.max.fill", android: "light_mode", web: "light_mode" },
   lightActivity: { ios: "figure.walk", android: "directions_walk", web: "directions_walk" },
   logout: { ios: "rectangle.portrait.and.arrow.right", android: "logout", web: "logout" },
   macros: { ios: "chart.pie.fill", android: "pie_chart", web: "pie_chart" },
@@ -50,6 +53,8 @@ const appSymbols = {
   photos: { ios: "photo.on.rectangle", android: "photo_library", web: "photo_library" },
   privacy: { ios: "hand.raised.fill", android: "privacy_tip", web: "privacy_tip" },
   profile: { ios: "person.fill", android: "person", web: "person" },
+  /** Unselected tab-bar variant. Selected tabs use the filled symbol. */
+  profileOutline: { ios: "person", android: "person", web: "person" },
   progress: { ios: "chart.line.uptrend.xyaxis", android: "monitoring", web: "monitoring" },
   protein: { ios: "dumbbell.fill", android: "fitness_center", web: "fitness_center" },
   recommendedPace: { ios: "gauge.with.dots.needle.50percent", android: "speed", web: "speed" },
