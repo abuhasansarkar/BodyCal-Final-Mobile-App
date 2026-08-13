@@ -124,10 +124,6 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
         carbsGrams: Math.max(0, Number(carbsGrams) || 0),
         fatGrams: Math.max(0, Number(fatGrams) || 0),
         mealType,
-        source: log.source,
-        localDate: log.localDate,
-        timezone: log.timezone,
-        clientRequestId: log.clientRequestId,
       });
       router.back();
     } catch {

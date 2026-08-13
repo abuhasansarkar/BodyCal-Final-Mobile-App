@@ -18,16 +18,18 @@ type WeightLogItem = {
   localDate: string;
 };
 
+/** Shape returned by `weights.getProgress`, which no longer reads the whole history. */
 type ProgressData = {
-  profile: {
-    currentWeightKg?: number;
-    goalWeightKg?: number;
-    weightUnit?: "kg" | "lb";
-    goalType?: "lose" | "maintain" | "gain";
-  } | null;
-  first: WeightLogItem | null;
-  latest: WeightLogItem | null;
-  count: number;
+  startWeightKg: number | null;
+  startLocalDate: string | null;
+  latestWeightKg: number | null;
+  latestLocalDate: string | null;
+  goalWeightKg: number | null;
+  goalType: "lose" | "maintain" | "gain" | null;
+  profileWeightKg: number | null;
+  displayUnit: "kg" | "lb";
+  entryCount: number;
+  countIsCapped: boolean;
 };
 
 type RangeOption = "week" | "month" | "3m" | "all";
@@ -114,11 +116,11 @@ function ProgressContent({
     }
   };
 
-  const latestKg = progress?.latest?.normalizedKg ?? progress?.profile?.currentWeightKg ?? null;
-  const firstKg = progress?.first?.normalizedKg ?? null;
-  const goalKg = progress?.profile?.goalWeightKg ?? null;
-  const unit = progress?.profile?.weightUnit ?? "kg";
-  const isGain = (progress?.profile?.goalType ?? "lose") === "gain";
+  const latestKg = progress?.latestWeightKg ?? progress?.profileWeightKg ?? null;
+  const firstKg = progress?.startWeightKg ?? null;
+  const goalKg = progress?.goalWeightKg ?? null;
+  const unit = progress?.displayUnit ?? "kg";
+  const isGain = (progress?.goalType ?? "lose") === "gain";
 
   const convertVal = (kg: number) => (unit === "lb" ? kg * 2.2046226218 : kg);
   const formatNum = (kg: number | null) => {
@@ -186,7 +188,7 @@ function ProgressContent({
             <Text className="mt-1 text-lg font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
               {formatNum(firstKg)}{firstKg !== null ? <Text className="text-xs font-semibold text-app-muted"> {unit}</Text> : null}
             </Text>
-            <Text className="mt-0.5 text-xs font-medium text-app-muted">{formatDate(progress?.first?.localDate)}</Text>
+            <Text className="mt-0.5 text-xs font-medium text-app-muted">{formatDate(progress?.startLocalDate)}</Text>
           </View>
 
           <View className="h-10 w-px bg-app-border" />
@@ -196,7 +198,7 @@ function ProgressContent({
             <Text className="mt-1 text-lg font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
               {formatNum(latestKg)}{latestKg !== null ? <Text className="text-xs font-semibold text-app-muted"> {unit}</Text> : null}
             </Text>
-            <Text className="mt-0.5 text-xs font-medium text-app-muted">{formatDate(progress?.latest?.localDate)}</Text>
+            <Text className="mt-0.5 text-xs font-medium text-app-muted">{formatDate(progress?.latestLocalDate)}</Text>
           </View>
 
           <View className="h-10 w-px bg-app-border" />

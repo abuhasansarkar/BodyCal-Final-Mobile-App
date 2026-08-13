@@ -8,15 +8,18 @@ import { View } from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
 import { hasBackendConfiguration, publicEnv } from "@/config/env";
+import { colors } from "@/config/theme";
 import { SubscriptionProvider } from "@/features/subscription/subscription-provider";
 import { hydrateAppLanguage, i18n } from "@/locales/i18n";
 import { AnalyticsProvider } from "@/providers/analytics-provider";
 import { ConvexUserGate } from "@/providers/convex-user-gate";
 import { NotificationProvider } from "@/providers/notification-provider";
 import { OutboxSyncProvider } from "@/providers/outbox-sync-provider";
+import { PushRegistrationProvider } from "@/providers/push-registration-provider";
 
 const convexClient = publicEnv.convexUrl ? new ConvexReactClient(publicEnv.convexUrl) : null;
 
+/** Holds the first paint until translations are ready, so no key ever flashes. */
 function LocalizationGate({ children }: PropsWithChildren) {
   const [isReady, setIsReady] = React.useState(false);
 
@@ -24,7 +27,7 @@ function LocalizationGate({ children }: PropsWithChildren) {
     void hydrateAppLanguage().finally(() => setIsReady(true));
   }, []);
 
-  return isReady ? children : <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />;
+  return isReady ? children : <View style={{ flex: 1, backgroundColor: colors.background }} />;
 }
 
 function AuthenticatedProviders({ children }: PropsWithChildren) {
@@ -32,22 +35,25 @@ function AuthenticatedProviders({ children }: PropsWithChildren) {
   return (
     <ConvexUserGate>
       <SubscriptionProvider userId={user?.id}>
-        <OutboxSyncProvider>{children}</OutboxSyncProvider>
+        <PushRegistrationProvider>
+          <OutboxSyncProvider>{children}</OutboxSyncProvider>
+        </PushRegistrationProvider>
       </SubscriptionProvider>
     </ConvexUserGate>
   );
 }
 
 export function AppProviders({ children }: PropsWithChildren) {
-  const content = hasBackendConfiguration && convexClient && publicEnv.clerkPublishableKey ? (
-    <ClerkProvider publishableKey={publicEnv.clerkPublishableKey} tokenCache={tokenCache}>
-      <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
-        <AuthenticatedProviders>{children}</AuthenticatedProviders>
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
-  ) : (
-    <SubscriptionProvider>{children}</SubscriptionProvider>
-  );
+  const content =
+    hasBackendConfiguration && convexClient && publicEnv.clerkPublishableKey ? (
+      <ClerkProvider publishableKey={publicEnv.clerkPublishableKey} tokenCache={tokenCache}>
+        <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
+          <AuthenticatedProviders>{children}</AuthenticatedProviders>
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    ) : (
+      <SubscriptionProvider>{children}</SubscriptionProvider>
+    );
 
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>

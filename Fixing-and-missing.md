@@ -1,3 +1,11 @@
-<!-- 1. App loading isses: When app load, not show welcome or get started screen, automaticly redirect Onboaring goal screen. I want, when app load, show Spalsh screen and then Welcome or Get Started Screen.  Not Onboarding Goal Screen -->
+# Reported issues
 
-<!-- 2.  -->
+## 1. App opens on the onboarding goal screen instead of Welcome — FIXED
+
+Startup now resolves through `resolveStartupDestination`, which sends a user with
+`onboardingCompleted: false` to `/(public)/welcome`. Covered by
+`src/features/onboarding/startup-destination.test.ts`.
+
+## 2.
+
+<!-- Add the next issue here. -->

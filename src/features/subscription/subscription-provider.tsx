@@ -1,3 +1,4 @@
+import NetInfo from "@react-native-community/netinfo";
 import React, { type PropsWithChildren } from "react";
 import { AppState, type NativeEventSubscription } from "react-native";
 import Purchases, {
@@ -20,57 +21,56 @@ type SubscriptionContextValue = {
   error: string | null;
   refresh: () => Promise<void>;
   purchase: (plan: "annual" | "monthly") => Promise<void>;
-  restore: () => Promise<void>;
+  restore: () => Promise<{ restored: boolean }>;
   trialEligible: Record<"annual" | "monthly", boolean | null>;
 };
 
 const SubscriptionContext = React.createContext<SubscriptionContextValue | null>(null);
+
 let loggingConfigured = false;
-let revenueCatConfigurationQueue = Promise.resolve();
+let configurationQueue = Promise.resolve();
 
 function configureRevenueCatLogging() {
   if (loggingConfigured) return;
 
   Purchases.setLogHandler((level, message) => {
-    if (isNonFatalRevenueCatUiConfigMessage(message)) {
-      return;
-    }
-
-    const formattedMessage = `[RevenueCat] ${message}`;
-    switch (level) {
-      case LOG_LEVEL.ERROR:
-        console.error(formattedMessage);
-        break;
-      case LOG_LEVEL.WARN:
-        console.warn(formattedMessage);
-        break;
-      case LOG_LEVEL.INFO:
-        console.info(formattedMessage);
-        break;
-      case LOG_LEVEL.DEBUG:
-        console.debug(formattedMessage);
-        break;
-      default:
-        console.log(formattedMessage);
-    }
+    if (isNonFatalRevenueCatUiConfigMessage(message)) return;
+    // Only ERROR and WARN are surfaced. RevenueCat's INFO/DEBUG stream carries
+    // subscriber detail that must not reach console breadcrumbs or crash reports.
+    if (level === LOG_LEVEL.ERROR) console.error(`[RevenueCat] ${message}`);
+    else if (level === LOG_LEVEL.WARN) console.warn(`[RevenueCat] ${message}`);
   });
   loggingConfigured = true;
 }
 
-function ensureRevenueCatConfigured(apiKey: string, userId: string) {
-  revenueCatConfigurationQueue = revenueCatConfigurationQueue
+function ensureConfigured(apiKey: string, userId: string) {
+  configurationQueue = configurationQueue
     .catch(() => undefined)
     .then(async () => {
       if (!(await Purchases.isConfigured())) {
         Purchases.configure({ apiKey, appUserID: userId });
         return;
       }
-
-      if ((await Purchases.getAppUserID()) !== userId) {
-        await Purchases.logIn(userId);
-      }
+      if ((await Purchases.getAppUserID()) !== userId) await Purchases.logIn(userId);
     });
-  return revenueCatConfigurationQueue;
+  return configurationQueue;
+}
+
+/**
+ * Detaches RevenueCat from the signed-out account.
+ *
+ * Without this, the SDK keeps the previous Clerk id as its App User ID and the
+ * next person to use the device inherits that subscriber.
+ */
+export async function releaseRevenueCatIdentity() {
+  configurationQueue = configurationQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (!(await Purchases.isConfigured())) return;
+      if (await Purchases.isAnonymous()) return;
+      await Purchases.logOut().catch(() => undefined);
+    });
+  return configurationQueue;
 }
 
 function revenueCatKey() {
@@ -84,7 +84,10 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
   const [annualPackage, setAnnualPackage] = React.useState<PurchasesPackage | null>(null);
   const [monthlyPackage, setMonthlyPackage] = React.useState<PurchasesPackage | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [trialEligible, setTrialEligible] = React.useState<Record<"annual" | "monthly", boolean | null>>({ annual: null, monthly: null });
+  const [trialEligible, setTrialEligible] = React.useState<Record<"annual" | "monthly", boolean | null>>({
+    annual: null,
+    monthly: null,
+  });
   const key = revenueCatKey();
 
   const applyCustomerInfo = React.useCallback((info: CustomerInfo) => {
@@ -92,26 +95,41 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
     setError(null);
   }, []);
 
-  const refresh = React.useCallback(async () => {
-    if (!key || !userId) {
+  /**
+   * A network failure is reported as `offlineUnknown`, not `error`.
+   * RevenueCat serves a cached CustomerInfo when it can, and losing connectivity
+   * must never read as "your subscription is broken".
+   */
+  const handleFailure = React.useCallback(async (cause: unknown) => {
+    const network = await NetInfo.fetch().catch(() => null);
+    if (network && !network.isConnected) {
+      setState("offlineUnknown");
+      setError(null);
       return;
     }
+    setState("error");
+    setError(cause instanceof Error ? cause.message : "Unable to refresh subscription.");
+  }, []);
+
+  const refresh = React.useCallback(async () => {
+    if (!key || !userId) return;
     try {
       applyCustomerInfo(await Purchases.getCustomerInfo());
     } catch (cause) {
-      setState("error");
-      setError(cause instanceof Error ? cause.message : "Unable to refresh subscription.");
+      await handleFailure(cause);
     }
-  }, [applyCustomerInfo, key, userId]);
+  }, [applyCustomerInfo, handleFailure, key, userId]);
 
   React.useEffect(() => {
     if (!key || !userId) return;
     configureRevenueCatLogging();
+
     let cancelled = false;
     let listenerRegistered = false;
     let appStateSubscription: NativeEventSubscription | null = null;
     const listener = (info: CustomerInfo) => applyCustomerInfo(info);
-    void ensureRevenueCatConfigured(key, userId)
+
+    void ensureConfigured(key, userId)
       .then(async () => {
         if (cancelled) return;
         Purchases.addCustomerInfoUpdateListener(listener);
@@ -120,33 +138,40 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
           if (nextState === "active") void refresh();
         });
 
-        const [info, offerings] = await Promise.all([Purchases.getCustomerInfo(), Purchases.getOfferings()]);
+        const [info, offerings] = await Promise.all([
+          Purchases.getCustomerInfo(),
+          Purchases.getOfferings(),
+        ]);
         if (cancelled) return;
+
         applyCustomerInfo(info);
         const packages = offerings.current?.availablePackages ?? [];
-        setAnnualPackage(packages.find((item) => item.packageType === PACKAGE_TYPE.ANNUAL) ?? null);
-        setMonthlyPackage(packages.find((item) => item.packageType === PACKAGE_TYPE.MONTHLY) ?? null);
-        const annual = packages.find((item) => item.packageType === PACKAGE_TYPE.ANNUAL);
-        const monthly = packages.find((item) => item.packageType === PACKAGE_TYPE.MONTHLY);
-        const ids = [annual?.product.identifier, monthly?.product.identifier].filter((id): id is string => Boolean(id));
-        if (ids.length) {
-          void Purchases.checkTrialOrIntroductoryPriceEligibility(ids)
-            .then((eligibility) => {
-              if (!cancelled) setTrialEligible({
-                annual: annual ? eligibility[annual.product.identifier]?.status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE : null,
-                monthly: monthly ? eligibility[monthly.product.identifier]?.status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE : null,
-              });
-            })
-            .catch(() => {
-              if (!cancelled) setTrialEligible({ annual: null, monthly: null });
-            });
+        const annual = packages.find((item) => item.packageType === PACKAGE_TYPE.ANNUAL) ?? null;
+        const monthly = packages.find((item) => item.packageType === PACKAGE_TYPE.MONTHLY) ?? null;
+        setAnnualPackage(annual);
+        setMonthlyPackage(monthly);
+
+        const ids = [annual?.product.identifier, monthly?.product.identifier].filter(
+          (id): id is string => Boolean(id),
+        );
+        if (ids.length === 0) return;
+
+        try {
+          const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility(ids);
+          if (cancelled) return;
+          const eligible = (item: PurchasesPackage | null) =>
+            item
+              ? eligibility[item.product.identifier]?.status ===
+                INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+              : null;
+          setTrialEligible({ annual: eligible(annual), monthly: eligible(monthly) });
+        } catch {
+          // Unknown eligibility must never render as "eligible".
+          if (!cancelled) setTrialEligible({ annual: null, monthly: null });
         }
       })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setState("error");
-          setError(cause instanceof Error ? cause.message : "Unable to load subscription options.");
-        }
+      .catch(async (cause: unknown) => {
+        if (!cancelled) await handleFailure(cause);
       });
 
     return () => {
@@ -154,24 +179,40 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
       if (listenerRegistered) Purchases.removeCustomerInfoUpdateListener(listener);
       appStateSubscription?.remove();
     };
-  }, [applyCustomerInfo, key, refresh, userId]);
+  }, [applyCustomerInfo, handleFailure, key, refresh, userId]);
 
-  const purchase = React.useCallback(async (plan: "annual" | "monthly") => {
-    const selectedPackage = plan === "annual" ? annualPackage : monthlyPackage;
-    if (!selectedPackage) throw new Error("This subscription option is unavailable.");
-    const result = await Purchases.purchasePackage(selectedPackage);
-    applyCustomerInfo(result.customerInfo);
-  }, [annualPackage, applyCustomerInfo, monthlyPackage]);
+  const purchase = React.useCallback(
+    async (plan: "annual" | "monthly") => {
+      const selected = plan === "annual" ? annualPackage : monthlyPackage;
+      if (!selected) throw new Error("This subscription option is unavailable.");
+      const result = await Purchases.purchasePackage(selected);
+      applyCustomerInfo(result.customerInfo);
+    },
+    [annualPackage, applyCustomerInfo, monthlyPackage],
+  );
 
+  /** An empty restore is informative, not an error. */
   const restore = React.useCallback(async () => {
     if (!key || !userId) throw new Error("RevenueCat is not configured.");
-    applyCustomerInfo(await Purchases.restorePurchases());
+    const info = await Purchases.restorePurchases();
+    applyCustomerInfo(info);
+    return { restored: Object.keys(info.entitlements.active).length > 0 };
   }, [applyCustomerInfo, key, userId]);
 
-  const effectiveState = !key || !userId ? "free" : state;
-  const value = React.useMemo(() => ({
-    state: effectiveState, annualPackage, monthlyPackage, error, refresh, purchase, restore, trialEligible,
-  }), [annualPackage, effectiveState, error, monthlyPackage, purchase, refresh, restore, trialEligible]);
+  const effectiveState: SubscriptionState = !key || !userId ? "free" : state;
+  const value = React.useMemo(
+    () => ({
+      state: effectiveState,
+      annualPackage,
+      monthlyPackage,
+      error,
+      refresh,
+      purchase,
+      restore,
+      trialEligible,
+    }),
+    [annualPackage, effectiveState, error, monthlyPackage, purchase, refresh, restore, trialEligible],
+  );
 
   return <SubscriptionContext value={value}>{children}</SubscriptionContext>;
 }
@@ -180,4 +221,16 @@ export function useSubscription() {
   const value = React.use(SubscriptionContext);
   if (!value) throw new Error("useSubscription must be used inside SubscriptionProvider.");
   return value;
+}
+
+/** Single definition of "has premium access", used by every gated surface. */
+export const PRO_STATES: readonly SubscriptionState[] = [
+  "trial",
+  "active",
+  "cancelledActive",
+  "billingIssueActive",
+];
+
+export function isProState(state: SubscriptionState) {
+  return PRO_STATES.includes(state);
 }

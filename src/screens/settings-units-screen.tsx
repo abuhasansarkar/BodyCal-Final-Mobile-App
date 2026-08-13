@@ -1,102 +1,110 @@
 import { useMutation, useQuery } from "convex/react";
-import { router } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import { AppScreen } from "@/components/app-screen";
-import { PrimaryButton } from "@/components/primary-button";
+import { ChoiceRow, RowGroup } from "@/components/ui/rows";
+import { ScreenTitle, SectionHeader } from "@/components/ui/section-card";
+import { InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { api } from "@/lib/convex-api";
-import { Pressable, Text, View } from "@/tw";
+import { View } from "@/tw";
+import type { HeightUnit, WeightUnit } from "@/types/domain";
 
 export function SettingsUnitsScreen() {
-  if (hasBackendConfiguration) return <ConfiguredUnitsScreen />;
+  const { t } = useTranslation();
+  if (hasBackendConfiguration) return <ConfiguredUnits />;
   return (
     <AppScreen>
-      <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">Units</Text>
-      <Text className="text-app-muted">Configure Convex to save unit preferences.</Text>
+      <ScreenTitle description={t("unitSettings.subtitle")} title={t("unitSettings.title")} />
     </AppScreen>
   );
 }
 
-function ConfiguredUnitsScreen() {
+/**
+ * Display units only.
+ *
+ * Storage is always kilograms and centimetres; this screen changes presentation
+ * and is mirrored to `userSettings` so the choice follows the account.
+ */
+function ConfiguredUnits() {
+  const { t } = useTranslation();
   const profile = useQuery(api.profiles.getCurrent, {});
+  const updateProfile = useMutation(api.profiles.update);
+  const updateSettings = useMutation(api.settings.update);
+  const [notice, setNotice] = React.useState<{ message: string; tone: "success" | "error" } | null>(null);
 
   if (profile === undefined) {
-    return <AppScreen><Text className="text-app-muted">Loading unit settings…</Text></AppScreen>;
+    return (
+      <AppScreen>
+        <ScreenSkeleton lines={2} />
+      </AppScreen>
+    );
   }
 
-  return <UnitsForm key={profile?._id ?? "new"} profile={profile} />;
-}
+  const weightUnit: WeightUnit = profile?.weightUnit ?? "kg";
+  const heightUnit: HeightUnit = profile?.heightUnit ?? "cm";
 
-type ProfileUnitsRecord = {
-  weightUnit?: "kg" | "lb";
-  heightUnit?: "cm" | "imperial";
-} | null;
-
-function UnitsForm({ profile }: { profile: ProfileUnitsRecord }) {
-  const updateProfile = useMutation(api.profiles.update);
-
-  const [weightUnit, setWeightUnit] = React.useState<"kg" | "lb">(profile?.weightUnit ?? "kg");
-  const [heightUnit, setHeightUnit] = React.useState<"cm" | "imperial">(profile?.heightUnit ?? "cm");
-  const [saving, setSaving] = React.useState(false);
-  const [message, setMessage] = React.useState<string | null>(null);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage(null);
+  const save = async (next: { weightUnit?: WeightUnit; heightUnit?: HeightUnit }) => {
+    setNotice(null);
     try {
-      await updateProfile({
-        weightUnit,
-        heightUnit,
+      if (profile) await updateProfile(next);
+      const resolvedWeight = next.weightUnit ?? weightUnit;
+      const resolvedHeight = next.heightUnit ?? heightUnit;
+      await updateSettings({
+        units: resolvedWeight === "kg" && resolvedHeight === "cm" ? "metric" : "imperial",
       });
-      setMessage("Units updated.");
-      setTimeout(() => router.back(), 1000);
+      setNotice({ message: t("unitSettings.saved"), tone: "success" });
     } catch {
-      setMessage("Could not save unit preferences.");
-    } finally {
-      setSaving(false);
+      setNotice({ message: t("unitSettings.saveError"), tone: "error" });
     }
   };
 
   return (
     <AppScreen>
-      <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">Units System</Text>
-      <Text className="text-sm text-app-muted">Select measurement display and input units.</Text>
+      <ScreenTitle description={t("unitSettings.subtitle")} title={t("unitSettings.title")} />
 
-      <View className="gap-2">
-        <Text className="px-1 text-sm font-semibold text-app-text">Weight Unit</Text>
-        <View className="flex-row gap-3">
-          {(["kg", "lb"] as const).map((u) => (
-            <Pressable
-              key={u}
-              accessibilityRole="button"
-              className={weightUnit === u ? "flex-1 rounded-2xl bg-[#111111] py-3.5 items-center" : "flex-1 rounded-2xl border border-app-border bg-white py-3.5 items-center"}
-              onPress={() => setWeightUnit(u)}
-            >
-              <Text className={weightUnit === u ? "text-base font-bold text-white uppercase" : "text-base font-bold text-app-text uppercase"}>{u === "kg" ? "Kilograms (kg)" : "Pounds (lb)"}</Text>
-            </Pressable>
-          ))}
-        </View>
+      <View className="gap-3">
+        <SectionHeader icon="weight" title={t("unitSettings.weightUnit")} />
+        <RowGroup>
+          {[
+            <ChoiceRow
+              key="kg"
+              onPress={() => void save({ weightUnit: "kg" })}
+              selected={weightUnit === "kg"}
+              title={t("unitSettings.kilograms")}
+            />,
+            <ChoiceRow
+              key="lb"
+              onPress={() => void save({ weightUnit: "lb" })}
+              selected={weightUnit === "lb"}
+              title={t("unitSettings.pounds")}
+            />,
+          ]}
+        </RowGroup>
       </View>
 
-      <View className="gap-2">
-        <Text className="px-1 text-sm font-semibold text-app-text">Height Unit</Text>
-        <View className="flex-row gap-3">
-          {(["cm", "imperial"] as const).map((u) => (
-            <Pressable
-              key={u}
-              accessibilityRole="button"
-              className={heightUnit === u ? "flex-1 rounded-2xl bg-[#111111] py-3.5 items-center" : "flex-1 rounded-2xl border border-app-border bg-white py-3.5 items-center"}
-              onPress={() => setHeightUnit(u)}
-            >
-              <Text className={heightUnit === u ? "text-base font-bold text-white uppercase" : "text-base font-bold text-app-text uppercase"}>{u === "cm" ? "Centimeters (cm)" : "Feet & Inches (ft/in)"}</Text>
-            </Pressable>
-          ))}
-        </View>
+      <View className="gap-3">
+        <SectionHeader icon="units" title={t("unitSettings.heightUnit")} />
+        <RowGroup>
+          {[
+            <ChoiceRow
+              key="cm"
+              onPress={() => void save({ heightUnit: "cm" })}
+              selected={heightUnit === "cm"}
+              title={t("unitSettings.centimetres")}
+            />,
+            <ChoiceRow
+              key="imperial"
+              onPress={() => void save({ heightUnit: "imperial" })}
+              selected={heightUnit === "imperial"}
+              title={t("unitSettings.feetInches")}
+            />,
+          ]}
+        </RowGroup>
       </View>
 
-      {message ? <Text accessibilityLiveRegion="polite" className="px-1 text-sm text-app-muted">{message}</Text> : null}
-      <PrimaryButton disabled={saving} icon="check" label={saving ? "Saving…" : "Save unit settings"} onPress={() => void handleSave()} />
+      {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
     </AppScreen>
   );
 }

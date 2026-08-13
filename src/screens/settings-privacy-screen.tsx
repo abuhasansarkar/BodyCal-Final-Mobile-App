@@ -1,80 +1,200 @@
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
+import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import React from "react";
-import { Share } from "react-native";
+import { useTranslation } from "react-i18next";
 
+import { AppIcon } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
+import { NavigationRow, RowGroup, ToggleRow } from "@/components/ui/rows";
+import { ScreenTitle, SectionCard, SectionHeader } from "@/components/ui/section-card";
+import { InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
+import { colors } from "@/config/theme";
 import { api } from "@/lib/convex-api";
-import { currentLocalDate } from "@/lib/local-day";
+import { useAnalyticsConsent } from "@/providers/analytics-provider";
 import { Text, View } from "@/tw";
 
 export function SettingsPrivacyScreen() {
+  const { t } = useTranslation();
   if (hasBackendConfiguration) return <ConfiguredPrivacyScreen />;
   return (
     <AppScreen>
-      <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">Privacy Policy & Data</Text>
-      <Text className="text-app-muted">BodyCal stores your nutrition and weight data securely in Convex.</Text>
+      <ScreenTitle description={t("privacySettings.subtitle")} title={t("privacySettings.title")} />
+      <Safeguards />
     </AppScreen>
   );
 }
 
+function Safeguards() {
+  const { t } = useTranslation();
+  const points = [
+    t("privacySettings.retentionPhotos"),
+    t("privacySettings.retentionTelemetry"),
+    t("privacySettings.retentionSharing"),
+  ];
+
+  return (
+    <SectionCard>
+      <View className="gap-3">
+        <SectionHeader icon="privacy" title={t("privacySettings.safeguardsTitle")} />
+        <View className="gap-2.5">
+          {points.map((point) => (
+            <View className="flex-row gap-2.5" key={point}>
+              <View className="pt-1">
+                <AppIcon color={colors.muted} name="checkCircle" size={15} />
+              </View>
+              <Text className="min-w-0 flex-1 text-sm leading-5 text-app-muted" selectable>
+                {point}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </SectionCard>
+  );
+}
+
+/**
+ * Privacy and data controls.
+ *
+ * Export now runs through the server `exportJobs` pipeline and hands back a
+ * download URL. It previously serialised up to a thousand records into the OS
+ * share sheet as a plain text message.
+ */
 function ConfiguredPrivacyScreen() {
-  const profile = useQuery(api.profiles.getCurrent, {});
-  const logs = useQuery(api.foodLogs.getHistory, { fromDate: "2000-01-01", toDate: currentLocalDate(), limit: 500 });
-  const weights = useQuery(api.weights.getHistory, { limit: 500 });
+  const { t } = useTranslation();
+  const exportStatus = useQuery(api.users.getExportStatus, {});
+  const requestExport = useMutation(api.users.requestExport);
+  const updateSettings = useMutation(api.settings.update);
+  const { consent, isAvailable, setConsent } = useAnalyticsConsent();
 
-  const [exporting, setExporting] = React.useState(false);
+  const [requesting, setRequesting] = React.useState(false);
+  const [notice, setNotice] = React.useState<{ message: string; tone: "error" | "info" } | null>(null);
 
-  const handleExport = async () => {
-    setExporting(true);
+  if (exportStatus === undefined) {
+    return (
+      <AppScreen>
+        <ScreenSkeleton lines={3} />
+      </AppScreen>
+    );
+  }
+
+  const startExport = async () => {
+    setRequesting(true);
+    setNotice(null);
     try {
-      const payload = {
-        exportedAt: new Date().toISOString(),
-        profile,
-        foodLogs: logs ?? [],
-        weightLogs: weights ?? [],
-      };
-      const jsonStr = JSON.stringify(payload, null, 2);
-      await Share.share({
-        title: "BodyCal My Data Export",
-        message: jsonStr,
+      await requestExport({});
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "";
+      setNotice({
+        message: message.includes("rate")
+          ? t("privacySettings.exportRateLimited")
+          : t("privacySettings.exportFailed"),
+        tone: "error",
       });
-    } catch {
-      // Ignore share cancellation
     } finally {
-      setExporting(false);
+      setRequesting(false);
     }
+  };
+
+  const toggleAnalytics = async (granted: boolean) => {
+    await setConsent(granted);
+    // Mirror the choice server-side so it follows the account across devices.
+    await updateSettings({ analyticsConsent: granted }).catch(() => undefined);
   };
 
   return (
     <AppScreen>
-      <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">Privacy & Data Control</Text>
-      <Text className="text-sm text-app-muted">
-        Your health data belongs to you. You can export or delete your account records at any time.
-      </Text>
+      <ScreenTitle description={t("privacySettings.subtitle")} title={t("privacySettings.title")} />
 
-      <View className="gap-3 rounded-3xl border border-app-border bg-white p-5">
-        <Text className="text-base font-bold text-app-text">Privacy Safeguards</Text>
-        <View className="gap-2">
-          <Text className="text-sm leading-6 text-app-muted">
-            • Photos uploaded for AI scanning are retained for maximum 24h if abandoned, or 30 days if attached to a meal log.
-          </Text>
-          <Text className="text-sm leading-6 text-app-muted">
-            • Crash logs and analytics telemetry strictly scrub PII, photos, notes, and calorie amounts.
-          </Text>
-          <Text className="text-sm leading-6 text-app-muted">
-            • We never sell or share user nutrition data with third-party advertisers.
-          </Text>
+      <Safeguards />
+
+      <SectionCard>
+        <View className="gap-3">
+          <SectionHeader
+            description={t("privacySettings.exportDescription")}
+            icon="privacy"
+            title={t("privacySettings.exportTitle")}
+          />
+
+          {exportStatus?.status === "pending" ? (
+            <InlineNotice message={t("privacySettings.exportPending")} />
+          ) : exportStatus?.status === "failed" ? (
+            <InlineNotice message={t("privacySettings.exportFailed")} tone="error" />
+          ) : null}
+
+          {exportStatus?.status === "complete" && exportStatus.downloadUrl ? (
+            <View className="gap-2">
+              <Text className="text-sm font-semibold text-app-text" selectable>
+                {t("privacySettings.exportReadyTitle")}
+              </Text>
+              <Text className="text-[13px] leading-[18px] text-app-muted" selectable>
+                {t("privacySettings.exportReadyDescription")}
+              </Text>
+              <PrimaryButton
+                icon="privacy"
+                label={t("privacySettings.exportDownload")}
+                onPress={() => void WebBrowser.openBrowserAsync(exportStatus.downloadUrl!)}
+              />
+            </View>
+          ) : (
+            <PrimaryButton
+              disabled={requesting || exportStatus?.status === "pending"}
+              icon="privacy"
+              label={requesting ? t("common.saving") : t("privacySettings.exportStart")}
+              onPress={() => void startExport()}
+            />
+          )}
+
+          {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
         </View>
+      </SectionCard>
+
+      <View className="gap-3">
+        <SectionHeader
+          description={t("privacySettings.analyticsDescription")}
+          icon="analysis"
+          title={t("privacySettings.analyticsTitle")}
+        />
+        {isAvailable ? (
+          <RowGroup>
+            {[
+              <ToggleRow
+                icon="analysis"
+                key="analytics"
+                onValueChange={(value) => void toggleAnalytics(value)}
+                title={t("privacySettings.analyticsToggle")}
+                value={consent === "granted"}
+              />,
+            ]}
+          </RowGroup>
+        ) : (
+          <InlineNotice message={t("privacySettings.analyticsUnavailable")} />
+        )}
       </View>
 
-      <View className="gap-3 rounded-3xl border border-app-border bg-app-surface p-5">
-        <Text className="text-base font-bold text-app-text">Export Personal Data</Text>
-        <Text className="text-sm leading-6 text-app-muted">
-          Download a complete copy of your food logs, body weights, and profile settings in JSON format.
-        </Text>
-        <PrimaryButton icon="privacy" label={exporting ? "Exporting data…" : "Export My Data (JSON)"} onPress={() => void handleExport()} />
+      <View className="gap-3">
+        <SectionHeader title={t("privacySettings.policyTitle")} />
+        <RowGroup>
+          {[
+            <NavigationRow
+              icon="terms"
+              key="terms"
+              onPress={() => router.push("/(app)/settings/terms")}
+              title={t("termsSettings.title")}
+            />,
+            <NavigationRow
+              destructive
+              description={t("privacySettings.deleteDescription")}
+              icon="delete"
+              key="delete"
+              onPress={() => router.push("/(app)/settings/delete-account")}
+              title={t("privacySettings.deleteTitle")}
+            />,
+          ]}
+        </RowGroup>
       </View>
     </AppScreen>
   );

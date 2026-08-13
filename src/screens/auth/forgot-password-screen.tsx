@@ -1,13 +1,16 @@
 import { useSignIn } from "@clerk/expo";
 import { router } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
-import { AuthField } from "@/screens/auth/auth-fields";
-import { Text } from "@/tw";
+import { Field } from "@/components/ui/form";
+import { ScreenTitle } from "@/components/ui/section-card";
+import { InlineNotice } from "@/components/ui/states";
 
 export function ForgotPasswordScreen() {
+  const { t } = useTranslation();
   const { fetchStatus, signIn } = useSignIn();
   const [emailAddress, setEmailAddress] = React.useState("");
   const [message, setMessage] = React.useState<string | null>(null);
@@ -23,11 +26,22 @@ export function ForgotPasswordScreen() {
 
   return (
     <AppScreen>
-      <Text className="text-3xl font-bold text-app-text">Reset your password</Text>
-      <Text className="text-base leading-6 text-app-muted">We will send a one-time code to your verified email address.</Text>
-      <AuthField label="Email" autoCapitalize="none" keyboardType="email-address" value={emailAddress} onChangeText={setEmailAddress} />
-      {message ? <Text accessibilityLiveRegion="polite" className="text-sm text-app-error">{message}</Text> : null}
-      <PrimaryButton disabled={!emailAddress || fetchStatus === "fetching"} label="Send reset code" onPress={() => void submit()} />
+      <ScreenTitle description={t("authFlow.forgotBody")} title={t("authFlow.forgotTitle")} />
+      <Field
+        autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
+        label={t("auth.email")}
+        onChangeText={setEmailAddress}
+        value={emailAddress}
+      />
+      {message ? <InlineNotice message={message} tone="error" /> : null}
+      <PrimaryButton
+        disabled={!emailAddress || fetchStatus === "fetching"}
+        icon="feedback"
+        label={t("authFlow.sendResetCode")}
+        onPress={() => void submit()}
+      />
     </AppScreen>
   );
 }

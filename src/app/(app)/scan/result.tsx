@@ -1,16 +1,113 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { AppScreen } from "@/components/app-screen";
 import { NutritionSummary } from "@/components/nutrition-summary";
 import { PrimaryButton } from "@/components/primary-button";
+import { SectionCard, SectionHeader, ScreenTitle } from "@/components/ui/section-card";
+import { EmptyState, InlineNotice } from "@/components/ui/states";
 import { nutritionEstimateSchema } from "@/domain/schemas";
-import { Text } from "@/tw";
 import { Image } from "@/tw/image";
+import { Text, View } from "@/tw";
+
+const CONFIDENCE_KEY = {
+  low: "scan.confidenceLow",
+  medium: "scan.confidenceMedium",
+  high: "scan.confidenceHigh",
+} as const;
 
 export default function ScanResultRoute() {
-  const { uri, estimate: rawEstimate, scanId } = useLocalSearchParams<{ uri: string; estimate?: string; scanId?: string }>();
-  let estimate;
-  try { estimate = nutritionEstimateSchema.parse(JSON.parse(rawEstimate ?? "null")); } catch { estimate = null; }
-  if (!estimate) return <AppScreen><Text className="text-3xl font-bold text-app-text">No estimate available</Text><Image className="h-52 w-full rounded-3xl object-cover" source={{ uri }} /><PrimaryButton icon="edit" label="Enter nutrition manually" onPress={() => router.replace("/(app)/food/manual")} /><PrimaryButton icon="refresh" label="Retake" onPress={() => router.replace("/(app)/scan/camera")} /></AppScreen>;
-  return <AppScreen><Text className="text-3xl font-bold text-app-text">{estimate.mealName}</Text><Text className="text-sm text-app-muted">Estimated · {estimate.confidence} confidence</Text><Image className="h-52 w-full rounded-3xl object-cover" source={{ uri }} /><NutritionSummary {...estimate.nutrition} />{estimate.components.map((component) => <Text key={`${component.name}-${component.portion}`} className="text-app-text">{component.name} · {component.portion}</Text>)}{estimate.warnings.map((warning) => <Text key={warning} className="text-sm text-app-muted">{warning}</Text>)}<PrimaryButton icon="edit" label="Review and add" onPress={() => router.push({ pathname: "/(app)/scan/edit", params: { estimate: rawEstimate, scanId } })} /><PrimaryButton icon="refresh" label="Retake" onPress={() => router.replace("/(app)/scan/camera")} /></AppScreen>;
+  const { t } = useTranslation();
+  const { uri, estimate: rawEstimate, scanId } = useLocalSearchParams<{
+    uri: string;
+    estimate?: string;
+    scanId?: string;
+  }>();
+
+  let estimate: ReturnType<typeof nutritionEstimateSchema.parse> | null = null;
+  try {
+    estimate = nutritionEstimateSchema.parse(JSON.parse(rawEstimate ?? "null"));
+  } catch {
+    estimate = null;
+  }
+
+  if (!estimate) {
+    return (
+      <AppScreen>
+        <EmptyState
+          description={t("scan.noEstimateDescription")}
+          icon="analysis"
+          title={t("scan.noEstimateTitle")}
+        />
+        <PrimaryButton
+          icon="edit"
+          label={t("scan.manualAction")}
+          onPress={() => router.replace("/(app)/food/manual")}
+        />
+        <PrimaryButton
+          icon="refresh"
+          label={t("scan.retake")}
+          onPress={() => router.replace("/(app)/scan/camera")}
+        />
+      </AppScreen>
+    );
+  }
+
+  return (
+    <AppScreen>
+      <Image
+        accessibilityLabel={estimate.mealName}
+        className="h-52 w-full rounded-3xl bg-app-surface"
+        contentFit="cover"
+        source={{ uri }}
+      />
+
+      <ScreenTitle description={t(CONFIDENCE_KEY[estimate.confidence])} title={estimate.mealName} />
+
+      <NutritionSummary {...estimate.nutrition} />
+
+      <SectionCard>
+        <View className="gap-2.5">
+          <SectionHeader icon="analysis" title={t("scan.componentsTitle")} />
+          {estimate.components.map((component) => (
+            <Text
+              className="text-sm text-app-text"
+              key={`${component.name}-${component.portion}`}
+              selectable
+            >
+              {component.name} · {component.portion}
+            </Text>
+          ))}
+        </View>
+      </SectionCard>
+
+      {estimate.warnings.length > 0 ? (
+        <SectionCard>
+          <View className="gap-2">
+            <SectionHeader icon="warning" title={t("scan.warningsTitle")} />
+            {estimate.warnings.map((warning) => (
+              <Text className="text-sm leading-5 text-app-muted" key={warning} selectable>
+                {warning}
+              </Text>
+            ))}
+          </View>
+        </SectionCard>
+      ) : null}
+
+      <InlineNotice message={t("nutritionTargets.estimateNote")} />
+
+      <PrimaryButton
+        icon="edit"
+        label={t("scan.reviewAndAdd")}
+        onPress={() =>
+          router.push({ pathname: "/(app)/scan/edit", params: { estimate: rawEstimate, scanId } })
+        }
+      />
+      <PrimaryButton
+        icon="refresh"
+        label={t("scan.retake")}
+        onPress={() => router.replace("/(app)/scan/camera")}
+      />
+    </AppScreen>
+  );
 }

@@ -1,114 +1,292 @@
+import { useMutation, useQuery } from "convex/react";
 import React from "react";
+import { useTranslation } from "react-i18next";
+import { Linking } from "react-native";
 
 import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
+import { Field } from "@/components/ui/form";
+import { RowGroup, ToggleRow } from "@/components/ui/rows";
+import { ScreenTitle, SectionCard, SectionHeader } from "@/components/ui/section-card";
+import { EmptyState, InlineNotice, ScreenSkeleton } from "@/components/ui/states";
+import { hasBackendConfiguration } from "@/config/env";
 import {
+  DEFAULT_REMINDER_TIMES,
+  getPermissionStatus,
   requestNotificationPermission,
-  scheduleDailyReminder,
+  syncReminders,
+  type PermissionStatus,
+  type ReminderKey,
 } from "@/features/notifications/scheduler";
-import { Pressable, Text, View } from "@/tw";
+import { api } from "@/lib/convex-api";
+import { currentTimezone } from "@/lib/local-day";
+import { Text, View } from "@/tw";
+
+type Selection = Record<ReminderKey, boolean>;
+type Times = Record<ReminderKey, string>;
+
+const REMINDER_KEYS: ReminderKey[] = ["daily", "meal", "hydration", "progress", "motivation"];
+
+const CATEGORY_COPY: Record<ReminderKey, { icon: "notification" | "foods" | "hydration" | "progress" | "motivation"; titleKey: string; descriptionKey: string }> = {
+  daily: { icon: "notification", titleKey: "dailyTitle", descriptionKey: "dailyDescription" },
+  meal: { icon: "foods", titleKey: "mealTitle", descriptionKey: "mealDescription" },
+  hydration: { icon: "hydration", titleKey: "hydrationTitle", descriptionKey: "hydrationDescription" },
+  progress: { icon: "progress", titleKey: "progressTitle", descriptionKey: "progressDescription" },
+  motivation: { icon: "motivation", titleKey: "motivationTitle", descriptionKey: "motivationDescription" },
+};
 
 export function SettingsNotificationsScreen() {
-  const [dailyEnabled, setDailyEnabled] = React.useState(true);
-  const [mealReminders, setMealReminders] = React.useState(true);
-  const [weeklyProgress, setWeeklyProgress] = React.useState(true);
-  const [permissionStatus, setPermissionStatus] = React.useState<string | null>(null);
-  const [message, setMessage] = React.useState<string | null>(null);
+  const { t } = useTranslation();
+  if (hasBackendConfiguration) return <ConfiguredNotificationSettings />;
+  return (
+    <AppScreen>
+      <ScreenTitle description={t("config.body")} title={t("notificationSettings.title")} />
+    </AppScreen>
+  );
+}
 
-  const handleRequestPermission = async () => {
-    setMessage(null);
+function ConfiguredNotificationSettings() {
+  const preferences = useQuery(api.notifications.getPreferences, {});
+  const [permission, setPermission] = React.useState<PermissionStatus | null>(null);
+
+  React.useEffect(() => {
+    void getPermissionStatus().then(setPermission);
+  }, []);
+
+  if (preferences === undefined || permission === null) {
+    return (
+      <AppScreen>
+        <ScreenSkeleton lines={3} />
+      </AppScreen>
+    );
+  }
+
+  return (
+    <NotificationForm
+      initialPermission={permission}
+      key={preferences?.updatedAt ?? "new"}
+      preferences={preferences}
+    />
+  );
+}
+
+type Preferences = {
+  enabled: boolean;
+  categories: Selection;
+  times: Times;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+} | null;
+
+/**
+ * Reminder preferences.
+ *
+ * Every change is persisted to Convex and reconciled with the local schedule, so a
+ * category toggled off actually cancels its notification. The previous version
+ * held all of this in local state, saved nothing, and stacked a duplicate 8 PM
+ * reminder on every press.
+ */
+function NotificationForm({
+  initialPermission,
+  preferences,
+}: {
+  initialPermission: PermissionStatus;
+  preferences: Preferences;
+}) {
+  const { t } = useTranslation();
+  const updatePreferences = useMutation(api.notifications.updatePreferences);
+
+  const [enabled, setEnabled] = React.useState(preferences?.enabled ?? false);
+  const [selection, setSelection] = React.useState<Selection>(
+    preferences?.categories ?? {
+      daily: true,
+      meal: true,
+      hydration: false,
+      progress: true,
+      motivation: false,
+    },
+  );
+  const [times, setTimes] = React.useState<Times>(preferences?.times ?? DEFAULT_REMINDER_TIMES);
+  const [quietStart, setQuietStart] = React.useState(preferences?.quietHoursStart ?? "22:00");
+  const [quietEnd, setQuietEnd] = React.useState(preferences?.quietHoursEnd ?? "07:00");
+  const [permission, setPermission] = React.useState(initialPermission);
+  const [saving, setSaving] = React.useState(false);
+  const [notice, setNotice] = React.useState<{ message: string; tone: "success" | "error" } | null>(null);
+
+  const timeValid = (value: string) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
+  const invalidTime = Object.values(times).some((value) => !timeValid(value));
+  const invalidQuietHours = !timeValid(quietStart) || !timeValid(quietEnd);
+
+  const copy = React.useMemo(
+    () =>
+      Object.fromEntries(
+        REMINDER_KEYS.map((key) => [
+          key,
+          {
+            title: t(`notificationSettings.${CATEGORY_COPY[key].titleKey}`),
+            body: t(`notificationSettings.${CATEGORY_COPY[key].descriptionKey}`),
+          },
+        ]),
+      ) as Record<ReminderKey, { title: string; body: string }>,
+    [t],
+  );
+
+  const askPermission = async () => {
+    const next = await requestNotificationPermission();
+    setPermission(next);
+    if (next === "granted") setEnabled(true);
+  };
+
+  const save = async () => {
+    if (saving || invalidTime || invalidQuietHours) return;
+    setSaving(true);
+    setNotice(null);
     try {
-      const res = await requestNotificationPermission();
-      if (res.granted) {
-        setPermissionStatus("Granted");
-        if (dailyEnabled) {
-          await scheduleDailyReminder({
-            hour: 20,
-            minute: 0,
-            title: "Log your daily meals",
-            body: "Keep your logging streak alive by recording today's meals.",
-            destination: "/(app)/(tabs)",
-          });
-        }
-        setMessage("Notifications enabled & daily reminder scheduled for 8:00 PM.");
-      } else {
-        setPermissionStatus("Denied");
-        setMessage("Notification permission was not granted by your operating system.");
-      }
+      const effective = enabled && permission === "granted";
+      await updatePreferences({
+        enabled: effective,
+        categories: selection,
+        times,
+        quietHoursStart: quietStart,
+        quietHoursEnd: quietEnd,
+        timezone: currentTimezone(),
+        permissionStatus: permission,
+      });
+
+      await syncReminders(
+        {
+          categories: effective
+            ? selection
+            : { daily: false, meal: false, hydration: false, progress: false, motivation: false },
+          times,
+          quietHoursStart: quietStart,
+          quietHoursEnd: quietEnd,
+        },
+        copy,
+      );
+      setNotice({ message: t("notificationSettings.saved"), tone: "success" });
     } catch {
-      setMessage("Could not request notification permissions.");
+      setNotice({ message: t("notificationSettings.saveError"), tone: "error" });
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <AppScreen>
-      <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">
-        Notifications
-      </Text>
-      <Text className="text-sm text-app-muted">
-        Configure reminders to stay consistent with logging and progress checks.
-      </Text>
+      <ScreenTitle description={t("notificationSettings.subtitle")} title={t("notificationSettings.title")} />
 
-      <View className="gap-3 rounded-3xl border border-app-border bg-white p-4">
-        <View className="flex-row items-center justify-between py-2">
-          <View className="min-w-0 flex-1 pr-3">
-            <Text className="text-base font-bold text-app-text">Daily Goal Reminder</Text>
-            <Text className="text-sm font-medium text-app-muted">Reminds you every evening at 8:00 PM to log remaining meals.</Text>
-          </View>
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: dailyEnabled }}
-            className={dailyEnabled ? "h-8 w-14 rounded-full bg-[#111111] p-1 items-end" : "h-8 w-14 rounded-full bg-[#E5E5E5] p-1 items-start"}
-            onPress={() => setDailyEnabled((v) => !v)}
-          >
-            <View className="h-6 w-6 rounded-full bg-white" />
-          </Pressable>
-        </View>
-
-        <View className="h-px bg-app-border" />
-
-        <View className="flex-row items-center justify-between py-2">
-          <View className="min-w-0 flex-1 pr-3">
-            <Text className="text-base font-bold text-app-text">Meal Reminders</Text>
-            <Text className="text-sm font-medium text-app-muted">Up to 3 reminders per day near breakfast, lunch, and dinner.</Text>
-          </View>
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: mealReminders }}
-            className={mealReminders ? "h-8 w-14 rounded-full bg-[#111111] p-1 items-end" : "h-8 w-14 rounded-full bg-[#E5E5E5] p-1 items-start"}
-            onPress={() => setMealReminders((v) => !v)}
-          >
-            <View className="h-6 w-6 rounded-full bg-white" />
-          </Pressable>
-        </View>
-
-        <View className="h-px bg-app-border" />
-
-        <View className="flex-row items-center justify-between py-2">
-          <View className="min-w-0 flex-1 pr-3">
-            <Text className="text-base font-bold text-app-text">Weekly Progress Reminder</Text>
-            <Text className="text-sm font-medium text-app-muted">Prompts you once a week to log your weight measurement.</Text>
-          </View>
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: weeklyProgress }}
-            className={weeklyProgress ? "h-8 w-14 rounded-full bg-[#111111] p-1 items-end" : "h-8 w-14 rounded-full bg-[#E5E5E5] p-1 items-start"}
-            onPress={() => setWeeklyProgress((v) => !v)}
-          >
-            <View className="h-6 w-6 rounded-full bg-white" />
-          </Pressable>
-        </View>
-      </View>
-
-      {permissionStatus ? (
-        <Text className="px-1 text-sm font-semibold text-app-muted">
-          OS Permission Status: {permissionStatus}
-        </Text>
+      {permission === "denied" ? (
+        <EmptyState
+          action={t("notificationSettings.openSettings")}
+          description={t("notificationSettings.permissionDeniedDescription")}
+          icon="notification"
+          onAction={() => void Linking.openSettings()}
+          title={t("notificationSettings.permissionDeniedTitle")}
+        />
+      ) : permission !== "granted" ? (
+        <EmptyState
+          action={t("common.enable")}
+          description={t("notificationSettings.permissionNeededDescription")}
+          icon="notification"
+          onAction={() => void askPermission()}
+          title={t("notificationSettings.permissionNeededTitle")}
+        />
       ) : null}
 
-      {message ? <Text accessibilityLiveRegion="polite" className="px-1 text-sm text-app-muted">{message}</Text> : null}
+      <RowGroup>
+        {[
+          <ToggleRow
+            description={t("notificationSettings.masterDescription")}
+            disabled={permission !== "granted"}
+            icon="notification"
+            key="master"
+            onValueChange={setEnabled}
+            title={t("notificationSettings.masterToggle")}
+            value={enabled && permission === "granted"}
+          />,
+        ]}
+      </RowGroup>
 
-      <PrimaryButton icon="notification" label="Save & Enable Notifications" onPress={() => void handleRequestPermission()} />
+      <View className="gap-3">
+        <SectionHeader title={t("notificationSettings.categoriesTitle")} />
+        <RowGroup>
+          {REMINDER_KEYS.map((key) => (
+            <ToggleRow
+              description={t(`notificationSettings.${CATEGORY_COPY[key].descriptionKey}`)}
+              disabled={!enabled || permission !== "granted"}
+              icon={CATEGORY_COPY[key].icon}
+              key={key}
+              onValueChange={(value) => setSelection((current) => ({ ...current, [key]: value }))}
+              title={t(`notificationSettings.${CATEGORY_COPY[key].titleKey}`)}
+              value={selection[key]}
+            />
+          ))}
+        </RowGroup>
+      </View>
+
+      <SectionCard>
+        <View className="gap-4">
+          <SectionHeader icon="calendar" title={t("notificationSettings.timesTitle")} />
+          {REMINDER_KEYS.filter((key) => selection[key]).map((key) => (
+            <Field
+              error={timeValid(times[key]) ? null : t("errors.saveFailed")}
+              key={key}
+              keyboardType="numbers-and-punctuation"
+              label={t(`notificationSettings.${CATEGORY_COPY[key].titleKey}`)}
+              onChangeText={(value) => setTimes((current) => ({ ...current, [key]: value }))}
+              placeholder="20:00"
+              value={times[key]}
+            />
+          ))}
+          {REMINDER_KEYS.every((key) => !selection[key]) ? (
+            <Text className="text-sm text-app-muted" selectable>
+              {t("notificationSettings.categoriesTitle")}
+            </Text>
+          ) : null}
+        </View>
+      </SectionCard>
+
+      <SectionCard>
+        <View className="gap-4">
+          <SectionHeader
+            description={t("notificationSettings.quietHoursDescription")}
+            icon="appearance"
+            title={t("notificationSettings.quietHoursTitle")}
+          />
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <Field
+                error={timeValid(quietStart) ? null : t("errors.saveFailed")}
+                keyboardType="numbers-and-punctuation"
+                label={t("notificationSettings.quietStart")}
+                onChangeText={setQuietStart}
+                placeholder="22:00"
+                value={quietStart}
+              />
+            </View>
+            <View className="flex-1">
+              <Field
+                error={timeValid(quietEnd) ? null : t("errors.saveFailed")}
+                keyboardType="numbers-and-punctuation"
+                label={t("notificationSettings.quietEnd")}
+                onChangeText={setQuietEnd}
+                placeholder="07:00"
+                value={quietEnd}
+              />
+            </View>
+          </View>
+        </View>
+      </SectionCard>
+
+      {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
+
+      <PrimaryButton
+        disabled={saving || invalidTime || invalidQuietHours}
+        icon="check"
+        label={saving ? t("common.saving") : t("common.save")}
+        onPress={() => void save()}
+      />
     </AppScreen>
   );
 }

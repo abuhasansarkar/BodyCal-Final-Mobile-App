@@ -4,29 +4,41 @@
 
 @import "nativewind/theme";
 
-@layer base {
-  html {
-    color-scheme: light dark;
-  }
-}
-
+/*
+ * BodyCal palette.
+ *
+ * Values are transcribed from design/TOKENS.md, which records only what the
+ * supplied design references actually show. The app ships a single light
+ * appearance (app.json pins userInterfaceStyle: "light"), so there is one
+ * palette here rather than a light/dark pair that no design covers.
+ *
+ * To add dark mode later: define the dark tokens inside a
+ * `@media (prefers-color-scheme: dark)` block below, restore "automatic" in
+ * app.json, and flip SUPPORTS_DARK_APPEARANCE in src/config/theme.ts.
+ */
 :root {
-  --app-background: light-dark(rgb(255 255 255), rgb(0 0 0));
-  --app-surface: light-dark(rgb(245 245 245), rgb(28 28 30));
-  --app-text: light-dark(rgb(17 17 17), rgb(255 255 255));
-  --app-muted: light-dark(rgb(82 82 82), rgb(180 180 180));
-  --app-border: light-dark(rgb(232 232 232), rgb(38 38 38));
-  --app-accent: light-dark(rgb(0 122 255), rgb(10 132 255));
-  --app-error: light-dark(rgb(220 38 38), rgb(248 113 113));
+  --app-background: #FFFFFF;
+  --app-surface: #F7F7F7;
+  --app-surface-muted: #FAFAFA;
+  --app-border: #E8E8E8;
+  --app-border-soft: #EEEEEE;
+  --app-text: #111111;
+  --app-muted: #737373;
+  --app-subtle: #A3A3A3;
+  --app-accent: #2F80ED;
+  --app-error: #DC2626;
+  --app-error-surface: #FFF1F1;
+
+  --app-protein: #2F80ED;
+  --app-carbs: #F97316;
+  --app-fat: #8B5CF6;
+  --app-calories: #FF6B00;
 }
 
 @media ios {
   :root {
     --font-sans: system-ui;
     --font-rounded: ui-rounded;
-    --app-background: #FFFFFF;
-    --app-surface: #F7F7F7;
-    --app-border: #E8E8E8;
   }
 }
 
@@ -34,9 +46,6 @@
   :root {
     --font-sans: normal;
     --font-rounded: normal;
-    --app-background: #FFFFFF;
-    --app-surface: #F7F7F7;
-    --app-border: #E8E8E8;
   }
 }
 
@@ -44,10 +53,18 @@
   @theme {
     --color-app-background: var(--app-background);
     --color-app-surface: var(--app-surface);
+    --color-app-surface-muted: var(--app-surface-muted);
+    --color-app-border: var(--app-border);
+    --color-app-border-soft: var(--app-border-soft);
     --color-app-text: var(--app-text);
     --color-app-muted: var(--app-muted);
-    --color-app-border: var(--app-border);
+    --color-app-subtle: var(--app-subtle);
     --color-app-accent: var(--app-accent);
     --color-app-error: var(--app-error);
+    --color-app-error-surface: var(--app-error-surface);
+    --color-app-protein: var(--app-protein);
+    --color-app-carbs: var(--app-carbs);
+    --color-app-fat: var(--app-fat);
+    --color-app-calories: var(--app-calories);
   }
 }

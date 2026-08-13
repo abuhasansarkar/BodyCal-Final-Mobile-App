@@ -1,6 +1,6 @@
 # BodyCal Production Plan
 
-Last updated: 2026-08-11
+Last updated: 2026-08-13
 
 ## 1. Purpose
 
@@ -95,12 +95,21 @@ design/           Supplied design sources and audit artifacts
 
 - [x] Expo SDK 57 dependency alignment.
 - [x] NativeWind 5/`react-native-css` Metro and CSS foundation.
-- [x] Semantic light/dark platform colors and CSS primitive wrappers.
+- [x] Single light appearance with all palette values in `src/global.css` and `src/config/theme.ts`.
+- [!] Dark appearance is deliberately not shipped: `design/TOKENS.md` documents no dark palette. `app.json` pins `userInterfaceStyle: "light"`; flip `SUPPORTS_DARK_APPEARANCE` once dark references are supplied.
 - [x] Route-only `src/app` structure.
 - [x] Development, preview, and production EAS profiles.
-- [x] Public/server environment contract in `.env.example`.
-- [x] ESLint, strict TypeScript, Jest, and Android Metro export verification.
-- [~] Startup configuration validation provides a setup state; production build-time failure rules remain to be added.
+- [x] Public/server environment contract in `.env.example`, covering every variable the code actually reads.
+- [x] ESLint, strict TypeScript, Jest, Expo Doctor, and Android Metro export verification all pass.
+- [x] Release builds throw on missing required public configuration; the unauthenticated setup fallback is development-only.
+
+### Testing
+
+- [x] Domain unit tests for the calculator, unit conversions, and safety caps.
+- [x] Convex tests for authenticated access, unauthenticated rejection, wrong-user rejection, idempotency, query limits, validation bounds, deletion, export, and subscription webhook ordering (48 tests).
+- [x] Offline outbox tests for deduplication, attempt caps, expiry, and account-switch clearing.
+- [x] Translation key-parity test across all eight languages.
+- [ ] Device tests for social auth, purchases, camera, and remote notifications.
 
 ### Navigation and screens
 
@@ -108,19 +117,23 @@ design/           Supplied design sources and audit artifacts
 - [x] Authenticated bootstrap waits for Clerk and Convex before selecting a protected route.
 - [x] Core screens have functional semantic UI.
 - [ ] Final visual implementation and design mapping.
-- [x] Complete loading, empty, stale, offline, failure, and retry states on every data-driven screen.
+- [x] Loading, empty, offline, failure, and retry states on every data-driven screen, through the shared components in `src/components/ui/states.tsx`.
+- [~] Screens are rebuilt on the documented design system; physical-device visual acceptance still pending.
 
 ### Domain and persistence
 
 - [x] Mifflin–St Jeor BMR and activity calculations.
 - [x] Loss/gain adjustment caps and calorie safety boundaries.
 - [x] Macro calculation and unit conversion helpers.
-- [x] Secure persisted onboarding draft.
+- [x] Validated persisted onboarding draft in AsyncStorage (it exceeds SecureStore's Android size ceiling and holds no credentials).
 - [x] Convex schema for users, profiles, goals, catalog, food logs, weights, AI scans, favorites, settings, devices, subscriptions, exports, and deletion jobs.
 - [x] Shared identity and ownership helpers.
-- [x] Idempotent food and weight mutations.
+- [x] Idempotent food and weight mutations, resolved through the `by_user_request` index rather than a per-user scan.
 - [x] AsyncStorage offline outbox and reconnect synchronization.
-- [x] Convex-generated client API exists; remove the temporary untyped `anyApi` bridge from client code.
+- [x] Every Convex module uses the generated `./_generated/server` builders and the generated `api`/`internal` references. No `mutationGeneric`, `makeFunctionReference`, or `anyApi` remains.
+- [x] Single shared nutrition calculator in `convex/lib/nutrition.ts`, imported by both the backend and the client.
+- [x] Server-side validation library (`convex/lib/validation.ts`) bounds every numeric range, date, string length, and locale.
+- [x] Per-identity rate limits on plan generation, entitlement verification, AI scans, and exports.
 
 ### Authentication and account lifecycle
 
@@ -128,9 +141,10 @@ design/           Supplied design sources and audit artifacts
 - [x] Email verification and password recovery.
 - [~] Native Apple/Google flow code and config plugins exist; provider consoles and physical-device tests remain.
 - [x] Clerk ID is reused as RevenueCat App User ID.
-- [x] Backend export and reverified deletion job foundations.
-- [x] Export status/download/share user experience.
-- [ ] Cross-device deletion completion screen and retry/status UX.
+- [x] Resumable, idempotent deletion job: all user data is cleared first and the Clerk identity last, so a failure never locks the user out.
+- [x] Export runs through the server `exportJobs` pipeline and returns an expiring download URL.
+- [x] Deletion status, retry, and cancel UX; a failed job reactivates the account.
+- [ ] Cross-device deletion completion notification.
 
 ### Tracking
 
@@ -146,10 +160,11 @@ design/           Supplied design sources and audit artifacts
 ### AI scanning
 
 - [x] Camera/gallery selection and permission handling.
-- [x] Client image resize/compression and 4 MB limit.
+- [x] Client image resize/compression that steps quality down until it fits the 4 MB limit.
 - [x] Direct Convex storage upload.
 - [x] Server-only OpenAI provider call with structured Zod output.
-- [x] Fresh server-side RevenueCat verification before each AI request.
+- [x] Server-side RevenueCat verification when the entitlement mirror is stale or missing, rather than on every request.
+- [x] Upload ownership is recorded and verified before a blob is analysed or attached.
 - [x] Daily/monthly quota enforcement and idempotent requests.
 - [x] Editable estimate before saving.
 - [x] 24-hour abandoned and 30-day attached image retention.
@@ -165,8 +180,10 @@ design/           Supplied design sources and audit artifacts
 - [x] Store-provided prices; no hard-coded paywall currency.
 - [x] Trial language only when store metadata and eligibility agree.
 - [x] Authenticated RevenueCat webhook endpoint and Convex subscription mirror.
-- [~] Webhook coverage exists but all RevenueCat event variants and transfer/refund semantics need fixture tests.
-- [ ] Offline cached-entitlement expiration behavior.
+- [x] Webhook replay protection, out-of-order-event guard, and replay of events that arrive before the Convex user exists.
+- [~] Fixture tests cover purchase, renewal, cancellation, billing issue, expiration, trial, replay, and stale ordering; transfer and refund semantics still need store-side validation.
+- [x] Offline entitlement is reported as `offlineUnknown` and premium stays unlocked from the last known status.
+- [ ] Cached-entitlement hard expiry policy while offline for an extended period.
 - [!] Product creation, pricing, trials, entitlement, offering, transfer policy, and sandbox lifecycle tests require store and RevenueCat accounts.
 
 ### Notifications
@@ -174,10 +191,13 @@ design/           Supplied design sources and audit artifacts
 - [x] Education screen before OS permission request.
 - [x] Android channels, response listener, and deep-link routing.
 - [x] Daily local reminders and trial-reminder scheduling helpers.
-- [x] Sign-out cleanup.
+- [x] Sign-out and account-switch cleanup of the outbox, scheduled reminders, and RevenueCat identity.
 - [x] Convex preferences and push-device records exist.
-- [ ] Expo push token registration, rotation, invalid receipt processing, and permission reconciliation.
-- [ ] Server reminder scheduler, quiet hours, deduplication, and multi-device policy.
+- [x] Expo push token registration, rotation, and permission reconciliation, deduplicated per installation and per token.
+- [ ] Invalid-receipt processing (requires a server sender).
+- [x] Local reminder scheduling with stable identifiers, quiet hours, and cancellation on disable.
+- [x] Reminder preferences persist to Convex.
+- [ ] Server-side reminder sender and multi-device delivery policy.
 - [ ] Timezone/locale change rescheduling.
 - [!] Remote push testing requires Expo credentials and physical Android/iOS devices.
 
@@ -185,13 +205,14 @@ design/           Supplied design sources and audit artifacts
 
 - [x] i18next initialization for English, Spanish, German, French, Brazilian Portuguese, Italian, Japanese, and Korean.
 - [x] Welcome/tab baseline translations exist.
-- [x] Move every user-facing string into translation resources across all screens.
-- [x] Translate, review, and test all copy in all eight launch languages.
+- [x] Every user-facing string lives in the translation resources; no screen hard-codes copy.
+- [x] All eight launch languages are complete, with key parity enforced by `ScreenTranslations` at compile time and by `src/locales/parity.test.ts` at test time.
+- [ ] Native-speaker review of the newly added copy.
 - [x] Complete metric/imperial input and display controls across all screens.
 - [x] Shared controls use semantic roles and minimum target sizing.
 - [ ] Full screen-reader, dynamic type, contrast, reduced-motion, and non-color state audit.
-- [x] Sentry disables default PII and strips request payloads.
-- [x] Analytics initialization is consent-gated and autocapture is disabled.
+- [x] Sentry disables default PII, strips request payloads, and drops console/network breadcrumbs.
+- [x] Analytics is consent-gated behind an explicit Settings toggle, autocapture is disabled, and consent is mirrored to `userSettings`.
 - [ ] Final analytics event taxonomy and sensitive-property denylist tests.
 - [!] Privacy policy, terms, support URL, store privacy labels, and Data Safety declarations require approved legal content.
 

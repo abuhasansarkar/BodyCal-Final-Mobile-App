@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import type { PropsWithChildren, ReactNode } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -16,16 +17,18 @@ type Props = PropsWithChildren<{
 }>;
 
 export function PostPurchaseShell({ buttonIcon, buttonLabel, children, footerAccessory, onContinue, showBack = true, step }: Props) {
+  const { t } = useTranslation();
+
   return (
     <SafeAreaView edges={["top", "right", "bottom", "left"]} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <View className="flex-1 bg-white">
         <View className="flex-row items-center gap-4 px-5 pb-2 pt-2">
           {showBack ? (
-            <Pressable accessibilityLabel="Back" accessibilityRole="button" className="h-12 w-12 items-center justify-center rounded-full bg-[#F5F5F5]" onPress={() => router.back()}>
+            <Pressable accessibilityLabel={t("common.back")} accessibilityRole="button" className="h-12 w-12 items-center justify-center rounded-full bg-[#F5F5F5]" onPress={() => router.back()}>
               <AppIcon name="back" size={24} weight="semibold" />
             </Pressable>
           ) : <View className="h-12 w-12" />}
-          <View accessibilityLabel={`Step ${step} of 3`} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: 3, now: step }} className="h-2 flex-1 flex-row gap-1 overflow-hidden rounded-full">
+          <View accessibilityLabel={t("onboarding.progress", { current: step, total: 3 })} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: 3, now: step }} className="h-2 flex-1 flex-row gap-1 overflow-hidden rounded-full">
             {[1, 2, 3].map((item) => <View className={`h-full flex-1 rounded-full ${item <= step ? "bg-[#111111]" : "bg-[#ECECEC]"}`} key={item} />)}
           </View>
         </View>

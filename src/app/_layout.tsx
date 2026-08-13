@@ -14,7 +14,7 @@ SplashScreen.setOptions({
 function RootLayout() {
   return (
     <AppProviders>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
       <Stack screenOptions={{ contentStyle: { backgroundColor: "#FFFFFF" }, headerBackButtonDisplayMode: "minimal" }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(public)" options={{ headerShown: false }} />

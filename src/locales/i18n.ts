@@ -3,12 +3,24 @@ import { getLocales } from "expo-localization";
 import { createInstance } from "i18next";
 import { initReactI18next } from "react-i18next";
 
-import { authAccountTranslations, cameraTranslations, dashboardExtraTranslations, dashboardTranslations, onboardingTranslations, paywallFlowTranslations, paywallTranslations, postPurchaseTranslations, profileTranslations, resources, tabExtraTranslations } from "@/locales/resources";
+import {
+  authAccountTranslations,
+  cameraTranslations,
+  dashboardExtraTranslations,
+  dashboardTranslations,
+  onboardingTranslations,
+  paywallFlowTranslations,
+  paywallTranslations,
+  postPurchaseTranslations,
+  profileTranslations,
+  resources,
+  tabExtraTranslations,
+} from "@/locales/resources";
+import { screenTranslations } from "@/locales/screens";
 
 const LANGUAGE_STORAGE_KEY = "bodycal.language.v1";
-const supportedLanguages = Object.keys(resources);
-export type SupportedLanguage = keyof typeof resources;
-export const languageOptions: { code: SupportedLanguage; flag: string; name: string }[] = [
+
+export const languageOptions = [
   { code: "en", flag: "🇺🇸", name: "English" },
   { code: "es", flag: "🇪🇸", name: "Español" },
   { code: "de", flag: "🇩🇪", name: "Deutsch" },
@@ -17,32 +29,124 @@ export const languageOptions: { code: SupportedLanguage; flag: string; name: str
   { code: "it", flag: "🇮🇹", name: "Italiano" },
   { code: "ja", flag: "🇯🇵", name: "日本語" },
   { code: "ko", flag: "🇰🇷", name: "한국어" },
-];
+] as const;
+
+export type SupportedLanguage = (typeof languageOptions)[number]["code"];
+
+export const supportedLanguages: SupportedLanguage[] = languageOptions.map((option) => option.code);
 
 function isSupportedLanguage(value: string | null): value is SupportedLanguage {
-  return value !== null && supportedLanguages.includes(value);
+  return value !== null && (supportedLanguages as string[]).includes(value);
+}
+
+/**
+ * Builds one language bundle.
+ *
+ * Every language — English included — goes through the same merge. English used to
+ * take a shorter path that skipped most namespace modules, which is precisely why
+ * the missing French and Italian keys went unnoticed for so long.
+ */
+/**
+ * Reads a per-language namespace module.
+ *
+ * `onboardingTranslations` carries only the seven non-English languages because
+ * English lives in `resources.en.translation`; this keeps that asymmetry in one
+ * place instead of forking the whole merge.
+ */
+function pick<T>(map: Record<string, T>, language: SupportedLanguage): T | undefined {
+  return map[language];
+}
+
+function buildBundle(language: SupportedLanguage) {
+  const base = resources[language].translation;
+  const screens = screenTranslations[language];
+
+  return {
+    translation: {
+      ...base,
+      auth: { ...base.auth, ...(authAccountTranslations[language] ?? {}) },
+      tabs: { ...base.tabs, ...(tabExtraTranslations[language] ?? {}) },
+      profile: profileTranslations[language],
+      camera: cameraTranslations[language],
+      paywall: paywallTranslations[language],
+      paywallFlow: paywallFlowTranslations[language],
+      dashboard: { ...dashboardTranslations[language], ...dashboardExtraTranslations[language] },
+
+      onboarding: {
+        // English onboarding copy lives in `resources`, the other seven in
+        // `onboardingTranslations`. Read whichever exists, then apply the shared keys.
+        ...((base as Record<string, object | undefined>).onboarding ?? {}),
+        ...(pick(onboardingTranslations as Record<string, object>, language) ?? {}),
+        ...screens.onboarding,
+      },
+      postPurchase: {
+        ...postPurchaseTranslations[language],
+        review: {
+          ...postPurchaseTranslations[language].review,
+          honestTitle: screens.postPurchaseReview.honestTitle,
+          honestDescription: screens.postPurchaseReview.honestDescription,
+          submitting: screens.postPurchaseReview.submitting,
+          submitError: screens.postPurchaseReview.submitError,
+          reasons: [
+            {
+              title: screens.postPurchaseReview.reasonAccuracyTitle,
+              description: screens.postPurchaseReview.reasonAccuracyDescription,
+            },
+            {
+              title: screens.postPurchaseReview.reasonSpeedTitle,
+              description: screens.postPurchaseReview.reasonSpeedDescription,
+            },
+          ],
+        },
+      },
+
+      common: { ...base.common, ...screens.common },
+      config: screens.config,
+      errors: screens.errors,
+      authFlow: screens.authFlow,
+      progress: screens.progress,
+      foodLogEdit: screens.foodLogEdit,
+      goalSettings: screens.goalSettings,
+      personalDetails: screens.personalDetails,
+      nutritionTargets: screens.nutritionTargets,
+      notificationSettings: screens.notificationSettings,
+      unitSettings: screens.unitSettings,
+      appearanceSettings: screens.appearanceSettings,
+      languageSettings: screens.languageSettings,
+      subscriptionSettings: screens.subscriptionSettings,
+      privacySettings: screens.privacySettings,
+      helpSettings: screens.helpSettings,
+      termsSettings: screens.termsSettings,
+      deleteAccount: screens.deleteAccount,
+      foodSearch: screens.foodSearch,
+      foodDetail: screens.foodDetail,
+      manualFood: screens.manualFood,
+      foodHeadline: screens.foodHeadline,
+      foodCategories: screens.foodCategories,
+      scan: screens.scan,
+      weight: screens.weight,
+      history: screens.history,
+    },
+  };
+}
+
+const localizedResources = Object.fromEntries(
+  supportedLanguages.map((language) => [language, buildBundle(language)]),
+);
+
+function resolveDeviceLanguage(): SupportedLanguage {
+  const tag = getLocales()[0]?.languageTag ?? "en";
+  if (isSupportedLanguage(tag)) return tag;
+  const base = tag.split("-")[0];
+  const match = supportedLanguages.find((language) => language.split("-")[0] === base);
+  return match ?? "en";
 }
 
 const i18n = createInstance();
-const localizedResources = {
-  en: { translation: { ...resources.en.translation, profile: profileTranslations.en } },
-  es: { translation: { ...resources.es.translation, auth: { ...resources.es.translation.auth, ...authAccountTranslations.es }, tabs: { ...resources.es.translation.tabs, ...tabExtraTranslations.es }, profile: profileTranslations.es, onboarding: onboardingTranslations.es, paywall: paywallTranslations.es, postPurchase: postPurchaseTranslations.es, dashboard: { ...dashboardTranslations.es, ...dashboardExtraTranslations.es }, paywallFlow: paywallFlowTranslations.es, camera: cameraTranslations.es } },
-  de: { translation: { ...resources.de.translation, auth: { ...resources.de.translation.auth, ...authAccountTranslations.de }, tabs: { ...resources.de.translation.tabs, ...tabExtraTranslations.de }, profile: profileTranslations.de, onboarding: onboardingTranslations.de, paywall: paywallTranslations.de, postPurchase: postPurchaseTranslations.de, dashboard: { ...dashboardTranslations.de, ...dashboardExtraTranslations.de }, paywallFlow: paywallFlowTranslations.de, camera: cameraTranslations.de } },
-  fr: { translation: { ...resources.fr.translation, auth: { ...resources.fr.translation.auth, ...authAccountTranslations.fr }, tabs: { ...resources.fr.translation.tabs, ...tabExtraTranslations.fr }, profile: profileTranslations.fr, onboarding: onboardingTranslations.fr, paywall: paywallTranslations.fr, postPurchase: postPurchaseTranslations.fr, dashboard: { ...dashboardTranslations.fr, ...dashboardExtraTranslations.fr }, paywallFlow: paywallFlowTranslations.fr, camera: cameraTranslations.fr } },
-  "pt-BR": { translation: { ...resources["pt-BR"].translation, auth: { ...resources["pt-BR"].translation.auth, ...authAccountTranslations["pt-BR"] }, tabs: { ...resources["pt-BR"].translation.tabs, ...tabExtraTranslations["pt-BR"] }, profile: profileTranslations["pt-BR"], onboarding: onboardingTranslations["pt-BR"], paywall: paywallTranslations["pt-BR"], postPurchase: postPurchaseTranslations["pt-BR"], dashboard: { ...dashboardTranslations["pt-BR"], ...dashboardExtraTranslations["pt-BR"] }, paywallFlow: paywallFlowTranslations["pt-BR"], camera: cameraTranslations["pt-BR"] } },
-  it: { translation: { ...resources.it.translation, auth: { ...resources.it.translation.auth, ...authAccountTranslations.it }, tabs: { ...resources.it.translation.tabs, ...tabExtraTranslations.it }, profile: profileTranslations.it, onboarding: onboardingTranslations.it, paywall: paywallTranslations.it, postPurchase: postPurchaseTranslations.it, dashboard: { ...dashboardTranslations.it, ...dashboardExtraTranslations.it }, paywallFlow: paywallFlowTranslations.it, camera: cameraTranslations.it } },
-  ja: { translation: { ...resources.ja.translation, auth: { ...resources.ja.translation.auth, ...authAccountTranslations.ja }, tabs: { ...resources.ja.translation.tabs, ...tabExtraTranslations.ja }, profile: profileTranslations.ja, onboarding: onboardingTranslations.ja, paywall: paywallTranslations.ja, postPurchase: postPurchaseTranslations.ja, dashboard: { ...dashboardTranslations.ja, ...dashboardExtraTranslations.ja }, paywallFlow: paywallFlowTranslations.ja, camera: cameraTranslations.ja } },
-  ko: { translation: { ...resources.ko.translation, auth: { ...resources.ko.translation.auth, ...authAccountTranslations.ko }, tabs: { ...resources.ko.translation.tabs, ...tabExtraTranslations.ko }, profile: profileTranslations.ko, onboarding: onboardingTranslations.ko, paywall: paywallTranslations.ko, postPurchase: postPurchaseTranslations.ko, dashboard: { ...dashboardTranslations.ko, ...dashboardExtraTranslations.ko }, paywallFlow: paywallFlowTranslations.ko, camera: cameraTranslations.ko } },
-};
-const deviceTag = getLocales()[0]?.languageTag ?? "en";
-const deviceLanguage = supportedLanguages.includes(deviceTag)
-  ? deviceTag
-  : supportedLanguages.includes(deviceTag.split("-")[0])
-    ? deviceTag.split("-")[0]
-    : "en";
+
 void i18n.use(initReactI18next).init({
   resources: localizedResources,
-  lng: deviceLanguage,
+  lng: resolveDeviceLanguage(),
   fallbackLng: "en",
   compatibilityJSON: "v4",
   initAsync: false,
@@ -51,10 +155,9 @@ void i18n.use(initReactI18next).init({
 });
 
 export async function hydrateAppLanguage() {
-  const persistedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
-
-  if (isSupportedLanguage(persistedLanguage) && i18n.resolvedLanguage !== persistedLanguage) {
-    await i18n.changeLanguage(persistedLanguage);
+  const persisted = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+  if (isSupportedLanguage(persisted) && i18n.resolvedLanguage !== persisted) {
+    await i18n.changeLanguage(persisted);
   }
 }
 
@@ -63,4 +166,10 @@ export async function setAppLanguage(languageCode: SupportedLanguage) {
   await i18n.changeLanguage(languageCode);
 }
 
-export { i18n, supportedLanguages };
+/** Clears the manual language choice so the device language applies again. */
+export async function useDeviceLanguage() {
+  await AsyncStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  await i18n.changeLanguage(resolveDeviceLanguage());
+}
+
+export { i18n };

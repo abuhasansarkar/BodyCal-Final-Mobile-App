@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import type { PropsWithChildren } from "react";
 import React from "react";
 
+import { resolveNotificationDestination } from "@/features/notifications/destinations";
 import { configureNotificationChannels } from "@/features/notifications/scheduler";
 
 Notifications.setNotificationHandler({
@@ -14,9 +15,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * Navigates from a tapped notification, but only to an allowlisted route.
+ * The payload is attacker-controllable, so an unknown destination is ignored.
+ */
 function navigateFromResponse(response: Notifications.NotificationResponse) {
-  const destination = response.notification.request.content.data?.destination;
-  if (typeof destination === "string" && destination.startsWith("/")) router.push(destination as never);
+  const destination = resolveNotificationDestination(
+    response.notification.request.content.data?.destination,
+  );
+  if (destination) router.push(destination);
 }
 
 export function NotificationProvider({ children }: PropsWithChildren) {
@@ -28,5 +35,6 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     const subscription = Notifications.addNotificationResponseReceivedListener(navigateFromResponse);
     return () => subscription.remove();
   }, []);
+
   return children;
 }

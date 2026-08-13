@@ -55,11 +55,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "29.5.14",
     "@types/node": "^26.2.0",
     "@types/react": "~19.2.2",
+    "convex-test": "^0.0.55",
     "eslint": "^9.39.0",
     "eslint-config-expo": "~57.0.1",
     "jest-expo": "~57.0.4",
@@ -76,17 +78,9 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "test:watch": "jest --watch"
-  },
-  "jest": {
-    "preset": "jest-expo",
-    "setupFiles": [
-      "<rootDir>/jest.setup.ts"
-    ],
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/convex/_generated/"
-    ]
+    "test:watch": "jest --watch",
+    "test:convex": "jest --selectProjects convex --runInBand",
+    "test:app": "jest --selectProjects app --runInBand"
   },
   "overrides": {
     "lightningcss": "1.30.1"

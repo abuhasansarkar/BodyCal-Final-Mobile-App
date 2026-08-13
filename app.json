@@ -6,15 +6,17 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bodycal",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.bodycal.app",
       "icon": "./assets/expo.icon",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "BodyCal uses your camera to estimate nutrition from a meal photo.",
-        "NSPhotoLibraryUsageDescription": "BodyCal lets you choose a meal photo for nutrition estimation."
-      }
+        "NSPhotoLibraryUsageDescription": "BodyCal lets you choose a meal photo for nutrition estimation.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "userInterfaceStyle": "light"
     },
     "android": {
       "package": "com.bodycal.app",
@@ -24,7 +26,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "userInterfaceStyle": "light"
     },
     "web": {
       "output": "static",
@@ -53,7 +56,8 @@
       [
         "expo-notifications",
         {
-          "color": "#208AEF"
+          "color": "#111111",
+          "defaultChannel": "meal-reminders"
         }
       ],
       [

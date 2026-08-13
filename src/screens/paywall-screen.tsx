@@ -148,7 +148,16 @@ export function PaywallScreen() {
     setWorking(true); setNotice(null);
     try { await operation(); success?.(); } catch { setNotice(t("paywall.actionError")); } finally { setWorking(false); }
   };
-  const restorePurchases = () => void run(restore, () => setNotice(t("paywall.restoreComplete")));
+  const restorePurchases = () =>
+    void run(async () => {
+      const result = await restore();
+      // An empty restore is informative, not a failure.
+      setNotice(
+        result.restored
+          ? t("subscriptionSettings.restored")
+          : t("subscriptionSettings.restoreEmpty"),
+      );
+    });
   const purchasePlan = () => void run(() => purchase(selectedPlan), () => router.replace("/(app)/benefits" as Href));
   const selectedTrialDuration = days ? t("paywall.daysFree", { count: days }) : t("paywall.freeTrial");
   const disclosure = eligible

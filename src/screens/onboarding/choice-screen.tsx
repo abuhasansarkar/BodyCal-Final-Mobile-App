@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Image, type ImageSource } from "expo-image";
 
 import { AppScreen } from "@/components/app-screen";
@@ -21,6 +22,8 @@ type Props<T extends string> = {
 };
 
 export function ChoiceScreen<T extends string>({ description = "", nextHref, onChange, options, step, title, value }: Props<T>) {
+  const { t } = useTranslation();
+
   if (step === undefined) {
     return (
       <AppScreen>
@@ -31,7 +34,7 @@ export function ChoiceScreen<T extends string>({ description = "", nextHref, onC
         <View accessibilityRole="radiogroup" className="gap-3">
           {options.map((option) => <SelectionCard description={option.description} key={option.value} label={option.label} onPress={() => onChange(option.value)} selected={value === option.value} />)}
         </View>
-        <PrimaryButton label="Continue" onPress={() => router.push(nextHref)} />
+        <PrimaryButton label={t("common.continue")} onPress={() => router.push(nextHref)} />
       </AppScreen>
     );
   }

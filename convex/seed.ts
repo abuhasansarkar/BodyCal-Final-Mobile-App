@@ -1,7 +1,22 @@
 import { v } from "convex/values";
-import { mutationGeneric as mutation } from "convex/server";
 
-import { requireCurrentUser } from "./lib/auth";
+import { internal } from "./_generated/api";
+import { internalMutation } from "./_generated/server";
+
+/**
+ * Seed data.
+ *
+ * Every entry point here is an INTERNAL mutation. These functions were previously
+ * public, which let any caller write to the shared food catalog on production and
+ * let any signed-in user inject fabricated weight and nutrition history into their
+ * own health record. Run them from the Convex dashboard or CLI:
+ *
+ *   npx convex run seed:seedCatalog
+ *   npx convex run seed:seedDemoDataForUser '{"clerkUserId":"user_..."}'
+ *
+ * The demo-data function requires an explicit target account, so writing
+ * synthetic health data is always a deliberate act rather than a side effect.
+ */
 
 type GoalType = "lose" | "maintain" | "gain";
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -271,34 +286,25 @@ const catalogSeedItems: SeedCatalogItem[] = [
   },
 ];
 
-async function seedCatalogImpl(ctx: any) {
-  let inserted = 0;
-  let updated = 0;
+/** All localized titles joined so one search index serves every launch language. */
+function buildSearchText(item: SeedCatalogItem) {
+  return [...Object.values(item.titles), ...item.ingredients].join(" ").slice(0, 1_000);
+}
 
-  for (const item of catalogSeedItems) {
-    const existing = await ctx.db
-      .query("foodCatalog")
-      .withIndex("by_slug", (q: any) => q.eq("slug", item.slug))
-      .unique();
+export const seedCatalog = internalMutation({
+  args: {},
+  returns: v.object({ inserted: v.number(), updated: v.number(), total: v.number() }),
+  handler: async (ctx) => {
+    let inserted = 0;
+    let updated = 0;
 
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        titles: item.titles,
-        descriptions: item.descriptions,
-        goalTypes: item.goalTypes,
-        mealTypes: item.mealTypes,
-        serving: item.serving,
-        calories: item.calories,
-        proteinGrams: item.proteinGrams,
-        carbsGrams: item.carbsGrams,
-        fatGrams: item.fatGrams,
-        ingredients: item.ingredients,
-        active: true,
-        version: (existing.version || 1) + 1,
-      });
-      updated++;
-    } else {
-      await ctx.db.insert("foodCatalog", {
+    for (const item of catalogSeedItems) {
+      const existing = await ctx.db
+        .query("foodCatalog")
+        .withIndex("by_slug", (q) => q.eq("slug", item.slug))
+        .unique();
+
+      const value = {
         slug: item.slug,
         titles: item.titles,
         descriptions: item.descriptions,
@@ -310,203 +316,218 @@ async function seedCatalogImpl(ctx: any) {
         carbsGrams: item.carbsGrams,
         fatGrams: item.fatGrams,
         ingredients: item.ingredients,
+        searchText: buildSearchText(item),
         active: true,
-        version: 1,
-      });
-      inserted++;
+      };
+
+      if (existing) {
+        await ctx.db.replace(existing._id, { ...value, version: existing.version + 1 });
+        updated += 1;
+      } else {
+        await ctx.db.insert("foodCatalog", { ...value, version: 1 });
+        inserted += 1;
+      }
     }
-  }
 
-  return { catalogInserted: inserted, catalogUpdated: updated, totalCatalog: catalogSeedItems.length };
-}
-
-async function seedUserDemoDataImpl(ctx: any) {
-  const user = await requireCurrentUser(ctx);
-
-  // 1. Ensure user profile active
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_user", (q: any) => q.eq("userId", user._id))
-    .unique();
-
-  if (!profile) {
-    await ctx.db.insert("userProfiles", {
-      userId: user._id,
-      dateOfBirth: "1998-05-15",
-      calculationBasis: "male",
-      heightCm: 178,
-      currentWeightKg: 72.5,
-      goalWeightKg: 78.0,
-      weightUnit: "kg",
-      heightUnit: "cm",
-      activityLevel: "active",
-      goalType: "gain",
-      goalPace: "recommended",
-      locale: "en",
-      timezone: "America/New_York",
-      updatedAt: Date.now(),
-    });
-  }
-
-  // 2. Ensure user active nutrition goal
-  const todayStr = new Date().toISOString().split("T")[0];
-  const goal = await ctx.db
-    .query("nutritionGoals")
-    .withIndex("by_user_effective", (q: any) => q.eq("userId", user._id))
-    .first();
-
-  if (!goal) {
-    await ctx.db.insert("nutritionGoals", {
-      userId: user._id,
-      calories: 2850,
-      proteinGrams: 160,
-      carbsGrams: 320,
-      fatGrams: 85,
-      effectiveFrom: todayStr,
-      formulaVersion: "mifflin_st_jeor_v1",
-      calculationMetadata: { bmr: 1750, tdee: 2600, surplus: 250 },
-      isManualOverride: false,
-      createdAt: Date.now(),
-    });
-  }
-
-  // 3. Seed weight history over past 3 weeks if empty
-  const existingWeights = await ctx.db
-    .query("weightLogs")
-    .withIndex("by_user_date", (q: any) => q.eq("userId", user._id))
-    .take(5);
-
-  let weightLogsInserted = 0;
-  if (existingWeights.length === 0) {
-    const pastDays = [
-      { daysAgo: 21, weight: 70.8 },
-      { daysAgo: 14, weight: 71.3 },
-      { daysAgo: 7, weight: 71.9 },
-      { daysAgo: 0, weight: 72.5 },
-    ];
-
-    for (const entry of pastDays) {
-      const date = new Date(Date.now() - entry.daysAgo * 86_400_000);
-      const dateStr = date.toISOString().split("T")[0];
-      await ctx.db.insert("weightLogs", {
-        userId: user._id,
-        normalizedKg: entry.weight,
-        displayValue: entry.weight,
-        displayUnit: "kg",
-        localDate: dateStr,
-        timezone: "America/New_York",
-        note: entry.daysAgo === 0 ? "Weekly check-in" : undefined,
-        clientRequestId: `seed_weight_${entry.daysAgo}`,
-        createdAt: date.getTime(),
-        updatedAt: date.getTime(),
-      });
-      weightLogsInserted++;
-    }
-  }
-
-  // 4. Seed food logs for today if empty
-  const existingFoodLogs = await ctx.db
-    .query("foodLogs")
-    .withIndex("by_user_date", (q: any) => q.eq("userId", user._id))
-    .filter((q: any) => q.eq(q.field("localDate"), todayStr))
-    .take(5);
-
-  let foodLogsInserted = 0;
-  if (existingFoodLogs.length === 0) {
-    const demoLogs = [
-      {
-        mealType: "breakfast" as const,
-        foodName: "Protein Pancake Stack",
-        serving: "1 stack",
-        servingUnit: "stack",
-        quantity: 1,
-        calories: 850,
-        proteinGrams: 42,
-        carbsGrams: 102,
-        fatGrams: 30,
-        source: "catalog" as const,
-      },
-      {
-        mealType: "lunch" as const,
-        foodName: "Chicken & Rice Power Bowl",
-        serving: "1 bowl",
-        servingUnit: "bowl",
-        quantity: 1,
-        calories: 720,
-        proteinGrams: 45,
-        carbsGrams: 78,
-        fatGrams: 28,
-        source: "catalog" as const,
-      },
-      {
-        mealType: "snack" as const,
-        foodName: "Peanut Butter Mass Shake",
-        serving: "1 glass",
-        servingUnit: "glass",
-        quantity: 1,
-        calories: 650,
-        proteinGrams: 32,
-        carbsGrams: 88,
-        fatGrams: 22,
-        source: "catalog" as const,
-      },
-    ];
-
-    for (const item of demoLogs) {
-      await ctx.db.insert("foodLogs", {
-        userId: user._id,
-        localDate: todayStr,
-        timezone: "America/New_York",
-        mealType: item.mealType,
-        source: item.source,
-        foodName: item.foodName,
-        serving: item.serving,
-        servingUnit: item.servingUnit,
-        quantity: item.quantity,
-        calories: item.calories,
-        proteinGrams: item.proteinGrams,
-        carbsGrams: item.carbsGrams,
-        fatGrams: item.fatGrams,
-        clientRequestId: `seed_food_${item.mealType}_${Date.now()}`,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-      foodLogsInserted++;
-    }
-  }
-
-  return {
-    success: true,
-    weightLogsInserted,
-    foodLogsInserted,
-    todayLocalDate: todayStr,
-  };
-}
-
-export const seedCatalog = mutation({
-  args: {},
-  handler: async (ctx) => {
-    return seedCatalogImpl(ctx);
+    return { inserted, updated, total: catalogSeedItems.length };
   },
 });
 
-export const seedUserDemoData = mutation({
-  args: {},
-  handler: async (ctx) => {
-    return seedUserDemoDataImpl(ctx);
+/** Removes a catalog entry from search and recommendations without deleting history. */
+export const deactivateCatalogItem = internalMutation({
+  args: { slug: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { slug }) => {
+    const existing = await ctx.db
+      .query("foodCatalog")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!existing) return false;
+    await ctx.db.patch(existing._id, { active: false, version: existing.version + 1 });
+    return true;
   },
 });
 
-export const runSeed = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const catalogResult = await seedCatalogImpl(ctx);
-    let userResult = null;
-    try {
-      userResult = await seedUserDemoDataImpl(ctx);
-    } catch {
-      // User identity optional if called anonymously
+/**
+ * Writes synthetic profile, goal, weight and food-log data for ONE named account.
+ *
+ * For local demos and screenshots only. It refuses to touch an account that
+ * already has data, so it can never overwrite somebody's real history.
+ */
+export const seedDemoDataForUser = internalMutation({
+  args: { clerkUserId: v.string() },
+  returns: v.object({
+    profileCreated: v.boolean(),
+    goalCreated: v.boolean(),
+    weightLogsInserted: v.number(),
+    foodLogsInserted: v.number(),
+  }),
+  handler: async (ctx, { clerkUserId }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", clerkUserId))
+      .unique();
+    if (!user) throw new Error(`No BodyCal user for Clerk id ${clerkUserId}`);
+
+    const now = Date.now();
+    const todayLocalDate = new Date(now).toISOString().slice(0, 10);
+
+    const existingProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    let profileCreated = false;
+    if (!existingProfile) {
+      await ctx.db.insert("userProfiles", {
+        userId: user._id,
+        dateOfBirth: "1998-05-15",
+        dateOfBirthPrecision: "day",
+        calculationBasis: "male",
+        heightCm: 178,
+        currentWeightKg: 72.5,
+        goalWeightKg: 78,
+        weightUnit: "kg",
+        heightUnit: "cm",
+        activityLevel: "active",
+        goalType: "gain",
+        goalPace: "recommended",
+        locale: "en",
+        timezone: "America/New_York",
+        updatedAt: now,
+      });
+      profileCreated = true;
     }
-    return { catalog: catalogResult, userDemo: userResult };
+
+    const existingGoal = await ctx.db
+      .query("nutritionGoals")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    let goalCreated = false;
+    if (!existingGoal) {
+      await ctx.db.insert("nutritionGoals", {
+        userId: user._id,
+        calories: 2_850,
+        proteinGrams: 160,
+        carbsGrams: 320,
+        fatGrams: 85,
+        effectiveFrom: todayLocalDate,
+        formulaVersion: "mifflin-st-jeor-v1",
+        calculationMetadata: {
+          bmr: 1_750,
+          tdee: 2_600,
+          appliedAdjustment: 250,
+          paceWasCapped: false,
+          aiGenerated: false,
+        },
+        isManualOverride: false,
+        createdAt: now,
+      });
+      goalCreated = true;
+    }
+
+    const existingWeights = await ctx.db
+      .query("weightLogs")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .take(1);
+
+    let weightLogsInserted = 0;
+    if (existingWeights.length === 0) {
+      for (const entry of [
+        { daysAgo: 21, weight: 70.8 },
+        { daysAgo: 14, weight: 71.3 },
+        { daysAgo: 7, weight: 71.9 },
+        { daysAgo: 0, weight: 72.5 },
+      ]) {
+        const at = now - entry.daysAgo * 86_400_000;
+        await ctx.db.insert("weightLogs", {
+          userId: user._id,
+          normalizedKg: entry.weight,
+          displayValue: entry.weight,
+          displayUnit: "kg",
+          localDate: new Date(at).toISOString().slice(0, 10),
+          timezone: "America/New_York",
+          clientRequestId: `seed_weight_${entry.daysAgo}`,
+          createdAt: at,
+          updatedAt: at,
+        });
+        weightLogsInserted += 1;
+      }
+    }
+
+    const existingLogs = await ctx.db
+      .query("foodLogs")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id).eq("localDate", todayLocalDate))
+      .take(1);
+
+    let foodLogsInserted = 0;
+    if (existingLogs.length === 0) {
+      const demoLogs = [
+        {
+          mealType: "breakfast" as const,
+          foodName: "Protein Pancake Stack",
+          serving: "1 stack",
+          calories: 850,
+          proteinGrams: 42,
+          carbsGrams: 102,
+          fatGrams: 30,
+        },
+        {
+          mealType: "lunch" as const,
+          foodName: "Chicken & Rice Power Bowl",
+          serving: "1 bowl",
+          calories: 720,
+          proteinGrams: 45,
+          carbsGrams: 78,
+          fatGrams: 28,
+        },
+        {
+          mealType: "snack" as const,
+          foodName: "Peanut Butter Mass Shake",
+          serving: "1 glass",
+          calories: 650,
+          proteinGrams: 32,
+          carbsGrams: 88,
+          fatGrams: 22,
+        },
+      ];
+
+      for (const [index, log] of demoLogs.entries()) {
+        const at = now - (demoLogs.length - index) * 3_600_000;
+        await ctx.db.insert("foodLogs", {
+          userId: user._id,
+          localDate: todayLocalDate,
+          timezone: "America/New_York",
+          mealType: log.mealType,
+          source: "catalog",
+          foodName: log.foodName,
+          serving: log.serving,
+          servingUnit: "portion",
+          quantity: 1,
+          calories: log.calories,
+          proteinGrams: log.proteinGrams,
+          carbsGrams: log.carbsGrams,
+          fatGrams: log.fatGrams,
+          clientRequestId: `seed_food_${index}`,
+          createdAt: at,
+          updatedAt: at,
+        });
+        foodLogsInserted += 1;
+      }
+    }
+
+    return { profileCreated, goalCreated, weightLogsInserted, foodLogsInserted };
+  },
+});
+
+/** Convenience wrapper for local setup: catalog plus one named demo account. */
+export const seedAll = internalMutation({
+  args: { clerkUserId: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { clerkUserId }) => {
+    await ctx.runMutation(internal.seed.seedCatalog, {});
+    if (clerkUserId) await ctx.runMutation(internal.seed.seedDemoDataForUser, { clerkUserId });
+    return null;
   },
 });

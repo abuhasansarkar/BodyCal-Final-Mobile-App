@@ -1,7 +1,36 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { requireCurrentUser } from "./lib/auth";
+import {
+  activityLevelValidator,
+  calculationBasisValidator,
+  goalPaceValidator,
+  goalTypeValidator,
+} from "./schema";
+import { assertDailyTargets, assertLocalDate } from "./lib/validation";
+
+export const calculationMetadataValidator = v.object({
+  bmr: v.optional(v.number()),
+  tdee: v.optional(v.number()),
+  requestedAdjustment: v.optional(v.number()),
+  appliedAdjustment: v.optional(v.number()),
+  paceWasCapped: v.optional(v.boolean()),
+  aiGenerated: v.optional(v.boolean()),
+  inputs: v.optional(
+    v.object({
+      age: v.number(),
+      calculationBasis: calculationBasisValidator,
+      heightCm: v.number(),
+      currentWeightKg: v.number(),
+      goalWeightKg: v.number(),
+      activityLevel: activityLevelValidator,
+      goalType: goalTypeValidator,
+      goalPace: goalPaceValidator,
+    }),
+  ),
+});
 
 const nutritionGoal = v.object({
   _id: v.id("nutritionGoals"),
@@ -13,31 +42,67 @@ const nutritionGoal = v.object({
   fatGrams: v.number(),
   effectiveFrom: v.string(),
   formulaVersion: v.string(),
-  calculationMetadata: v.any(),
+  calculationMetadata: calculationMetadataValidator,
   isManualOverride: v.boolean(),
   createdAt: v.number(),
 });
 
-function isValidLocalDate(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
+/**
+ * Writes a goal for `effectiveFrom`, replacing an existing goal for the same day.
+ *
+ * Historical goals are never rewritten — only the row that already shares this
+ * effective date is replaced, so a double-tap in Goal settings cannot leave two
+ * goals competing for the same day.
+ */
+export async function upsertGoalForDate(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  value: {
+    calories: number;
+    proteinGrams: number;
+    carbsGrams: number;
+    fatGrams: number;
+    effectiveFrom: string;
+    formulaVersion: string;
+    calculationMetadata: Doc<"nutritionGoals">["calculationMetadata"];
+    isManualOverride: boolean;
+  },
+): Promise<Id<"nutritionGoals">> {
+  assertDailyTargets(value);
+  assertLocalDate(value.effectiveFrom, "effectiveFrom");
 
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (year < 1_000 || month < 1 || month > 12 || day < 1) return false;
+  const rounded = {
+    ...value,
+    calories: Math.round(value.calories),
+    proteinGrams: Math.round(value.proteinGrams),
+    carbsGrams: Math.round(value.carbsGrams),
+    fatGrams: Math.round(value.fatGrams),
+  };
 
-  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const sameDay = await ctx.db
+    .query("nutritionGoals")
+    .withIndex("by_user_effective", (q) =>
+      q.eq("userId", userId).eq("effectiveFrom", value.effectiveFrom),
+    )
+    .unique();
+
+  if (sameDay) {
+    await ctx.db.replace(sameDay._id, {
+      ...rounded,
+      userId,
+      createdAt: sameDay.createdAt,
+    });
+    return sameDay._id;
+  }
+
+  return await ctx.db.insert("nutritionGoals", { ...rounded, userId, createdAt: Date.now() });
 }
 
 export const getActive = query({
   args: { localDate: v.string() },
   returns: v.union(nutritionGoal, v.null()),
   handler: async (ctx, { localDate }) => {
-    if (!isValidLocalDate(localDate)) {
-      throw new ConvexError("localDate must use the YYYY-MM-DD format");
-    }
-
+    assertLocalDate(localDate, "localDate");
     const user = await requireCurrentUser(ctx);
     return await ctx.db
       .query("nutritionGoals")
@@ -46,6 +111,19 @@ export const getActive = query({
       )
       .order("desc")
       .first();
+  },
+});
+
+export const getHistory = query({
+  args: {},
+  returns: v.array(nutritionGoal),
+  handler: async (ctx) => {
+    const user = await requireCurrentUser(ctx);
+    return await ctx.db
+      .query("nutritionGoals")
+      .withIndex("by_user_effective", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(24);
   },
 });
 
@@ -58,25 +136,20 @@ export const createGoal = mutation({
     effectiveFrom: v.string(),
     isManualOverride: v.boolean(),
     formulaVersion: v.optional(v.string()),
-    calculationMetadata: v.optional(v.any()),
+    calculationMetadata: v.optional(calculationMetadataValidator),
   },
+  returns: v.id("nutritionGoals"),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
-    if (!isValidLocalDate(args.effectiveFrom)) throw new ConvexError("Invalid effectiveFrom date");
-    if (args.calories < 1200 || args.calories > 6000) throw new ConvexError("Calories must be between 1,200 and 6,000");
-
-    const now = Date.now();
-    return ctx.db.insert("nutritionGoals", {
-      userId: user._id,
-      calories: Math.round(args.calories),
-      proteinGrams: Math.round(args.proteinGrams),
-      carbsGrams: Math.round(args.carbsGrams),
-      fatGrams: Math.round(args.fatGrams),
+    return await upsertGoalForDate(ctx, user._id, {
+      calories: args.calories,
+      proteinGrams: args.proteinGrams,
+      carbsGrams: args.carbsGrams,
+      fatGrams: args.fatGrams,
       effectiveFrom: args.effectiveFrom,
-      isManualOverride: args.isManualOverride,
       formulaVersion: args.formulaVersion ?? "mifflin-st-jeor-v1",
       calculationMetadata: args.calculationMetadata ?? {},
-      createdAt: now,
+      isManualOverride: args.isManualOverride,
     });
   },
 });

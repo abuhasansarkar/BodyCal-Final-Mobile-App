@@ -1,85 +1,100 @@
 import { useQuery } from "convex/react";
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { EmptyState, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
-import { curatedFoods, type CatalogFood } from "@/features/food/catalog";
+import { colors, macroColors, shadows } from "@/config/theme";
 import { api } from "@/lib/convex-api";
 import { currentLocalDate } from "@/lib/local-day";
+import { i18n } from "@/locales/i18n";
 import { Image, Pressable, ScrollView, Text, TextInput, View } from "@/tw";
+import type { GoalType, MealType } from "@/types/domain";
 
 const brandLogo = require("@/../assets/images/BodyCal-Black-Logo.png");
 
-type CategoryFilter = "all" | "breakfast" | "lunch" | "dinner" | "snack" | "shakes";
+type CategoryFilter = "all" | MealType;
 
-const categoryFilters: { key: CategoryFilter; label: string; icon: AppIconName }[] = [
-  { key: "all", label: "All", icon: "foods" },
-  { key: "breakfast", label: "Breakfast", icon: "calories" },
-  { key: "lunch", label: "Lunch", icon: "foods" },
-  { key: "dinner", label: "Dinner", icon: "nutrition" },
-  { key: "snack", label: "Snacks", icon: "hydration" },
-  { key: "shakes", label: "Shakes", icon: "protein" },
-];
+/** Catalog item as projected by `foods.searchCatalog`. */
+type CatalogItem = {
+  _id: string;
+  title: string;
+  description: string;
+  serving: string;
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  imageUrl: string | null;
+};
 
 export function FoodsScreen() {
-  if (hasBackendConfiguration) {
-    return <ConfiguredFoodsScreen />;
+  const { t } = useTranslation();
+  if (!hasBackendConfiguration) {
+    return (
+      <AppScreen edges={["top", "left", "right"]}>
+        <Text accessibilityRole="header" className="text-2xl font-bold text-app-text">
+          {t("tabs.foods")}
+        </Text>
+        <EmptyState description={t("config.body")} icon="foods" title={t("config.title")} />
+      </AppScreen>
+    );
   }
-  return <FoodsContent streak={3} userGoal="gain" />;
+  return <ConfiguredFoodsScreen />;
 }
 
+/**
+ * The Foods tab, now reading the Convex catalog.
+ *
+ * It previously rendered a hard-coded five-item array with remote Unsplash URLs,
+ * which meant every user saw the same five foods and the seeded catalog, search
+ * index and favourites were all unreachable.
+ */
 function ConfiguredFoodsScreen() {
+  const { t } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? "en";
+
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [category, setCategory] = React.useState<CategoryFilter>("all");
+
   const profile = useQuery(api.profiles.getCurrent, {});
   const streak = useQuery(api.dashboard.getLoggingStreak, { todayLocalDate: currentLocalDate() });
+  const goal: GoalType = profile?.goalType ?? "maintain";
 
-  const userGoal = profile?.goalType ?? "gain";
-  return <FoodsContent streak={streak ?? 3} userGoal={userGoal} />;
-}
+  const searching = searchQuery.trim().length > 0;
+  const results = useQuery(
+    api.foods.searchCatalog,
+    searching
+      ? { query: searchQuery, locale, mealType: category === "all" ? undefined : category }
+      : "skip",
+  );
+  const recommended = useQuery(
+    api.foods.getRecommendations,
+    searching ? "skip" : { goalType: goal, locale },
+  );
 
-function FoodsContent({ streak = 3, userGoal = "gain" }: { streak?: number; userGoal?: "lose" | "maintain" | "gain" }) {
-  const { t } = useTranslation();
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [selectedCategory, setSelectedCategory] = React.useState<CategoryFilter>("all");
+  const foods = searching ? results : recommended;
+  const visible = React.useMemo(() => {
+    if (!foods) return undefined;
+    if (category === "all" || searching) return foods;
+    return foods.filter((food) => food.mealTypes.includes(category));
+  }, [category, foods, searching]);
 
-  const headline =
-    userGoal === "lose"
-      ? "Foods for healthy weight loss"
-      : userGoal === "maintain"
-        ? "Foods for maintaining weight"
-        : "Foods for healthy weight gain";
+  const headline = t(`foodHeadline.${goal}`);
 
-  const subtitle =
-    userGoal === "lose"
-      ? "Nutrient-dense, satisfying meals to keep you full and energized."
-      : userGoal === "maintain"
-        ? "Balanced, wholesome meals to keep your current weight steady."
-        : "High-calorie, nutrient-dense meals to help you build muscle and reach your goals.";
-
-  const searchPlaceholder =
-    userGoal === "gain"
-      ? "Search high-calorie foods and meals"
-      : userGoal === "lose"
-        ? "Search low-calorie foods and meals"
-        : "Search balanced foods and meals";
-
-  const filteredFoods = curatedFoods.filter((item) => {
-    const matchesSearch =
-      !searchQuery.trim() ||
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      selectedCategory === "all" || item.category === selectedCategory || item.mealTypes.includes(selectedCategory as never);
-
-    return matchesSearch && matchesCategory;
-  });
+  const categories: { icon: AppIconName; key: CategoryFilter; label: string }[] = [
+    { key: "all", icon: "foods", label: t("foodCategories.all") },
+    { key: "breakfast", icon: "calories", label: t("foodCategories.breakfast") },
+    { key: "lunch", icon: "foods", label: t("foodCategories.lunch") },
+    { key: "dinner", icon: "nutrition", label: t("foodCategories.dinner") },
+    { key: "snack", icon: "hydration", label: t("foodCategories.snack") },
+  ];
 
   return (
     <AppScreen edges={["top", "left", "right"]}>
-      {/* Header Lockup: BodyCal Logo + Live Streak Badge */}
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <Image accessibilityLabel="BodyCal" className="h-10 w-10" contentFit="contain" source={brandLogo} />
@@ -87,123 +102,133 @@ function FoodsContent({ streak = 3, userGoal = "gain" }: { streak?: number; user
         </View>
 
         <View
-          accessibilityLabel={`${streak} day streak`}
-          className="flex-row items-center gap-1.5 rounded-2xl border border-app-border bg-white px-3 py-1.5"
-          style={{ borderCurve: "continuous", boxShadow: "0 4px 14px rgba(0, 0, 0, 0.04)" }}
+          accessibilityLabel={t("dashboard.streakLabel", { count: streak ?? 0 })}
+          className="min-h-11 flex-row items-center gap-1.5 rounded-2xl border border-app-border bg-white px-3"
+          style={{ borderCurve: "continuous", boxShadow: shadows.floating }}
         >
-          <AppIcon color="#FF6B00" name="calories" size={18} weight="semibold" />
-          <Text className="text-sm font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
-            {streak}
+          <AppIcon color={macroColors.calories} name="calories" size={18} weight="semibold" />
+          <Text
+            className="text-sm font-bold text-app-text"
+            selectable
+            style={{ fontVariant: ["tabular-nums"] }}
+          >
+            {streak ?? 0}
           </Text>
-          <Text className="text-sm font-semibold text-app-muted">day streak</Text>
         </View>
       </View>
 
-      {/* Search Input Bar */}
-      <View className="min-h-13 flex-row items-center gap-3 rounded-2xl border border-app-border bg-white px-4 py-3" style={{ borderCurve: "continuous" }}>
-        <AppIcon color="#737373" name="search" size={20} />
+      <View
+        className="min-h-12 flex-row items-center gap-3 rounded-2xl border border-app-border bg-white px-4"
+        style={{ borderCurve: "continuous" }}
+      >
+        <AppIcon color={colors.muted} name="search" size={20} />
         <TextInput
-          accessibilityLabel="Search foods and meals"
-          className="min-h-10 min-w-0 flex-1 text-base text-app-text placeholder:text-app-muted"
+          accessibilityLabel={t("foodSearch.placeholder")}
+          autoCorrect={false}
+          className="min-h-12 min-w-0 flex-1 text-base text-app-text"
           onChangeText={setSearchQuery}
-          placeholder={searchPlaceholder}
+          placeholder={t("foodSearch.placeholder")}
+          placeholderTextColor={colors.subtle}
+          returnKeyType="search"
           value={searchQuery}
         />
         {searchQuery ? (
-          <Pressable accessibilityLabel="Clear search" accessibilityRole="button" className="h-9 w-9 items-center justify-center rounded-full bg-app-surface" onPress={() => setSearchQuery("")}>
-            <AppIcon color="#737373" name="close" size={16} />
+          <Pressable
+            accessibilityLabel={t("foodSearch.clear")}
+            accessibilityRole="button"
+            className="h-11 w-11 items-center justify-center rounded-full"
+            onPress={() => setSearchQuery("")}
+          >
+            <AppIcon color={colors.muted} name="close" size={16} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* Horizontal Category Chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="flex-row gap-2 py-1">
-        {categoryFilters.map((cat) => {
-          const active = selectedCategory === cat.key;
+      <ScrollView
+        contentContainerClassName="flex-row gap-2 py-1"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {categories.map((item) => {
+          const active = category === item.key;
           return (
             <Pressable
-              key={cat.key}
-              accessibilityRole="button"
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
               className={
                 active
-                  ? "flex-row items-center gap-1.5 rounded-full bg-[#111111] px-4 py-2.5"
-                  : "flex-row items-center gap-1.5 rounded-full border border-app-border bg-white px-4 py-2.5"
+                  ? "min-h-11 flex-row items-center gap-1.5 rounded-full bg-[#111111] px-4"
+                  : "min-h-11 flex-row items-center gap-1.5 rounded-full border border-app-border bg-white px-4"
               }
-              onPress={() => setSelectedCategory(cat.key)}
+              key={item.key}
+              onPress={() => setCategory(item.key)}
             >
-              <AppIcon color={active ? "#FFFFFF" : "#737373"} name={cat.icon} size={16} />
-              <Text className={active ? "text-sm font-bold text-white" : "text-sm font-semibold text-app-text"}>
-                {cat.label}
+              <AppIcon color={active ? colors.white : colors.muted} name={item.icon} size={16} />
+              <Text
+                className={
+                  active ? "text-sm font-bold text-white" : "text-sm font-semibold text-app-text"
+                }
+              >
+                {item.label}
               </Text>
             </Pressable>
           );
         })}
       </ScrollView>
 
-      {/* Headline & Subtitle Section */}
-      <View className="gap-1.5 pt-1">
-        <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.4px] text-app-text">
-          {headline}
-        </Text>
-        <Text className="text-sm leading-5 text-app-muted">{subtitle}</Text>
-      </View>
+      <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.4px] text-app-text">
+        {searching ? t("foodSearch.title") : headline}
+      </Text>
 
-      {/* Sub-header: Recommended for you */}
-      <View className="flex-row items-center justify-between pt-1">
-        <Text className="text-base font-bold text-app-text">Recommended for you</Text>
-        <Text className="text-sm font-semibold text-app-muted">{filteredFoods.length} items</Text>
-      </View>
-
-      {/* Food Cards List */}
-      {filteredFoods.length === 0 ? (
-        <View className="items-center justify-center rounded-3xl border border-app-border bg-white p-8">
-          <AppIcon color="#737373" name="search" size={32} />
-          <Text className="mt-2 text-base font-semibold text-app-text">No matching foods found</Text>
-          <Text className="mt-1 text-center text-xs text-app-muted">
-            Try searching for another food or add a custom meal manually.
-          </Text>
-          <Link href="/(app)/add-food" asChild>
-            <Pressable accessibilityRole="button" className="mt-4 min-h-11 flex-row items-center gap-2 rounded-2xl bg-[#111111] px-5 py-2.5">
-              <AppIcon color="#FFFFFF" name="add" size={18} />
-              <Text className="text-sm font-semibold text-white">Add Custom Food</Text>
-            </Pressable>
-          </Link>
-        </View>
+      {visible === undefined ? (
+        <ScreenSkeleton lines={3} />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          action={t("foodSearch.addManually")}
+          description={t("foodSearch.emptyDescription")}
+          icon="search"
+          onAction={() => router.push("/(app)/food/manual")}
+          title={t("foodSearch.emptyTitle")}
+        />
       ) : (
         <View className="gap-4">
-          {filteredFoods.map((food) => (
-            <FoodCard key={food.id} food={food} />
+          {visible.map((food) => (
+            <FoodCard food={food} key={food._id} />
           ))}
         </View>
       )}
 
-      {/* Footer Disclaimer & Manual Entry Link */}
-      <View className="items-center gap-3 pt-2 pb-4">
-        <Text className="text-center text-xs text-app-muted">
-          {t("common.estimated")} · Curated nutritional suggestions
+      <View className="items-center gap-3 pb-4 pt-2">
+        <Text className="text-center text-xs text-app-muted" selectable>
+          {t("nutritionTargets.estimateNote")}
         </Text>
-        <Link href="/(app)/add-food" asChild>
-          <Pressable accessibilityRole="button" className="min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-app-border bg-white px-5 active:bg-app-surface">
-            <AppIcon color="#111111" name="add" size={19} weight="semibold" />
-            <Text className="text-sm font-semibold text-app-text">Log Custom Food Manually</Text>
-          </Pressable>
-        </Link>
+        <Pressable
+          accessibilityRole="button"
+          className="min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border border-app-border bg-white px-5 active:bg-app-surface"
+          onPress={() => router.push("/(app)/food/manual")}
+        >
+          <AppIcon color={colors.text} name="add" size={19} weight="semibold" />
+          <Text className="text-sm font-semibold text-app-text">{t("foodSearch.addManually")}</Text>
+        </Pressable>
       </View>
     </AppScreen>
   );
 }
 
-function FoodCard({ food }: { food: CatalogFood }) {
+function FoodCard({ food }: { food: CatalogItem }) {
+  const { i18n: instance, t } = useTranslation();
+  const number = new Intl.NumberFormat(instance.resolvedLanguage, { maximumFractionDigits: 0 });
+
   return (
-    <Link href={{ pathname: "/(app)/food/[id]", params: { id: food.id } }} asChild>
-      <Pressable
-        accessibilityLabel={food.title}
-        accessibilityRole="button"
-        className="min-h-[148px] overflow-hidden rounded-3xl border border-app-border bg-white active:bg-app-surface"
-        style={{ borderCurve: "continuous", boxShadow: "0 6px 24px rgba(0, 0, 0, 0.04)" }}
-      >
-        <View className="flex-row">
-          {/* Left Side: Photographic Food Image */}
+    <Pressable
+      accessibilityLabel={food.title}
+      accessibilityRole="button"
+      className="min-h-[148px] overflow-hidden rounded-3xl border border-app-border bg-white active:bg-app-surface"
+      onPress={() => router.push({ pathname: "/(app)/food/[id]", params: { id: food._id } })}
+      style={{ borderCurve: "continuous", boxShadow: shadows.card }}
+    >
+      <View className="flex-row">
+        {food.imageUrl ? (
           <Image
             accessibilityLabel={food.title}
             cachePolicy="memory"
@@ -212,54 +237,61 @@ function FoodCard({ food }: { food: CatalogFood }) {
             source={{ uri: food.imageUrl }}
             transition={200}
           />
+        ) : (
+          <View className="h-full w-[130px] items-center justify-center bg-app-surface">
+            <AppIcon color={colors.muted} name="foods" size={30} />
+          </View>
+        )}
 
-          {/* Right Side: Details & Macro Breakdown */}
-          <View className="min-w-0 flex-1 justify-between p-4 gap-2">
-            <View className="gap-1">
-              <Text accessibilityRole="header" className="text-base font-bold text-app-text" numberOfLines={1} selectable>
-                {food.title}
+        <View className="min-w-0 flex-1 justify-between gap-2 p-4">
+          <View className="gap-1">
+            <Text
+              accessibilityRole="header"
+              className="text-base font-bold text-app-text"
+              numberOfLines={1}
+              selectable
+            >
+              {food.title}
+            </Text>
+            <Text className="text-[13px] leading-[18px] text-app-muted" numberOfLines={2} selectable>
+              {food.description}
+            </Text>
+          </View>
+
+          <View className="gap-2">
+            <View className="flex-row items-center gap-1.5">
+              <AppIcon color={macroColors.calories} name="calories" size={15} weight="semibold" />
+              <Text
+                className="text-sm font-bold text-app-text"
+                selectable
+                style={{ fontVariant: ["tabular-nums"] }}
+              >
+                {t("dashboard.logCalories", { calories: number.format(food.calories) })}
               </Text>
-              <Text className="text-sm leading-5 text-app-muted" numberOfLines={2} selectable>
-                {food.description}
+              <Text className="text-xs text-app-muted" numberOfLines={1}>
+                · {food.serving}
               </Text>
             </View>
 
-            <Text className="text-sm font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
-              {food.calories} <Text className="text-sm font-medium text-app-muted">kcal</Text>
-            </Text>
-
-            <View className="h-px bg-app-border" />
-
-            {/* 3-Column Macro Breakdown */}
-            <View className="flex-row items-center justify-between">
-              <View className="items-start">
-                <Text className="text-xs font-bold text-[#2F80ED]" selectable style={{ fontVariant: ["tabular-nums"] }}>
-                  {food.proteinGrams}g
-                </Text>
-                <Text className="text-xs font-semibold text-app-muted">Protein</Text>
-              </View>
-
-              <View className="h-6 w-px bg-app-border" />
-
-              <View className="items-start">
-                <Text className="text-xs font-bold text-[#F97316]" selectable style={{ fontVariant: ["tabular-nums"] }}>
-                  {food.carbsGrams}g
-                </Text>
-                <Text className="text-xs font-semibold text-app-muted">Carbs</Text>
-              </View>
-
-              <View className="h-6 w-px bg-app-border" />
-
-              <View className="items-start">
-                <Text className="text-xs font-bold text-[#8B5CF6]" selectable style={{ fontVariant: ["tabular-nums"] }}>
-                  {food.fatGrams}g
-                </Text>
-                <Text className="text-xs font-semibold text-app-muted">Fat</Text>
-              </View>
+            <View className="flex-row gap-3">
+              <MacroChip color={macroColors.protein} label={t("nutritionTargets.protein")} value={food.proteinGrams} />
+              <MacroChip color={macroColors.carbs} label={t("nutritionTargets.carbs")} value={food.carbsGrams} />
+              <MacroChip color={macroColors.fat} label={t("nutritionTargets.fat")} value={food.fatGrams} />
             </View>
           </View>
         </View>
-      </Pressable>
-    </Link>
+      </View>
+    </Pressable>
+  );
+}
+
+function MacroChip({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <View accessibilityLabel={`${label} ${value}`} className="flex-row items-center gap-1">
+      <View className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+      <Text className="text-xs font-semibold text-app-muted" style={{ fontVariant: ["tabular-nums"] }}>
+        {value}g
+      </Text>
+    </View>
   );
 }
