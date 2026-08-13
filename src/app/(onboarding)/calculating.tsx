@@ -1,10 +1,11 @@
-import { useAction } from "convex/react";
+import { useAction, useConvexAuth } from "convex/react";
 import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { AccessibilityInfo, ActivityIndicator } from "react-native";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
+import { hasBackendConfiguration } from "@/config/env";
 import { OnboardingStageScreen } from "@/screens/onboarding/onboarding-stage-screen";
 import { api } from "@/lib/convex-api";
 import { useOnboarding } from "@/features/onboarding/onboarding-provider";
@@ -23,13 +24,24 @@ type GenerationStep = {
 export default function CalculatingRoute() {
   const { t } = useTranslation();
   const { draft, update } = useOnboarding();
+  const { isAuthenticated, isLoading: convexAuthLoading } = useConvexAuth();
   const generatePlan = useAction(api.planGeneration.generate);
   const [progress, setProgress] = React.useState(0);
   const [aiDone, setAiDone] = React.useState(false);
 
-  // ── 1. Fire AI request immediately on mount ──────────────────────────────
+  // ── 1. Fire AI request if authenticated, otherwise finish immediately ──────
   React.useEffect(() => {
     let mounted = true;
+
+    if (convexAuthLoading) return;
+
+    if (!hasBackendConfiguration || !isAuthenticated) {
+      setTimeout(() => {
+        if (mounted) setAiDone(true);
+      }, 0);
+      return;
+    }
+
     void generatePlan({
       calculationBasis: draft.calculationBasis,
       age: draft.age,
@@ -50,9 +62,11 @@ export default function CalculatingRoute() {
       .finally(() => {
         if (mounted) setAiDone(true);
       });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [convexAuthLoading, isAuthenticated]);
 
   // ── 2. Run progress animation; stall at 95% until AI finishes ───────────
   React.useEffect(() => {

@@ -15,6 +15,9 @@ import { currentLocalDate } from "@/lib/local-day";
 import { Image, Link, Pressable, Text, View } from "@/tw";
 
 const scanHero = require("@/../assets/images/welcome-food-scan-hero.png");
+const proteinFoodImage = require("@/../assets/images/food (2).png");
+const carbsFoodImage = require("@/../assets/images/food (3).png");
+const fatFoodImage = require("@/../assets/images/food (1).png");
 
 type Nutrition = { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number };
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -168,9 +171,9 @@ function TodayContent({
       <CalorieCard goal={goal?.calories ?? 0} progress={calorieProgress} remaining={remaining} summary={summary.calories} />
 
       <View className="flex-row gap-3">
-        <MacroCard color="#2F80ED" icon="protein" label={t("dashboard.proteinLeft")} value={Math.max(0, (goal?.proteinGrams ?? 0) - summary.proteinGrams)} goal={goal?.proteinGrams} />
-        <MacroCard color="#F97316" icon="carbs" label={t("dashboard.carbsLeft")} value={Math.max(0, (goal?.carbsGrams ?? 0) - summary.carbsGrams)} goal={goal?.carbsGrams} />
-        <MacroCard color="#8B5CF6" icon="fat" label={t("dashboard.fatLeft")} value={Math.max(0, (goal?.fatGrams ?? 0) - summary.fatGrams)} goal={goal?.fatGrams} />
+        <MacroCard color="#2F80ED" image={proteinFoodImage} label={t("dashboard.proteinLeft")} value={Math.max(0, (goal?.proteinGrams ?? 0) - summary.proteinGrams)} goal={goal?.proteinGrams} />
+        <MacroCard color="#F97316" image={carbsFoodImage} label={t("dashboard.carbsLeft")} value={Math.max(0, (goal?.carbsGrams ?? 0) - summary.carbsGrams)} goal={goal?.carbsGrams} />
+        <MacroCard color="#8B5CF6" image={fatFoodImage} label={t("dashboard.fatLeft")} value={Math.max(0, (goal?.fatGrams ?? 0) - summary.fatGrams)} goal={goal?.fatGrams} />
       </View>
 
       <ScanBanner />
@@ -256,7 +259,7 @@ function CalorieCard({ goal, progress, remaining, summary }: { goal: number; pro
   );
 }
 
-function MacroCard({ color, goal, icon, label, value }: { color: string; goal?: number; icon: AppIconName; label: string; value: number }) {
+function MacroCard({ color, goal, image, label, value }: { color: string; goal?: number; image: number; label: string; value: number }) {
   const progress = goal ? Math.min(100, Math.max(0, ((goal - value) / goal) * 100)) : 0;
   return (
     <View
@@ -272,8 +275,13 @@ function MacroCard({ color, goal, icon, label, value }: { color: string; goal?: 
       <View className="h-1.5 overflow-hidden rounded-full bg-[#E8E8E8]">
         <View className="h-full rounded-full" style={{ backgroundColor: color, width: `${progress}%` }} />
       </View>
-      <View className="mt-auto h-12 w-12 items-center justify-center self-center rounded-full" style={{ backgroundColor: `${color}14` }}>
-        <AppIcon color={color} name={icon} size={24} />
+      <View className="mt-auto h-14 w-14 items-center justify-center self-center">
+        <Image
+          accessible={false}
+          className="h-full w-full"
+          contentFit="contain"
+          source={image}
+        />
       </View>
     </View>
   );

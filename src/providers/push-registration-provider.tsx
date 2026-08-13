@@ -1,7 +1,7 @@
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { useMutation, useQuery } from "convex/react";
 import type { PropsWithChildren } from "react";
 import React from "react";
 import { Platform } from "react-native";
@@ -22,7 +22,8 @@ import { i18n } from "@/locales/i18n";
  * stops targeting a device that can no longer receive anything.
  */
 export function PushRegistrationProvider({ children }: PropsWithChildren) {
-  const preferences = useQuery(api.notifications.getPreferences, {});
+  const { isAuthenticated } = useConvexAuth();
+  const preferences = useQuery(api.notifications.getPreferences, isAuthenticated ? {} : "skip");
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const lastToken = React.useRef<string | null>(null);

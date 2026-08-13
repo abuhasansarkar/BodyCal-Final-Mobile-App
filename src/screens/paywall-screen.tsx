@@ -35,9 +35,9 @@ function BrandHeader({ onClose, onRestore, showRestore }: { onClose: () => void;
           </Pressable>
         ) : <View className="h-12 w-16" />}
       </View>
-      <View className="items-center pb-2">
-        <Image accessibilityLabel="BodyCal" contentFit="contain" source={logo} style={{ height: 76, width: 76 }} />
-        <Text className="text-[21px] font-bold tracking-[-0.5px] text-[#111111]">BodyCal</Text>
+      <View className="items-center pb-4">
+        <Image accessibilityLabel="BodyCal" contentFit="contain" source={logo} style={{ height: 80, width: 80 }} />
+        <Text className="text-[22px] font-bold tracking-[-0.5px] text-[#111111]">BodyCal</Text>
       </View>
     </>
   );
@@ -45,10 +45,12 @@ function BrandHeader({ onClose, onRestore, showRestore }: { onClose: () => void;
 
 function BenefitRow({ description, icon, title }: { description: string; icon: AppIconName; title: string }) {
   return (
-    <View className="min-h-[62px] flex-row items-center gap-4 rounded-2xl border border-[#ECECEC] bg-white px-4 py-3" style={{ borderCurve: "continuous" }}>
-      <AppIcon name={icon} size={27} />
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text className="text-[15px] font-semibold text-[#111111]" selectable>{title}</Text>
+    <View className="min-h-[68px] flex-row items-center gap-4 rounded-2xl border border-[#ECECEC] bg-white px-5 py-4" style={{ borderCurve: "continuous" }}>
+      <View className="h-10 w-10 items-center justify-center rounded-full bg-[#F5F5F5]">
+        <AppIcon name={icon} size={22} />
+      </View>
+      <View className="min-w-0 flex-1 gap-1">
+        <Text className="text-[16px] font-semibold text-[#111111]" selectable>{title}</Text>
         <Text className="text-[14px] font-medium leading-[20px] text-[#525252]" selectable>{description}</Text>
       </View>
     </View>
@@ -58,21 +60,23 @@ function BenefitRow({ description, icon, title }: { description: string; icon: A
 function StepOne({ cta, disclosure, onContinue }: { cta: string; disclosure: string; onContinue: () => void }) {
   const { t } = useTranslation();
   return (
-    <View className="flex-1 gap-4">
-      <View className="items-center gap-2 px-4">
-        <Text accessibilityRole="header" className="text-center text-[29px] font-bold leading-[35px] tracking-[-0.7px] text-[#111111]" selectable>{t("paywall.title")}</Text>
+    <View className="flex-1 gap-5">
+      <View className="items-center gap-3 px-4 pt-2">
+        <Text accessibilityRole="header" className="text-center text-[32px] font-bold leading-[38px] tracking-[-0.8px] text-[#111111]" selectable>{t("paywall.title")}</Text>
         <Text className="text-center text-[15px] font-medium leading-[22px] text-[#525252]" selectable>{t("paywallFlow.benefitsSubtitle")}</Text>
       </View>
-      <View className="gap-2">
+      <View className="gap-3">
         <BenefitRow description={t("paywallFlow.nutritionDescription")} icon="nutrition" title={t("paywallFlow.nutritionTitle")} />
         <BenefitRow description={t("paywallFlow.trackingDescription")} icon="goal" title={t("paywallFlow.trackingTitle")} />
         <BenefitRow description={t("paywallFlow.progressDescription")} icon="progress" title={t("paywallFlow.progressTitle")} />
       </View>
-      <Image accessibilityLabel={t("welcome.mealImage")} className="min-h-[180px] flex-1 rounded-3xl" contentFit="cover" source={meal} />
-      <View className="items-center gap-3">
-        <View className="flex-row items-center gap-2 rounded-full bg-[#F5F5F5] px-4 py-2"><AppIcon name="motivation" size={17} /><Text className="text-sm font-semibold text-[#111111]">{t("paywallFlow.flexibleBadge")}</Text></View>
-        <PrimaryButton className="min-h-[60px] w-full rounded-2xl" label={cta} labelClassName="text-[18px]" onPress={onContinue} />
-        <Text className="text-center text-[14px] font-medium leading-[20px] text-[#525252]" selectable>{disclosure}</Text>
+      <View className="mt-auto items-center gap-4 pb-4">
+        <View className="flex-row items-center gap-2 rounded-full bg-[#F5F5F5] px-4 py-2.5">
+          <AppIcon name="motivation" size={17} />
+          <Text className="text-[13px] font-semibold text-[#111111]">{t("paywallFlow.flexibleBadge")}</Text>
+        </View>
+        <PrimaryButton className="min-h-[56px] w-full rounded-full" label={cta} labelClassName="text-[17px]" onPress={onContinue} />
+        <Text className="text-center text-[13px] font-medium leading-[18px] text-[#737373]" selectable>{disclosure}</Text>
       </View>
     </View>
   );

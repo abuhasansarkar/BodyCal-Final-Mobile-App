@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Linking } from "react-native";
@@ -11,12 +11,12 @@ import { ScreenTitle, SectionCard, SectionHeader } from "@/components/ui/section
 import { EmptyState, InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import {
-  DEFAULT_REMINDER_TIMES,
-  getPermissionStatus,
-  requestNotificationPermission,
-  syncReminders,
-  type PermissionStatus,
-  type ReminderKey,
+    DEFAULT_REMINDER_TIMES,
+    getPermissionStatus,
+    requestNotificationPermission,
+    syncReminders,
+    type PermissionStatus,
+    type ReminderKey,
 } from "@/features/notifications/scheduler";
 import { api } from "@/lib/convex-api";
 import { currentTimezone } from "@/lib/local-day";
@@ -46,7 +46,8 @@ export function SettingsNotificationsScreen() {
 }
 
 function ConfiguredNotificationSettings() {
-  const preferences = useQuery(api.notifications.getPreferences, {});
+  const { isAuthenticated } = useConvexAuth();
+  const preferences = useQuery(api.notifications.getPreferences, isAuthenticated ? {} : "skip");
   const [permission, setPermission] = React.useState<PermissionStatus | null>(null);
 
   React.useEffect(() => {
