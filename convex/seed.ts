@@ -531,3 +531,325 @@ export const seedAll = internalMutation({
     return null;
   },
 });
+
+// ---------------------------------------------------------------------------
+// Ninety-day demo history
+// ---------------------------------------------------------------------------
+
+type MealPreset = {
+  mealType: MealType;
+  foodName: string;
+  serving: string;
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  source: "ai" | "manual" | "catalog";
+};
+
+const breakfastPresets: MealPreset[] = [
+  { mealType: "breakfast", foodName: "Protein Pancake Stack", serving: "1 stack", calories: 850, proteinGrams: 42, carbsGrams: 102, fatGrams: 30, source: "catalog" },
+  { mealType: "breakfast", foodName: "Greek Yogurt & Fresh Berries", serving: "1 bowl", calories: 280, proteinGrams: 25, carbsGrams: 32, fatGrams: 6, source: "catalog" },
+  { mealType: "breakfast", foodName: "Berry Spinach Protein Smoothie", serving: "1 glass", calories: 340, proteinGrams: 30, carbsGrams: 40, fatGrams: 5, source: "ai" },
+  { mealType: "breakfast", foodName: "Oats, Banana & Almond Butter", serving: "1 bowl", calories: 520, proteinGrams: 18, carbsGrams: 74, fatGrams: 17, source: "manual" },
+];
+
+const lunchPresets: MealPreset[] = [
+  { mealType: "lunch", foodName: "Chicken & Rice Power Bowl", serving: "1 bowl", calories: 720, proteinGrams: 45, carbsGrams: 78, fatGrams: 28, source: "catalog" },
+  { mealType: "lunch", foodName: "Grilled Turkey & Avocado Wrap", serving: "1 wrap", calories: 480, proteinGrams: 36, carbsGrams: 42, fatGrams: 18, source: "catalog" },
+  { mealType: "lunch", foodName: "Salmon Avocado Quinoa Bowl", serving: "1 bowl", calories: 610, proteinGrams: 38, carbsGrams: 48, fatGrams: 24, source: "ai" },
+  { mealType: "lunch", foodName: "Beef & Broccoli Stir Fry", serving: "1 plate", calories: 660, proteinGrams: 44, carbsGrams: 58, fatGrams: 26, source: "manual" },
+];
+
+const dinnerPresets: MealPreset[] = [
+  { mealType: "dinner", foodName: "Steak Alfredo Pasta", serving: "1 plate", calories: 980, proteinGrams: 55, carbsGrams: 96, fatGrams: 38, source: "catalog" },
+  { mealType: "dinner", foodName: "Salmon Avocado Quinoa Bowl", serving: "1 bowl", calories: 610, proteinGrams: 38, carbsGrams: 48, fatGrams: 24, source: "catalog" },
+  { mealType: "dinner", foodName: "Roast Chicken, Potatoes & Greens", serving: "1 plate", calories: 740, proteinGrams: 52, carbsGrams: 62, fatGrams: 28, source: "ai" },
+  { mealType: "dinner", foodName: "Lentil & Vegetable Curry", serving: "1 bowl", calories: 540, proteinGrams: 24, carbsGrams: 76, fatGrams: 14, source: "manual" },
+];
+
+const snackPresets: MealPreset[] = [
+  { mealType: "snack", foodName: "Peanut Butter Mass Shake", serving: "1 glass", calories: 650, proteinGrams: 32, carbsGrams: 88, fatGrams: 22, source: "catalog" },
+  { mealType: "snack", foodName: "Cottage Cheese & Pineapple", serving: "1 cup", calories: 220, proteinGrams: 24, carbsGrams: 20, fatGrams: 4, source: "manual" },
+  { mealType: "snack", foodName: "Trail Mix", serving: "40 g", calories: 210, proteinGrams: 6, carbsGrams: 18, fatGrams: 13, source: "manual" },
+];
+
+/**
+ * Deterministic pseudo-random in [0, 1).
+ *
+ * Seeded from the day index so a re-run reproduces the same history instead of
+ * generating fresh noise, which keeps the seeder idempotent in practice as well
+ * as in its duplicate checks.
+ */
+function pseudoRandom(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43_758.5453;
+  return value - Math.floor(value);
+}
+
+function pick<T>(items: T[], seed: number): T {
+  return items[Math.floor(pseudoRandom(seed) * items.length) % items.length];
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Writes a realistic multi-month history for ONE named account: effective-dated
+ * nutrition goals, weight trend, daily meals, custom foods, favourites,
+ * reminder preferences and app settings.
+ *
+ * Local demos and screenshots only. Every write is keyed by a deterministic
+ * `clientRequestId` or checked against existing rows first, so re-running tops
+ * up missing days rather than duplicating history.
+ *
+ * Deliberately NOT seeded:
+ * - `subscriptionMirror`, because RevenueCat is the only authority for the pro
+ *   entitlement and a fabricated mirror row would grant premium access that no
+ *   purchase backs.
+ * - `aiScans` and `imageUploads`, because both require a real `_storage` id and
+ *   a mutation cannot write blobs. Meals that would have come from a scan are
+ *   still recorded with `source: "ai"`.
+ */
+export const seedHistoryForUser = internalMutation({
+  args: { clerkUserId: v.string(), days: v.optional(v.number()) },
+  returns: v.object({
+    days: v.number(),
+    goalsInserted: v.number(),
+    weightLogsInserted: v.number(),
+    foodLogsInserted: v.number(),
+    customFoodsInserted: v.number(),
+    favoritesInserted: v.number(),
+    notificationPreferences: v.string(),
+    userSettings: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const days = Math.min(180, Math.max(1, Math.floor(args.days ?? 90)));
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .unique();
+    if (!user) throw new Error(`No BodyCal user for Clerk id ${args.clerkUserId}`);
+
+    const now = Date.now();
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    const timezone = profile?.timezone ?? "America/New_York";
+    const goalWeightKg = profile?.goalWeightKg ?? 78;
+    const endWeightKg = profile?.currentWeightKg ?? 72.5;
+    // Walk backwards from today's weight to a plausible starting point.
+    const startWeightKg = endWeightKg - (goalWeightKg > endWeightKg ? 4.5 : -4.5);
+
+    const localDateAt = (at: number) => new Date(at).toISOString().slice(0, 10);
+    const dayStart = (offset: number) => now - offset * DAY_MS;
+
+    // ---- Effective-dated nutrition goals -----------------------------------
+    // Two entries so the history shows a goal change without rewriting the past.
+    const goalPlan = [
+      { offset: days, calories: 2_650, proteinGrams: 150, carbsGrams: 300, fatGrams: 78 },
+      { offset: Math.floor(days / 3), calories: 2_850, proteinGrams: 160, carbsGrams: 320, fatGrams: 85 },
+    ];
+    let goalsInserted = 0;
+    for (const plan of goalPlan) {
+      const effectiveFrom = localDateAt(dayStart(plan.offset));
+      const existing = await ctx.db
+        .query("nutritionGoals")
+        .withIndex("by_user_effective", (q) => q.eq("userId", user._id).eq("effectiveFrom", effectiveFrom))
+        .unique();
+      if (existing) continue;
+      await ctx.db.insert("nutritionGoals", {
+        userId: user._id,
+        calories: plan.calories,
+        proteinGrams: plan.proteinGrams,
+        carbsGrams: plan.carbsGrams,
+        fatGrams: plan.fatGrams,
+        effectiveFrom,
+        formulaVersion: "mifflin-st-jeor-v1",
+        calculationMetadata: {
+          bmr: 1_750,
+          tdee: 2_600,
+          appliedAdjustment: plan.calories - 2_600,
+          paceWasCapped: false,
+          aiGenerated: false,
+        },
+        isManualOverride: false,
+        createdAt: dayStart(plan.offset),
+      });
+      goalsInserted += 1;
+    }
+
+    // ---- Weight trend, every second day ------------------------------------
+    let weightLogsInserted = 0;
+    for (let offset = days; offset >= 0; offset -= 2) {
+      const at = dayStart(offset);
+      const clientRequestId = `seed_weight_${days}_${offset}`;
+      const existing = await ctx.db
+        .query("weightLogs")
+        .withIndex("by_user_request", (q) => q.eq("userId", user._id).eq("clientRequestId", clientRequestId))
+        .unique();
+      if (existing) continue;
+
+      const progress = (days - offset) / days;
+      const noise = (pseudoRandom(offset + 1) - 0.5) * 0.5;
+      const weight = Math.round((startWeightKg + (endWeightKg - startWeightKg) * progress + noise) * 10) / 10;
+      await ctx.db.insert("weightLogs", {
+        userId: user._id,
+        normalizedKg: weight,
+        displayValue: weight,
+        displayUnit: profile?.weightUnit ?? "kg",
+        localDate: localDateAt(at),
+        timezone,
+        clientRequestId,
+        createdAt: at,
+        updatedAt: at,
+      });
+      weightLogsInserted += 1;
+    }
+
+    // ---- Daily meals --------------------------------------------------------
+    let foodLogsInserted = 0;
+    for (let offset = days; offset >= 0; offset -= 1) {
+      // A couple of unlogged days a fortnight keeps streaks and averages honest.
+      if (pseudoRandom(offset * 7.7) < 0.08) continue;
+
+      const at = dayStart(offset);
+      const localDate = localDateAt(at);
+      const meals: MealPreset[] = [
+        pick(breakfastPresets, offset * 3.1),
+        pick(lunchPresets, offset * 5.3),
+        pick(dinnerPresets, offset * 7.1),
+      ];
+      if (pseudoRandom(offset * 2.3) > 0.45) meals.push(pick(snackPresets, offset * 11.7));
+
+      for (const [index, meal] of meals.entries()) {
+        const clientRequestId = `seed_food_${days}_${offset}_${index}`;
+        const existing = await ctx.db
+          .query("foodLogs")
+          .withIndex("by_user_request", (q) => q.eq("userId", user._id).eq("clientRequestId", clientRequestId))
+          .unique();
+        if (existing) continue;
+
+        // Spread entries across the day so "recently uploaded" ordering looks real.
+        const loggedAt = at - (meals.length - index) * 3_600_000;
+        await ctx.db.insert("foodLogs", {
+          userId: user._id,
+          localDate,
+          timezone,
+          mealType: meal.mealType,
+          source: meal.source,
+          foodName: meal.foodName,
+          serving: meal.serving,
+          servingUnit: "portion",
+          quantity: 1,
+          calories: meal.calories,
+          proteinGrams: meal.proteinGrams,
+          carbsGrams: meal.carbsGrams,
+          fatGrams: meal.fatGrams,
+          clientRequestId,
+          createdAt: loggedAt,
+          updatedAt: loggedAt,
+        });
+        foodLogsInserted += 1;
+      }
+    }
+
+    // ---- Custom foods -------------------------------------------------------
+    const customFoodSeeds = [
+      { name: "Home Protein Shake", serving: "1 shaker (500 ml)", calories: 380, proteinGrams: 40, carbsGrams: 32, fatGrams: 8, favorite: true },
+      { name: "Mum's Chicken Curry", serving: "1 bowl (350 g)", calories: 620, proteinGrams: 42, carbsGrams: 48, fatGrams: 26, favorite: false },
+      { name: "Overnight Oats", serving: "1 jar (300 g)", calories: 450, proteinGrams: 22, carbsGrams: 62, fatGrams: 14, favorite: true },
+    ];
+    const existingCustom = await ctx.db
+      .query("customFoods")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    let customFoodsInserted = 0;
+    for (const seed of customFoodSeeds) {
+      if (existingCustom.some((item) => item.name === seed.name)) continue;
+      await ctx.db.insert("customFoods", {
+        userId: user._id,
+        name: seed.name,
+        serving: seed.serving,
+        servingUnit: "portion",
+        calories: seed.calories,
+        proteinGrams: seed.proteinGrams,
+        carbsGrams: seed.carbsGrams,
+        fatGrams: seed.fatGrams,
+        favorite: seed.favorite,
+        createdAt: now,
+        updatedAt: now,
+      });
+      customFoodsInserted += 1;
+    }
+
+    // ---- Favourites over real catalog rows -----------------------------------
+    let favoritesInserted = 0;
+    for (const slug of ["chicken-rice-power-bowl", "greek-yogurt-berries"]) {
+      const item = await ctx.db
+        .query("foodCatalog")
+        .withIndex("by_slug", (q) => q.eq("slug", slug))
+        .unique();
+      if (!item) continue;
+      const existing = await ctx.db
+        .query("favorites")
+        .withIndex("by_user_reference", (q) => q.eq("userId", user._id).eq("referenceId", item._id))
+        .unique();
+      if (existing) continue;
+      await ctx.db.insert("favorites", {
+        userId: user._id,
+        referenceType: "catalog",
+        referenceId: item._id,
+        createdAt: now,
+      });
+      favoritesInserted += 1;
+    }
+
+    // ---- Reminder preferences -------------------------------------------------
+    const existingPreferences = await ctx.db
+      .query("notificationPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    let notificationPreferences = "kept";
+    if (!existingPreferences) {
+      await ctx.db.insert("notificationPreferences", {
+        userId: user._id,
+        enabled: true,
+        categories: { daily: true, meal: true, hydration: false, progress: true, motivation: false },
+        times: { daily: "09:00", meal: "12:30", hydration: "15:00", progress: "19:00", motivation: "08:00" },
+        timezone,
+        permissionStatus: "granted",
+        updatedAt: now,
+      });
+      notificationPreferences = "created";
+    }
+
+    // ---- App settings ---------------------------------------------------------
+    const existingSettings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+    let userSettings = "kept";
+    if (!existingSettings) {
+      await ctx.db.insert("userSettings", {
+        userId: user._id,
+        languageMode: "system",
+        units: "metric",
+        appearance: "system",
+        analyticsConsent: false,
+        updatedAt: now,
+      });
+      userSettings = "created";
+    }
+
+    return {
+      days,
+      goalsInserted,
+      weightLogsInserted,
+      foodLogsInserted,
+      customFoodsInserted,
+      favoritesInserted,
+      notificationPreferences,
+      userSettings,
+    };
+  },
+});

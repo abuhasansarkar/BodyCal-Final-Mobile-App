@@ -35,6 +35,7 @@ const appSymbols = {
   help: { ios: "questionmark.circle", android: "help", web: "help" },
   history: { ios: "clock.arrow.circlepath", android: "history", web: "history" },
   heart: { ios: "heart.fill", android: "favorite", web: "favorite" },
+  heartOutline: { ios: "heart", android: "favorite_border", web: "favorite_border" },
   home: { ios: "house.fill", android: "home", web: "home" },
   /** Unselected tab-bar variant. Selected tabs use the filled symbol. */
   homeOutline: { ios: "house", android: "home", web: "home" },

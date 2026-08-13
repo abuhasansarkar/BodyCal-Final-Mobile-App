@@ -349,6 +349,7 @@ export const de: ScreenTranslations = {
     resultCount_other: "{{count}} Ergebnisse",
     favoriteAdd: "Zu Favoriten hinzufügen",
     favoriteRemove: "Aus Favoriten entfernen",
+    removeCustom: "{{name}} entfernen",
   },
   foodDetail: {
     notFound: "Dieses Lebensmittel ist nicht mehr verfügbar.",
@@ -362,6 +363,7 @@ export const de: ScreenTranslations = {
     loggedOffline: "Offline gespeichert. Wird synchronisiert, sobald du wieder online bist.",
     logError: "Dieses Lebensmittel konnte nicht erfasst werden. Bitte versuche es erneut.",
     perServing: "Pro Portion",
+    servingSize: "Portionsgröße",
     ingredients: "Zutaten",
   },
   manualFood: {

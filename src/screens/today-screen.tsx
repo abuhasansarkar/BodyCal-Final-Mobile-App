@@ -114,18 +114,21 @@ function ConfiguredDashboard() {
 }
 
 function GreetingHeader() {
+  const { t } = useTranslation();
   const { user } = useUser();
-  const userName = user?.firstName ?? "";
+  // `dashboard.greeting.*` already carries the ", {{name}}" clause per language,
+  // so the name is interpolated rather than concatenated — word order differs.
   const hour = new Date().getHours();
-  const timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const period = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+  const name = user?.firstName?.trim() || t("dashboard.friend");
 
   return (
     <View className="min-w-0 flex-1">
-      <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.5px] text-app-text" numberOfLines={1} selectable>
-        {userName ? `${timeGreeting}, ${userName} 👋` : `${timeGreeting} 👋`}
+      <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.5px] text-app-text" numberOfLines={2} selectable>
+        {`${t(`dashboard.greeting.${period}`, { name })} 👋`}
       </Text>
       <Text className="text-sm font-medium text-app-muted" selectable>
-        Stay consistent. Results follow.
+        {t("dashboard.encouragement")}
       </Text>
     </View>
   );
@@ -158,12 +161,13 @@ function TodayContent({
   return (
     <AppScreen edges={["top", "left", "right"]}>
       {/*
-        The brand lockup and streak used to be the navigator's header. Native
-        tabs render no header, so they live in the screen now — which also
-        matches `main-dashbaord.png`, where both sit above the week strip.
+        Native tabs render no header, so the screen carries its own. The greeting
+        takes the slot the brand lockup held, with the streak beside it.
+        `items-start` keeps the badge level with the greeting's first line rather
+        than centred against two lines of text.
       */}
-      <View className="flex-row items-center justify-between gap-3">
-        <BrandTitle />
+      <View className="flex-row items-start justify-between gap-3">
+        <GreetingHeader />
         <LoggingStreakBadge value={loggingStreak} />
       </View>
       {isOffline ? (
@@ -174,8 +178,6 @@ function TodayContent({
           </Text>
         </View>
       ) : null}
-
-      <GreetingHeader />
 
       <DashboardWeekCarousel locale={locale} onSelectDate={onSelectDate} selectedDate={selectedDate} />
       <CalorieCard goal={goal?.calories ?? 0} progress={calorieProgress} remaining={remaining} summary={summary.calories} />
@@ -263,7 +265,11 @@ function CalorieCard({ goal, progress, remaining, summary }: { goal: number; pro
             <View className="absolute inset-0 rounded-full border-[9px] border-transparent" style={{ borderLeftColor: "#111111", borderBottomColor: "#111111", transform: [{ rotate: `${(progress - 50) * 3.6 - 135}deg` }] }} />
           </>
         ) : null}
-        <AppIcon name="calories" size={32} weight="semibold" />
+        {/*
+          Decorative: the ring's own accessibilityLabel already announces the
+          calorie progress, so the mark must not add a second announcement.
+        */}
+        <Image accessible={false} className="h-11 w-11" contentFit="contain" source={brandLogo} />
       </View>
     </View>
   );
@@ -303,15 +309,6 @@ function MacroCard({ color, goal, image, label, value }: { color: string; goal?:
           source={image}
         />
       </View>
-    </View>
-  );
-}
-
-function BrandTitle() {
-  return (
-    <View className="min-w-0 flex-1 flex-row items-center gap-2">
-      <Image accessibilityLabel="BodyCal" className="h-11 w-11" contentFit="contain" source={brandLogo} />
-      <Text className="text-[26px] font-bold tracking-[-0.5px] text-app-text" numberOfLines={1}>BodyCal</Text>
     </View>
   );
 }

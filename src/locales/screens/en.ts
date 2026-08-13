@@ -347,6 +347,7 @@ export const en = {
     resultCount_other: "{{count}} results",
     favoriteAdd: "Add to favourites",
     favoriteRemove: "Remove from favourites",
+    removeCustom: "Remove {{name}}",
   },
   foodDetail: {
     notFound: "This food is no longer available.",
@@ -360,6 +361,7 @@ export const en = {
     loggedOffline: "Saved offline. It will sync when you reconnect.",
     logError: "This food could not be logged. Please try again.",
     perServing: "Per serving",
+    servingSize: "Serving size",
     ingredients: "Ingredients",
   },
   manualFood: {

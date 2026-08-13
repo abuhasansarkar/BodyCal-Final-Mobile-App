@@ -347,6 +347,7 @@ export const es: ScreenTranslations = {
     resultCount_other: "{{count}} resultados",
     favoriteAdd: "Añadir a favoritos",
     favoriteRemove: "Quitar de favoritos",
+    removeCustom: "Eliminar {{name}}",
   },
   foodDetail: {
     notFound: "Este alimento ya no está disponible.",
@@ -360,6 +361,7 @@ export const es: ScreenTranslations = {
     loggedOffline: "Guardado sin conexión. Se sincronizará al reconectarte.",
     logError: "No se pudo registrar este alimento. Inténtalo de nuevo.",
     perServing: "Por ración",
+    servingSize: "Ración",
     ingredients: "Ingredientes",
   },
   manualFood: {

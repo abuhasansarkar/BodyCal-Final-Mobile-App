@@ -343,6 +343,7 @@ export const ja: ScreenTranslations = {
     resultCount_other: "{{count}} 件",
     favoriteAdd: "お気に入りに追加",
     favoriteRemove: "お気に入りから削除",
+    removeCustom: "{{name}}を削除",
   },
   foodDetail: {
     notFound: "この食品は利用できなくなりました。",
@@ -356,6 +357,7 @@ export const ja: ScreenTranslations = {
     loggedOffline: "オフラインで保存しました。再接続時に同期します。",
     logError: "この食品を記録できませんでした。もう一度お試しください。",
     perServing: "1 食あたり",
+    servingSize: "1食分",
     ingredients: "材料",
   },
   manualFood: {

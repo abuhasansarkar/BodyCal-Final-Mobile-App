@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -47,8 +47,15 @@ function ConfiguredSearch() {
   });
   const recent = useQuery(api.foods.getRecent, { limit: 8 });
   const customFoods = useQuery(api.foods.listCustomFoods, {});
+  const favorites = useQuery(api.foods.getFavorites, { locale });
+  const toggleFavorite = useMutation(api.foods.toggleFavorite);
+  const removeCustomFood = useMutation(api.foods.removeCustomFood);
 
-  const loading = results === undefined || recent === undefined || customFoods === undefined;
+  const loading =
+    results === undefined ||
+    recent === undefined ||
+    customFoods === undefined ||
+    favorites === undefined;
 
   return (
     <AppScreen>
@@ -114,6 +121,14 @@ function ConfiguredSearch() {
                     }
                     serving={food.serving}
                     title={food.title}
+                    trailing={
+                      <FavoriteToggle
+                        isFavorite={food.isFavorite}
+                        onToggle={() =>
+                          void toggleFavorite({ referenceType: "catalog", referenceId: food._id })
+                        }
+                      />
+                    }
                   />
                 ))}
               </View>
@@ -126,6 +141,33 @@ function ConfiguredSearch() {
               onAction={() => router.push("/(app)/food/manual")}
               title={t("foodSearch.emptyTitle")}
             />
+          ) : null}
+
+          {favorites.length > 0 ? (
+            <View className="gap-3">
+              <SectionHeader title={t("foodSearch.favoritesSection")} />
+              <View className="gap-2">
+                {favorites.map((food) => (
+                  <FoodResultRow
+                    calories={food.calories}
+                    key={food._id}
+                    onPress={() =>
+                      router.push({ pathname: "/(app)/food/[id]", params: { id: food._id } })
+                    }
+                    serving={food.serving}
+                    title={food.title}
+                    trailing={
+                      <FavoriteToggle
+                        isFavorite
+                        onToggle={() =>
+                          void toggleFavorite({ referenceType: "catalog", referenceId: food._id })
+                        }
+                      />
+                    }
+                  />
+                ))}
+              </View>
+            </View>
           ) : null}
 
           {customFoods.length > 0 ? (
@@ -144,6 +186,17 @@ function ConfiguredSearch() {
                     }
                     serving={food.serving}
                     title={food.name}
+                    trailing={
+                      <Pressable
+                        accessibilityLabel={t("foodSearch.removeCustom", { name: food.name })}
+                        accessibilityRole="button"
+                        className="h-11 w-11 items-center justify-center rounded-full active:bg-app-surface"
+                        hitSlop={6}
+                        onPress={() => void removeCustomFood({ id: food._id })}
+                      >
+                        <AppIcon color={colors.muted} name="delete" size={19} />
+                      </Pressable>
+                    }
                   />
                 ))}
               </View>
@@ -190,5 +243,31 @@ function ConfiguredSearch() {
         <Text className="text-base font-semibold text-app-accent">{t("foodSearch.addManually")}</Text>
       </Pressable>
     </AppScreen>
+  );
+}
+
+/**
+ * Favourite switch for a catalog food.
+ *
+ * `toggleFavorite` already flips server-side and the list query is reactive, so
+ * there is no local state to drift out of sync with the database.
+ */
+function FavoriteToggle({ isFavorite, onToggle }: { isFavorite: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      accessibilityLabel={isFavorite ? t("foodSearch.favoriteRemove") : t("foodSearch.favoriteAdd")}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isFavorite }}
+      className="h-11 w-11 items-center justify-center rounded-full active:bg-app-surface"
+      hitSlop={6}
+      onPress={onToggle}
+    >
+      <AppIcon
+        color={isFavorite ? colors.danger : colors.muted}
+        name={isFavorite ? "heart" : "heartOutline"}
+        size={20}
+      />
+    </Pressable>
   );
 }

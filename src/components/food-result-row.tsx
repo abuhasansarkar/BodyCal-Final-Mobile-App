@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
@@ -13,11 +14,14 @@ export function FoodResultRow({
   onPress,
   serving,
   title,
+  trailing,
 }: {
   calories: number;
   onPress: () => void;
   serving: string;
   title: string;
+  /** Optional action rendered instead of the chevron, e.g. favourite or delete. */
+  trailing?: ReactNode;
 }) {
   const { i18n, t } = useTranslation();
   const number = new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 0 });
@@ -48,7 +52,7 @@ export function FoodResultRow({
       >
         {number.format(calories)}
       </Text>
-      <AppIcon color={colors.subtle} name="chevronRight" size={18} />
+      {trailing ?? <AppIcon color={colors.subtle} name="chevronRight" size={18} />}
     </Pressable>
   );
 }

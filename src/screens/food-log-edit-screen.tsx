@@ -90,6 +90,7 @@ type FoodLogRecord = {
   localDate: string;
   timezone: string;
   clientRequestId: string;
+  imageUrl: string | null;
 };
 
 function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }) {
@@ -148,13 +149,8 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
 
   return (
     <AppScreen>
-      {/*
-        `getById` returns the stored document, which carries `imageStorageId` but
-        no resolved URL, so this is always the generic placeholder for now.
-        Showing the entry's own photo needs the storage URL resolving in the
-        query, the way `dashboard.getRecentUploads` already does.
-      */}
-      <FoodThumbnail className="h-52 w-full rounded-3xl bg-app-surface" imageUrl={null} name={foodName} />
+      {/* The entry's own photo when it has one; a generic meal still otherwise. */}
+      <FoodThumbnail className="h-52 w-full rounded-3xl bg-app-surface" imageUrl={log.imageUrl} name={foodName} />
 
       <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">
         {t("foodLogEdit.title")}

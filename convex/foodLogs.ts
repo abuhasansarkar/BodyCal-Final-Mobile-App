@@ -124,12 +124,32 @@ export const getDaySummary = query({
   },
 });
 
+/**
+ * One owned entry, with its photo resolved to a URL.
+ *
+ * The stored document only carries a storage id, so the edit screen had no way
+ * to show the meal photo and always fell back to a placeholder. The lookup
+ * mirrors `dashboard.getRecentUploads`: prefer the log's own image, otherwise the
+ * linked scan's, and only when that scan belongs to the same user and its image
+ * has not passed retention.
+ */
 export const getById = query({
   args: { id: v.id("foodLogs") },
-  returns: v.union(foodLog, v.null()),
+  returns: v.union(foodLog.extend({ imageUrl: v.union(v.string(), v.null()) }), v.null()),
   handler: async (ctx, { id }) => {
     const user = await requireCurrentUser(ctx);
-    return await loadOwned(ctx, id, user._id);
+    const log = await loadOwned(ctx, id, user._id);
+    if (!log) return null;
+
+    let storageId = log.imageStorageId;
+    if (!storageId && log.aiScanId) {
+      const scan = await ctx.db.get(log.aiScanId);
+      if (scan && scan.userId === user._id && !scan.imageDeletedAt) {
+        storageId = scan.imageStorageId;
+      }
+    }
+
+    return { ...log, imageUrl: storageId ? await ctx.storage.getUrl(storageId) : null };
   },
 });
 

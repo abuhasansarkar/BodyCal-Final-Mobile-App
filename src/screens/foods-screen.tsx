@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { FoodThumbnail } from "@/components/food-thumbnail";
 import { EmptyState, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { colors, macroColors, shadows } from "@/config/theme";
@@ -95,11 +96,13 @@ function ConfiguredFoodsScreen() {
 
   return (
     <AppScreen edges={["top", "left", "right"]}>
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <Image accessibilityLabel="BodyCal" className="h-10 w-10" contentFit="contain" source={brandLogo} />
-          <Text className="text-2xl font-bold tracking-[-0.5px] text-app-text">BodyCal</Text>
-        </View>
+      {/*
+        Standing alone since the wordmark was dropped, the mark needs more size
+        to hold the corner against the streak badge. `min-h-14` fixes the row
+        height so both sides stay centred on the same axis.
+      */}
+      <View className="min-h-14 flex-row items-center justify-between">
+        <Image accessibilityLabel="BodyCal" className="h-14 w-14" contentFit="contain" source={brandLogo} />
 
         <View
           accessibilityLabel={t("dashboard.streakLabel", { count: streak ?? 0 })}
@@ -228,6 +231,15 @@ function ConfiguredFoodsScreen() {
   );
 }
 
+/**
+ * One recommended or searched food.
+ *
+ * `foods.png` gives the card a tall photo down the left and a macro row beneath
+ * the calories. No catalog row carries an image yet, so `FoodThumbnail` supplies
+ * a generic meal still rather than the grey cutlery tile that made every card
+ * look broken. Both the image and the card use fixed heights: percentage sizing
+ * does not resolve on the image element here.
+ */
 function FoodCard({ food }: { food: CatalogItem }) {
   const { i18n: instance, t } = useTranslation();
   const number = new Intl.NumberFormat(instance.resolvedLanguage, { maximumFractionDigits: 0 });
@@ -240,33 +252,15 @@ function FoodCard({ food }: { food: CatalogItem }) {
       onPress={() => router.push({ pathname: "/(app)/food/[id]", params: { id: food._id } })}
       style={{ borderCurve: "continuous", boxShadow: shadows.card }}
     >
-      <View className="min-h-[148px] flex-row items-stretch">
-        {food.imageUrl ? (
-          <Image
-            accessibilityLabel={food.title}
-            cachePolicy="memory"
-            className="w-[120px] bg-app-surface"
-            contentFit="cover"
-            source={{ uri: food.imageUrl }}
-            transition={200}
-          />
-        ) : (
-          <View className="min-h-[148px] w-[120px] items-center justify-center self-stretch bg-app-surface">
-            <AppIcon color={colors.muted} name="foods" size={30} />
-          </View>
-        )}
+      <View className="flex-row items-stretch">
+        <FoodThumbnail className="h-44 w-36 bg-app-surface" imageUrl={food.imageUrl} name={food.title} />
 
         <View className="min-w-0 flex-1 justify-between gap-2 p-4">
           <View className="gap-1">
-            <Text
-              accessibilityRole="header"
-              className="text-base font-bold text-app-text"
-              numberOfLines={1}
-              selectable
-            >
+            <Text accessibilityRole="header" className="text-base font-bold text-app-text" numberOfLines={2} selectable>
               {food.title}
             </Text>
-            <Text className="text-[13px] leading-[18px] text-app-muted" numberOfLines={2} selectable>
+            <Text className="text-[13px] leading-4.5 text-app-muted" numberOfLines={2} selectable>
               {food.description}
             </Text>
           </View>
@@ -274,22 +268,19 @@ function FoodCard({ food }: { food: CatalogItem }) {
           <View className="gap-2">
             <View className="flex-row items-center gap-1.5">
               <AppIcon color={macroColors.calories} name="calories" size={15} weight="semibold" />
-              <Text
-                className="text-sm font-bold text-app-text"
-                selectable
-                style={{ fontVariant: ["tabular-nums"] }}
-              >
+              <Text className="text-sm font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
                 {t("dashboard.logCalories", { calories: number.format(food.calories) })}
-              </Text>
-              <Text className="text-xs text-app-muted" numberOfLines={1}>
-                · {food.serving}
               </Text>
             </View>
 
-            <View className="flex-row gap-3">
-              <MacroChip color={macroColors.protein} label={t("nutritionTargets.protein")} value={food.proteinGrams} />
-              <MacroChip color={macroColors.carbs} label={t("nutritionTargets.carbs")} value={food.carbsGrams} />
-              <MacroChip color={macroColors.fat} label={t("nutritionTargets.fat")} value={food.fatGrams} />
+            <View className="h-px bg-app-border-soft" />
+
+            <View className="flex-row items-center">
+              <MacroStat color={macroColors.protein} label={t("nutritionTargets.protein")} value={food.proteinGrams} />
+              <View className="h-7 w-px bg-app-border-soft" />
+              <MacroStat color={macroColors.carbs} label={t("nutritionTargets.carbs")} value={food.carbsGrams} />
+              <View className="h-7 w-px bg-app-border-soft" />
+              <MacroStat color={macroColors.fat} label={t("nutritionTargets.fat")} value={food.fatGrams} />
             </View>
           </View>
         </View>
@@ -298,13 +289,17 @@ function FoodCard({ food }: { food: CatalogItem }) {
   );
 }
 
-function MacroChip({ color, label, value }: { color: string; label: string; value: number }) {
+/** Coloured macro value over a muted label, as the reference shows. */
+function MacroStat({ color, label, value }: { color: string; label: string; value: number }) {
   return (
-    <View accessibilityLabel={`${label} ${value}`} className="flex-row items-center gap-1">
-      <View className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-      <Text className="text-xs font-semibold text-app-muted" style={{ fontVariant: ["tabular-nums"] }}>
+    <View accessibilityLabel={`${label} ${value}g`} className="min-w-0 flex-1 items-center gap-0.5">
+      <Text className="text-[15px] font-bold" selectable style={{ color, fontVariant: ["tabular-nums"] }}>
         {value}g
+      </Text>
+      <Text className="text-[11px] font-medium text-app-muted" numberOfLines={1}>
+        {label}
       </Text>
     </View>
   );
 }
+

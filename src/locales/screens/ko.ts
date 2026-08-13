@@ -343,6 +343,7 @@ export const ko: ScreenTranslations = {
     resultCount_other: "{{count}}개 결과",
     favoriteAdd: "즐겨찾기에 추가",
     favoriteRemove: "즐겨찾기에서 제거",
+    removeCustom: "{{name}} 삭제",
   },
   foodDetail: {
     notFound: "이 음식은 더 이상 제공되지 않습니다.",
@@ -356,6 +357,7 @@ export const ko: ScreenTranslations = {
     loggedOffline: "오프라인으로 저장했습니다. 다시 연결되면 동기화됩니다.",
     logError: "이 음식을 기록하지 못했습니다. 다시 시도해 주세요.",
     perServing: "1회 제공량 기준",
+    servingSize: "1회 제공량",
     ingredients: "재료",
   },
   manualFood: {
