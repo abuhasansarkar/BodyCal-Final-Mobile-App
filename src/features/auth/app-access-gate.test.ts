@@ -23,7 +23,7 @@ describe("app access gate", () => {
     })).toBe(appAccessDestinations.loading);
   });
 
-  it("sends incomplete users back to onboarding completion", () => {
+  it("sends incomplete users to the first onboarding question", () => {
     expect(resolveAppAccess({
       currentUser: { onboardingCompleted: false },
       isAuthLoaded: true,
@@ -31,6 +31,8 @@ describe("app access gate", () => {
       isConvexLoading: false,
       isSignedIn: true,
     })).toBe(appAccessDestinations.onboarding);
+    // Never a later step: the completion mutation would persist placeholder body metrics.
+    expect(appAccessDestinations.onboarding).toBe("/(onboarding)/goal");
   });
 
   it("allows completed users into the app", () => {

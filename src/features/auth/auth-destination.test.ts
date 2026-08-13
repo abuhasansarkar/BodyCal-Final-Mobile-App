@@ -4,6 +4,7 @@ import {
   authDestinations,
   getAuthDestinationKey,
   getAuthDismissRoute,
+  getPostSignUpRoute,
   resolveAuthDestination,
 } from "@/features/auth/auth-destination";
 
@@ -12,6 +13,16 @@ describe("authentication destinations", () => {
     expect(resolveAuthDestination("onboarding")).toBe(authDestinations.onboarding);
     expect(getAuthDestinationKey(authDestinations.onboarding)).toBe("onboarding");
     expect(getAuthDismissRoute(authDestinations.onboarding)).toBe("/(onboarding)/result");
+  });
+
+  it("never sends a resuming guest back to the first onboarding question", () => {
+    // The draft is already answered by the time sign-in is offered.
+    expect(authDestinations.onboarding).not.toBe("/(onboarding)/goal");
+    expect(getPostSignUpRoute(authDestinations.onboarding)).toBe(authDestinations.onboarding);
+  });
+
+  it("starts a public sign-up at the first onboarding question", () => {
+    expect(getPostSignUpRoute(authDestinations.app)).toBe("/(onboarding)/goal");
   });
 
   it("resolves paywall authentication without falling back to Today", () => {

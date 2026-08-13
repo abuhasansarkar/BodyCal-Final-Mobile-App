@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
-import type { AuthDestination } from "@/features/auth/auth-destination";
+import { getPostSignUpRoute, type AuthDestination } from "@/features/auth/auth-destination";
 import { Image } from "@/tw/image";
 import { Pressable, Text } from "@/tw";
 
@@ -23,7 +23,7 @@ export function SocialAuthButtons({ destination }: { destination: AuthDestinatio
       if (!result.createdSessionId || !result.setActive) throw new Error(t("auth.authenticationFailed"));
       await result.setActive({ session: result.createdSessionId });
       const targetDestination = result.signUp?.status === "complete"
-        ? "/(onboarding)/goal" as const
+        ? getPostSignUpRoute(destination)
         : destination;
       router.replace(targetDestination);
     } catch {

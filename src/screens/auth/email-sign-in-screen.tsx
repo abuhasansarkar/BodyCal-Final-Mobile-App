@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AppIcon } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
-import type { AuthDestination } from "@/features/auth/auth-destination";
+import { getPostSignUpRoute, type AuthDestination } from "@/features/auth/auth-destination";
 import { AuthField } from "@/screens/auth/auth-fields";
 import { Link, Pressable, Text, View } from "@/tw";
 
@@ -132,7 +132,7 @@ export function EmailSignInScreen({ destination = "/(app)/(tabs)/today", initial
           setFormError(t("auth.additionalVerification"));
           return;
         }
-        await signUp.finalize({ navigate: () => router.replace("/(onboarding)/goal") });
+        await signUp.finalize({ navigate: () => router.replace(getPostSignUpRoute(destination)) });
       }
     } catch (err: any) {
       setFormError(err?.message ?? t("auth.authenticationFailed"));
