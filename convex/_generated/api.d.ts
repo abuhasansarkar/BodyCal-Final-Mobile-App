@@ -33,6 +33,7 @@ import type * as settings from "../settings.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as subscriptionsActions from "../subscriptionsActions.js";
 import type * as subscriptionsDb from "../subscriptionsDb.js";
+import type * as tests_setup from "../tests/setup.js";
 import type * as uploads from "../uploads.js";
 import type * as users from "../users.js";
 import type * as usersActions from "../usersActions.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   subscriptions: typeof subscriptions;
   subscriptionsActions: typeof subscriptionsActions;
   subscriptionsDb: typeof subscriptionsDb;
+  "tests/setup": typeof tests_setup;
   uploads: typeof uploads;
   users: typeof users;
   usersActions: typeof usersActions;

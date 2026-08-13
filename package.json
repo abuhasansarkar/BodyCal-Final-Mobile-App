@@ -77,9 +77,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch",
-    "test:convex": "jest --selectProjects convex --runInBand",
+    "test:convex": "jest --selectProjects convex --runInBand --forceExit",
     "test:app": "jest --selectProjects app --runInBand"
   },
   "overrides": {

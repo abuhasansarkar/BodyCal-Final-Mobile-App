@@ -14,38 +14,110 @@ import schema from "../schema";
  * compiles to CommonJS.
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
+function loadModule(relPath: string) {
+  const m = require(relPath);
+  return Promise.resolve({ ...m, default: m });
+}
+
 export const modules = {
   // convex-test locates the module root through the "_generated" entries.
-  "_generated/api.js": () => Promise.resolve(require("../_generated/api")),
-  "_generated/server.js": () => Promise.resolve(require("../_generated/server")),
-  "ai.ts": () => Promise.resolve(require("../ai")),
-  "aiDb.ts": () => Promise.resolve(require("../aiDb")),
-  "dashboard.ts": () => Promise.resolve(require("../dashboard")),
-  "feedback.ts": () => Promise.resolve(require("../feedback")),
-  "foodLogs.ts": () => Promise.resolve(require("../foodLogs")),
-  "foods.ts": () => Promise.resolve(require("../foods")),
-  "http.ts": () => Promise.resolve(require("../http")),
-  "maintenance.ts": () => Promise.resolve(require("../maintenance")),
-  "notifications.ts": () => Promise.resolve(require("../notifications")),
-  "nutritionGoals.ts": () => Promise.resolve(require("../nutritionGoals")),
-  "onboarding.ts": () => Promise.resolve(require("../onboarding")),
-  "planGeneration.ts": () => Promise.resolve(require("../planGeneration")),
-  "planGenerationDb.ts": () => Promise.resolve(require("../planGenerationDb")),
-  "profiles.ts": () => Promise.resolve(require("../profiles")),
-  "seed.ts": () => Promise.resolve(require("../seed")),
-  "settings.ts": () => Promise.resolve(require("../settings")),
-  "subscriptions.ts": () => Promise.resolve(require("../subscriptions")),
-  "subscriptionsActions.ts": () => Promise.resolve(require("../subscriptionsActions")),
-  "subscriptionsDb.ts": () => Promise.resolve(require("../subscriptionsDb")),
-  "uploads.ts": () => Promise.resolve(require("../uploads")),
-  "users.ts": () => Promise.resolve(require("../users")),
-  "usersActions.ts": () => Promise.resolve(require("../usersActions")),
-  "usersDb.ts": () => Promise.resolve(require("../usersDb")),
-  "weights.ts": () => Promise.resolve(require("../weights")),
+  "_generated/api.js": () => loadModule("../_generated/api"),
+  "_generated/server.js": () => loadModule("../_generated/server"),
+  "ai.ts": () => loadModule("../ai"),
+  "ai.js": () => loadModule("../ai"),
+  "ai": () => loadModule("../ai"),
+  "aiDb.ts": () => loadModule("../aiDb"),
+  "aiDb.js": () => loadModule("../aiDb"),
+  "aiDb": () => loadModule("../aiDb"),
+  "dashboard.ts": () => loadModule("../dashboard"),
+  "dashboard.js": () => loadModule("../dashboard"),
+  "dashboard": () => loadModule("../dashboard"),
+  "feedback.ts": () => loadModule("../feedback"),
+  "feedback.js": () => loadModule("../feedback"),
+  "feedback": () => loadModule("../feedback"),
+  "foodLogs.ts": () => loadModule("../foodLogs"),
+  "foodLogs.js": () => loadModule("../foodLogs"),
+  "foodLogs": () => loadModule("../foodLogs"),
+  "foods.ts": () => loadModule("../foods"),
+  "foods.js": () => loadModule("../foods"),
+  "foods": () => loadModule("../foods"),
+  "http.ts": () => loadModule("../http"),
+  "http.js": () => loadModule("../http"),
+  "http": () => loadModule("../http"),
+  "maintenance.ts": () => loadModule("../maintenance"),
+  "maintenance.js": () => loadModule("../maintenance"),
+  "maintenance": () => loadModule("../maintenance"),
+  "notifications.ts": () => loadModule("../notifications"),
+  "notifications.js": () => loadModule("../notifications"),
+  "notifications": () => loadModule("../notifications"),
+  "nutritionGoals.ts": () => loadModule("../nutritionGoals"),
+  "nutritionGoals.js": () => loadModule("../nutritionGoals"),
+  "nutritionGoals": () => loadModule("../nutritionGoals"),
+  "onboarding.ts": () => loadModule("../onboarding"),
+  "onboarding.js": () => loadModule("../onboarding"),
+  "onboarding": () => loadModule("../onboarding"),
+  "planGeneration.ts": () => loadModule("../planGeneration"),
+  "planGeneration.js": () => loadModule("../planGeneration"),
+  "planGeneration": () => loadModule("../planGeneration"),
+  "planGenerationDb.ts": () => loadModule("../planGenerationDb"),
+  "planGenerationDb.js": () => loadModule("../planGenerationDb"),
+  "planGenerationDb": () => loadModule("../planGenerationDb"),
+  "profiles.ts": () => loadModule("../profiles"),
+  "profiles.js": () => loadModule("../profiles"),
+  "profiles": () => loadModule("../profiles"),
+  "seed.ts": () => loadModule("../seed"),
+  "seed.js": () => loadModule("../seed"),
+  "seed": () => loadModule("../seed"),
+  "settings.ts": () => loadModule("../settings"),
+  "settings.js": () => loadModule("../settings"),
+  "settings": () => loadModule("../settings"),
+  "subscriptions.ts": () => loadModule("../subscriptions"),
+  "subscriptions.js": () => loadModule("../subscriptions"),
+  "subscriptions": () => loadModule("../subscriptions"),
+  "subscriptionsActions.ts": () => loadModule("../subscriptionsActions"),
+  "subscriptionsActions.js": () => loadModule("../subscriptionsActions"),
+  "subscriptionsActions": () => loadModule("../subscriptionsActions"),
+  "subscriptionsDb.ts": () => loadModule("../subscriptionsDb"),
+  "subscriptionsDb.js": () => loadModule("../subscriptionsDb"),
+  "subscriptionsDb": () => loadModule("../subscriptionsDb"),
+  "uploads.ts": () => loadModule("../uploads"),
+  "uploads.js": () => loadModule("../uploads"),
+  "uploads": () => loadModule("../uploads"),
+  "users.ts": () => loadModule("../users"),
+  "users.js": () => loadModule("../users"),
+  "users": () => loadModule("../users"),
+  "usersActions.ts": () => loadModule("../usersActions"),
+  "usersActions.js": () => loadModule("../usersActions"),
+  "usersActions": () => loadModule("../usersActions"),
+  "usersDb.ts": () => loadModule("../usersDb"),
+  "usersDb.js": () => loadModule("../usersDb"),
+  "usersDb": () => loadModule("../usersDb"),
+  "weights.ts": () => loadModule("../weights"),
+  "weights.js": () => loadModule("../weights"),
+  "weights": () => loadModule("../weights"),
 };
 
+const activeInstances = new Set<TestConvex>();
+
 export function setupTest() {
-  return convexTest(schema, modules);
+  const t = convexTest(schema, modules);
+  activeInstances.add(t);
+  return t;
+}
+
+declare const afterEach: any;
+
+if (typeof afterEach === "function") {
+  afterEach(async () => {
+    for (const t of activeInstances) {
+      try {
+        await t.finishInProgressScheduledFunctions();
+      } catch {
+        // Ignore errors during teardown cleanup
+      }
+    }
+    activeInstances.clear();
+  });
 }
 
 /**
