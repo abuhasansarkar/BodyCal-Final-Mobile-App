@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
 import { Pressable, Text, TextInput, View } from "@/tw";
@@ -7,6 +8,7 @@ import { Pressable, Text, TextInput, View } from "@/tw";
 type Props = ComponentProps<typeof TextInput> & { label: string; error?: string | null };
 
 export function AuthField({ error, label, secureTextEntry, ...props }: Props) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = React.useState(false);
   const [hidePassword, setHidePassword] = React.useState(secureTextEntry ?? false);
 
@@ -37,7 +39,7 @@ export function AuthField({ error, label, secureTextEntry, ...props }: Props) {
         />
         {isPassword ? (
           <Pressable
-            accessibilityLabel={hidePassword ? "Show password" : "Hide password"}
+            accessibilityLabel={hidePassword ? t("common.showPassword") : t("common.hidePassword")}
             accessibilityRole="button"
             className="-mr-2 h-11 w-11 items-center justify-center rounded-full active:opacity-60"
             hitSlop={8}

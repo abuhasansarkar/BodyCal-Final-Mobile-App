@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/expo";
 import { useConvexAuth, useQuery } from "convex/react";
 import { Redirect } from "expo-router";
 import { Stack } from "expo-router/stack";
+import { useTranslation } from "react-i18next";
 
 import { hasBackendConfiguration } from "@/config/env";
 import { appAccessDestinations, resolveAppAccess } from "@/features/auth/app-access-gate";
@@ -27,16 +28,17 @@ function ProtectedAppLayout() {
 }
 
 function AppStack() {
+  const { t } = useTranslation();
   return (
     <Stack screenOptions={{ contentStyle: { backgroundColor: "#FFFFFF" }, headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="add-food" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5, 1], title: "Add food" }} />
+      <Stack.Screen name="add-food" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5, 1], title: t("authFlow.addSheetTitle") }} />
       <Stack.Screen name="paywall" options={{ presentation: "fullScreenModal", headerShown: false }} />
       <Stack.Screen name="benefits" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="review" options={{ headerShown: false }} />
       <Stack.Screen name="thank-you" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="scan/camera" options={{ headerShown: false }} />
-      <Stack.Screen name="weight/add" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5], title: "Add weight" }} />
+      <Stack.Screen name="weight/add" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5], title: t("weight.addTitle") }} />
     </Stack>
   );
 }

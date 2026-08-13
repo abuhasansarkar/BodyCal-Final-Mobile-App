@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
 
-import { AppIcon } from "@/components/app-icon";
 import { getPostSignUpRoute, type AuthDestination } from "@/features/auth/auth-destination";
 import { Image } from "@/tw/image";
 import { Pressable, Text } from "@/tw";
@@ -41,7 +40,18 @@ export function SocialAuthButtons({ destination }: { destination: AuthDestinatio
         disabled={activeProvider !== null}
         onPress={() => void complete("apple")}
       >
-        <AppIcon color="#FFFFFF" name="apple" size={22} weight="semibold" />
+        {/*
+          The supplied black mark, tinted white for the black button — Apple's
+          required lockup. The previous SF Symbol had no Material equivalent, so
+          the Android button rendered with no logo at all.
+        */}
+        <Image
+          accessibilityIgnoresInvertColors
+          className="h-5.5 w-5.5"
+          contentFit="contain"
+          source={require("@/../assets/images/apple-sign-in-logo.png")}
+          tintColor="#FFFFFF"
+        />
         <Text className="text-base font-semibold text-white">
           {activeProvider === "apple" ? t("auth.signingIn") : t("auth.apple")}
         </Text>

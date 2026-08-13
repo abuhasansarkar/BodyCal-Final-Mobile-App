@@ -2,6 +2,8 @@ import type { ScreenTranslations } from "./en";
 
 export const ja: ScreenTranslations = {
   common: {
+    showPassword: "パスワードを表示",
+    hidePassword: "パスワードを非表示",
     save: "保存",
     saving: "保存中…",
     saved: "保存しました",
@@ -31,6 +33,7 @@ export const ja: ScreenTranslations = {
   config: {
     title: "セットアップが必要です",
     body: "続けるには Clerk と Convex の設定を追加してください。",
+    previewAction: "残りのフローをプレビュー",
   },
   postPurchaseReview: {
     honestTitle: "率直なご意見がもっとも役立ちます",
@@ -53,6 +56,7 @@ export const ja: ScreenTranslations = {
     forgotBody: "確認済みのメールアドレスにワンタイムコードを送信します。",
     sendResetCode: "コードを送信",
     addTitle: "どの方法で記録しますか？",
+    addSheetTitle: "食事を追加",
     scanWithAi: "AI で解析",
     searchFoods: "食品を検索",
     proBadge: "Pro",

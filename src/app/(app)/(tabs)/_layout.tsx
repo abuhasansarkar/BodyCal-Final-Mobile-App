@@ -1,14 +1,20 @@
 import { router, Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
-import type { ColorValue } from "react-native";
+import { StyleSheet, type ColorValue } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { Image, Text, View } from "@/tw";
 
 const brandLogo = require("@/../assets/images/BodyCal-Black-Logo.png");
 
+/** Bar height above the home indicator. The inset is added, never absorbed. */
+const TAB_BAR_CONTENT_HEIGHT = 62;
+
 export default function TabsLayout() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -17,7 +23,17 @@ export default function TabsLayout() {
         tabBarActiveTintColor: "#111111",
         tabBarInactiveTintColor: "#737373",
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-        tabBarStyle: { backgroundColor: "#FFFFFF", borderTopColor: "#E8E8E8", height: 74, paddingBottom: 7, paddingTop: 7 },
+        // A fixed height swallows the bottom inset, so on a device with a home
+        // indicator the labels sat underneath it. Add the inset to the height
+        // instead of letting it eat into the content.
+        tabBarStyle: {
+          backgroundColor: "#FFFFFF",
+          borderTopColor: "#E8E8E8",
+          borderTopWidth: StyleSheet.hairlineWidth,
+          height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: 7,
+        },
       }}
     >
       <Tabs.Screen name="today" options={{ headerRightContainerStyle: { paddingRight: 12 }, headerShadowVisible: false, headerTitle: () => <BrandTitle />, headerTitleAlign: "left", title: t("tabs.home"), tabBarIcon: ({ color }) => <TabIcon color={color} name="home" /> }} />

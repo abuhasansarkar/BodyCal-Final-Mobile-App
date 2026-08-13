@@ -8,6 +8,8 @@
  */
 export const en = {
   common: {
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     save: "Save",
     saving: "Saving…",
     saved: "Saved",
@@ -37,6 +39,7 @@ export const en = {
   config: {
     title: "Setup required",
     body: "Add your Clerk and Convex configuration to continue.",
+    previewAction: "Preview the remaining flow",
   },
   postPurchaseReview: {
     honestTitle: "Honest feedback helps most",
@@ -59,6 +62,7 @@ export const en = {
     forgotBody: "We will send a one-time code to your verified email address.",
     sendResetCode: "Send reset code",
     addTitle: "How would you like to log?",
+    addSheetTitle: "Add food",
     scanWithAi: "Scan with AI",
     searchFoods: "Search foods",
     proBadge: "Pro",

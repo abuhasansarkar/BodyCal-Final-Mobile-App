@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
 import { colors } from "@/config/theme";
@@ -21,6 +22,7 @@ type FieldProps = ComponentProps<typeof TextInput> & {
 };
 
 export function Field({ error, hint, label, secureTextEntry, suffix, ...props }: FieldProps) {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = React.useState(false);
   const [hidden, setHidden] = React.useState(secureTextEntry ?? false);
   const isPassword = Boolean(secureTextEntry);
@@ -53,6 +55,7 @@ export function Field({ error, hint, label, secureTextEntry, suffix, ...props }:
         {suffix ? <Text className="pl-2 text-sm font-medium text-app-muted">{suffix}</Text> : null}
         {isPassword ? (
           <Pressable
+            accessibilityLabel={hidden ? t("common.showPassword") : t("common.hidePassword")}
             accessibilityRole="button"
             accessibilityState={{ selected: !hidden }}
             className="-mr-2 h-11 w-11 items-center justify-center rounded-full active:opacity-60"

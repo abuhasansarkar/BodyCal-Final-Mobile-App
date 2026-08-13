@@ -2,6 +2,8 @@ import type { ScreenTranslations } from "./en";
 
 export const fr: ScreenTranslations = {
   common: {
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
     save: "Enregistrer",
     saving: "Enregistrement…",
     saved: "Enregistré",
@@ -31,6 +33,7 @@ export const fr: ScreenTranslations = {
   config: {
     title: "Configuration requise",
     body: "Ajoutez votre configuration Clerk et Convex pour continuer.",
+    previewAction: "Aperçu du parcours restant",
   },
   postPurchaseReview: {
     honestTitle: "Un avis sincère nous aide le plus",
@@ -53,6 +56,7 @@ export const fr: ScreenTranslations = {
     forgotBody: "Nous enverrons un code à usage unique à votre e-mail vérifié.",
     sendResetCode: "Envoyer le code",
     addTitle: "Comment souhaitez-vous enregistrer ?",
+    addSheetTitle: "Ajouter un aliment",
     scanWithAi: "Analyser avec l'IA",
     searchFoods: "Rechercher des aliments",
     proBadge: "Pro",

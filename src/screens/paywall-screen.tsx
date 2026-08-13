@@ -7,21 +7,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { PrimaryButton } from "@/components/primary-button";
-import { useSubscription } from "@/features/subscription/subscription-provider";
+import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
+import { freeTrialDays } from "@/features/subscription/trial-length";
 import { Link, Pressable, ScrollView, Text, View } from "@/tw";
 
 const logo = require("@/../assets/images/BodyCal-Black-Logo.png");
-const meal = require("@/../assets/images/welcome-meal-hero.png");
 type Plan = "annual" | "monthly";
 type Step = 1 | 2 | 3;
+type Notice = { message: string; tone: "error" | "info" };
 
-function freeTrialDays(subscriptionPackage: PurchasesPackage | null) {
-  const intro = subscriptionPackage?.product.introPrice;
-  if (!intro || intro.price !== 0 || intro.periodUnit !== "DAY") return null;
-  return intro.periodNumberOfUnits * intro.cycles;
+function packageTrialDays(subscriptionPackage: PurchasesPackage | null) {
+  return freeTrialDays(subscriptionPackage?.product.introPrice);
 }
 
-function BrandHeader({ onClose, onRestore, showRestore }: { onClose: () => void; onRestore: () => void; showRestore: boolean }) {
+function BrandHeader({ onClose, onRestore }: { onClose: () => void; onRestore: () => void }) {
   const { t } = useTranslation();
   return (
     <>
@@ -29,11 +28,10 @@ function BrandHeader({ onClose, onRestore, showRestore }: { onClose: () => void;
         <Pressable accessibilityLabel={t("paywallFlow.close")} accessibilityRole="button" className="h-12 w-12 items-center justify-center rounded-full active:bg-app-surface" onPress={onClose}>
           <AppIcon name="close" size={21} />
         </Pressable>
-        {showRestore ? (
-          <Pressable accessibilityRole="button" className="min-h-12 min-w-16 items-end justify-center" onPress={onRestore}>
-            <Text className="text-sm font-medium text-[#111111]">{t("paywall.restore")}</Text>
-          </Pressable>
-        ) : <View className="h-12 w-16" />}
+        {/* Restore stays reachable on every step — the stores require it to be findable. */}
+        <Pressable accessibilityRole="button" className="min-h-12 min-w-16 items-end justify-center" onPress={onRestore}>
+          <Text className="text-sm font-medium text-[#111111]">{t("paywall.restore")}</Text>
+        </Pressable>
       </View>
       <View className="items-center pb-4">
         <Image accessibilityLabel="BodyCal" contentFit="contain" source={logo} style={{ height: 80, width: 80 }} />
@@ -137,30 +135,32 @@ export function PaywallScreen() {
   const [step, setStep] = React.useState<Step>(1);
   const [plan, setPlan] = React.useState<Plan>("annual");
   const [working, setWorking] = React.useState(false);
-  const [notice, setNotice] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<Notice | null>(null);
   const selectedPlan: Plan = plan === "annual" && !annualPackage && monthlyPackage ? "monthly" : plan;
   const selectedPackage = selectedPlan === "annual" ? annualPackage : monthlyPackage;
-  const eligible = trialEligible[selectedPlan] === true && selectedPackage?.product.introPrice?.price === 0;
-  const days = eligible ? freeTrialDays(selectedPackage) : null;
+  // A trial is only claimed when the store confirmed both eligibility and a length.
+  const days = packageTrialDays(selectedPackage);
+  const eligible = trialEligible[selectedPlan] === true && days !== null;
   const annualSavings = annualPackage && monthlyPackage && monthlyPackage.product.price > 0 ? Math.max(0, Math.round((1 - annualPackage.product.price / (monthlyPackage.product.price * 12)) * 100)) : 0;
   const loadingPrice = state === "loading" ? t("common.loading") : t("paywall.unavailable");
-  const active = ["trial", "active", "cancelledActive", "billingIssueActive"].includes(state);
+  const active = isProState(state);
 
   const close = () => router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)/today" as Href);
   const run = async (operation: () => Promise<void>, success?: () => void) => {
     if (working) return;
     setWorking(true); setNotice(null);
-    try { await operation(); success?.(); } catch { setNotice(t("paywall.actionError")); } finally { setWorking(false); }
+    try { await operation(); success?.(); } catch { setNotice({ message: t("paywall.actionError"), tone: "error" }); } finally { setWorking(false); }
   };
   const restorePurchases = () =>
     void run(async () => {
       const result = await restore();
-      // An empty restore is informative, not a failure.
-      setNotice(
-        result.restored
+      // An empty restore is informative, not a failure — both outcomes read as info.
+      setNotice({
+        message: result.restored
           ? t("subscriptionSettings.restored")
           : t("subscriptionSettings.restoreEmpty"),
-      );
+        tone: "info",
+      });
     });
   const purchasePlan = () => void run(() => purchase(selectedPlan), () => router.replace("/(app)/benefits" as Href));
   const selectedTrialDuration = days ? t("paywall.daysFree", { count: days }) : t("paywall.freeTrial");
@@ -171,7 +171,17 @@ export function PaywallScreen() {
   return (
     <SafeAreaView edges={["top", "right", "bottom", "left"]} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <ScrollView className="flex-1 bg-white" contentContainerClassName="flex-grow px-5 pb-5" contentInsetAdjustmentBehavior="automatic">
-        <BrandHeader onClose={step === 1 ? close : () => setStep((step - 1) as Step)} onRestore={restorePurchases} showRestore={step !== 2} />
+        <BrandHeader onClose={step === 1 ? close : () => setStep((step - 1) as Step)} onRestore={restorePurchases} />
+        {/* Shared with every step: restore is reachable from step 1, so its result has to be too. */}
+        {notice || error ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            className={`pb-3 text-center text-sm ${notice?.tone === "info" ? "text-[#737373]" : "text-app-error"}`}
+            selectable
+          >
+            {notice?.message ?? t("paywall.loadError")}
+          </Text>
+        ) : null}
         {step === 1 ? <StepOne cta={eligible ? t("paywallFlow.tryFree") : t("common.continue")} disclosure={eligible ? t("paywallFlow.thenPrice", { price: selectedPackage?.product.priceString ?? loadingPrice }) : t("paywall.storeDisclosure")} onContinue={() => setStep(2)} /> : null}
         {step === 2 ? <StepTwo hasTrial={eligible} onContinue={() => setStep(3)} trialDays={days} /> : null}
         {step === 3 ? (
@@ -182,7 +192,6 @@ export function PaywallScreen() {
               <PlanOption disabled={!monthlyPackage} label={t("paywall.monthly")} onPress={() => setPlan("monthly")} price={monthlyPackage?.product.priceString ?? loadingPrice} selected={selectedPlan === "monthly"} />
             </View>
             <View className="gap-3 rounded-2xl border border-[#E8E8E8] bg-[#FAFAFA] p-4"><FeatureLine icon="unlock" left={eligible ? t("paywallFlow.daysFree", { count: days ?? 0 }) : t("paywallFlow.fullAccess")} right={t("paywallFlow.fullAccess")} /><FeatureLine icon="privacy" left={t("paywallFlow.cancelAnytimeShort")} right={t("paywallFlow.noCommitments")} /><FeatureLine icon="checkCircle" left={t("paywallFlow.securePrivate")} right={t("paywallFlow.storeProtected")} /></View>
-            {error || notice ? <Text accessibilityLiveRegion="polite" className={`text-center text-sm ${notice === t("paywall.restoreComplete") ? "text-[#737373]" : "text-app-error"}`}>{notice ?? t("paywall.loadError")}</Text> : null}
             <View className="mt-auto gap-3"><PrimaryButton className="min-h-[60px] rounded-2xl" disabled={working || !selectedPackage || active} label={active ? t("paywall.active") : working ? t("paywall.processing") : eligible ? t("paywall.startTrialDays", { count: days ?? 0 }) : t("common.continue")} labelClassName="text-[18px]" onPress={purchasePlan} /><Text className="text-center text-[13px] leading-[18px] text-[#737373]" selectable>{disclosure}</Text><View className="flex-row flex-wrap justify-center gap-x-2"><Link className="min-h-11 py-3 text-sm font-medium text-[#111111] underline" href="/(app)/settings/terms">{t("paywall.terms")}</Link><Link className="min-h-11 py-3 text-sm font-medium text-[#111111] underline" href="/(app)/settings/privacy">{t("paywall.privacy")}</Link></View><View className="flex-row items-center justify-center gap-2"><AppIcon color="#737373" name="privacy" size={15} /><Text className="text-xs text-[#737373]">{t("paywallFlow.secureCheckout")}</Text></View></View>
           </View>
         ) : null}

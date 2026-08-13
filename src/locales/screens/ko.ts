@@ -2,6 +2,8 @@ import type { ScreenTranslations } from "./en";
 
 export const ko: ScreenTranslations = {
   common: {
+    showPassword: "비밀번호 표시",
+    hidePassword: "비밀번호 숨기기",
     save: "저장",
     saving: "저장 중…",
     saved: "저장됨",
@@ -31,6 +33,7 @@ export const ko: ScreenTranslations = {
   config: {
     title: "설정이 필요합니다",
     body: "계속하려면 Clerk와 Convex 설정을 추가하세요.",
+    previewAction: "나머지 흐름 미리보기",
   },
   postPurchaseReview: {
     honestTitle: "솔직한 의견이 가장 큰 도움이 됩니다",
@@ -53,6 +56,7 @@ export const ko: ScreenTranslations = {
     forgotBody: "확인된 이메일로 일회용 코드를 보냅니다.",
     sendResetCode: "코드 보내기",
     addTitle: "어떻게 기록할까요?",
+    addSheetTitle: "음식 추가",
     scanWithAi: "AI로 분석",
     searchFoods: "음식 검색",
     proBadge: "Pro",

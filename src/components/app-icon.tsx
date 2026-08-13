@@ -9,7 +9,6 @@ const appSymbols = {
   add: { ios: "plus", android: "add", web: "add" },
   analysis: { ios: "chart.bar.fill", android: "bar_chart", web: "bar_chart" },
   appearance: { ios: "circle.lefthalf.filled", android: "palette", web: "palette" },
-  apple: { ios: "apple.logo", android: "apple" as any, web: "apple" as any },
   back: { ios: "chevron.left", android: "arrow_back", web: "arrow_back" },
   calendar: { ios: "calendar", android: "calendar_today", web: "calendar_today" },
   calories: { ios: "flame.fill", android: "local_fire_department", web: "local_fire_department" },

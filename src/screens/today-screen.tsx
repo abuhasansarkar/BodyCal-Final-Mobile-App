@@ -275,11 +275,16 @@ function MacroCard({ color, goal, image, label, value }: { color: string; goal?:
       <View className="h-1.5 overflow-hidden rounded-full bg-[#E8E8E8]">
         <View className="h-full rounded-full" style={{ backgroundColor: color, width: `${progress}%` }} />
       </View>
-      <View className="mt-auto h-14 w-14 items-center justify-center self-center">
+      {/*
+        `main-dashbaord.png` seats each macro photo in a circular tinted well at
+        the card's lower-left, not floating centred. `overflow-hidden` with a
+        cover fit keeps the circle clean whatever the source aspect ratio.
+      */}
+      <View className="mt-auto h-14 w-14 overflow-hidden rounded-full bg-app-surface">
         <Image
           accessible={false}
           className="h-full w-full"
-          contentFit="contain"
+          contentFit="cover"
           source={image}
         />
       </View>

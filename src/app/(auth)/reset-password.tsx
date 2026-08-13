@@ -1,8 +1,10 @@
 import { Stack } from "expo-router/stack";
+import { useTranslation } from "react-i18next";
 
 import { ResetPasswordScreen } from "@/screens/auth/reset-password-screen";
 
 export default function ResetPasswordRoute() {
+  const { t } = useTranslation();
   return (
     <>
       <Stack.Screen
@@ -11,7 +13,7 @@ export default function ResetPasswordRoute() {
           headerShadowVisible: false,
           headerTintColor: "#111111",
           headerTransparent: false,
-          title: "Reset password",
+          title: t("authFlow.forgotTitle"),
         }}
       />
       <ResetPasswordScreen />

@@ -32,6 +32,9 @@ Only supplied, real filenames are listed here. A route is not visually accepted 
 
 ## Implementation notes
 
+- `/(app)/(tabs)/today` macro tiles use the supplied photography: `assets/images/food (2).png` for protein, `assets/images/food (3).png` for carbohydrates, and `assets/images/food (1).png` for fat. Note the space before the parenthesis in each filename. Each sits in a circular tinted well at the tile's lower-left, per `main-dashbaord.png`, and is marked `accessible={false}` because the adjacent value and label already carry the meaning.
+- The Apple authentication button uses `assets/images/apple-sign-in-logo.png` tinted white on the black button. The previous SF Symbol `apple.logo` had no Material Symbols counterpart, so the Android button rendered without a logo.
+- Unused supplied assets, kept but not currently mapped to any route: `BodyCal-White-Logo.png`, `daily-goal-runner.png`, `logo-glow.png`, `muscular-body-man.png`, `muscular-body-man-hero.png`. `assets/images/tabIcons/` and the `expo-*`/`react-logo*`/`tutorial-web` files are unused Expo template leftovers.
 - `/(public)/welcome` uses `assets/images/welcome-food-scan-hero.png`, derived from the user-supplied person-photographing-food reference with its phone frame and instruction UI removed.
 - The language badge in `welcome.jpg` shows only its closed state. In the app it opens a native form sheet containing all eight launch languages, with radio semantics and a persisted selection.
 - The sign-in entry follows the authentication bottom-sheet pattern in `DESIGN-SYSTEM.md`; choosing email opens the mapped email/password screen within the same native sheet stack.
