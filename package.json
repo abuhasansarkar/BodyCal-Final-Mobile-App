@@ -74,6 +74,7 @@
     "start:dev-client": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
+    "ios:sim": "bash scripts/ios-sim.sh",
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",

@@ -25,6 +25,18 @@ export interface NutritionValues {
   fatGrams: number;
 }
 
+/**
+ * An AI estimate's nutrition: the day-total values plus descriptive detail the
+ * provider reports when the photo supports it. `null` means the model declined
+ * to judge the value; `undefined` means the estimate predates the field.
+ */
+export interface EstimateNutrition extends NutritionValues {
+  saturatedFatGrams?: number | null;
+  fiberGrams?: number | null;
+  sugarGrams?: number | null;
+  sodiumMilligrams?: number | null;
+}
+
 export interface OnboardingDraft {
   goal: GoalType;
   calculationBasis: CalculationBasis;

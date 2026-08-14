@@ -68,6 +68,9 @@ const appSymbols = {
   star: { ios: "star.fill", android: "star", web: "star" },
   subscription: { ios: "crown.fill", android: "workspace_premium", web: "workspace_premium" },
   terms: { ios: "doc.text.fill", android: "description", web: "description" },
+  /** Camera torch. The bolt, not `light`'s sun — this switches the LED, not a theme. */
+  torch: { ios: "bolt.fill", android: "flash_on", web: "flash_on" },
+  torchOff: { ios: "bolt.slash.fill", android: "flash_off", web: "flash_off" },
   units: { ios: "ruler", android: "straighten", web: "straighten" },
   unlock: { ios: "lock.open.fill", android: "lock_open", web: "lock_open" },
   veryActive: { ios: "dumbbell.fill", android: "fitness_center", web: "fitness_center" },

@@ -24,6 +24,18 @@ const estimateSchema = z.object({
     proteinGrams: z.number().min(0).max(1_000),
     carbsGrams: z.number().min(0).max(2_000),
     fatGrams: z.number().min(0).max(1_000),
+    /*
+      Detail beyond the four values a day total is built from. Nullable rather
+      than optional: OpenAI structured outputs require every property to appear
+      in `required`, so "the photo does not support this value" has to travel as
+      an explicit null instead of an absent key. A null is displayed as
+      not-estimated rather than as a zero — reading "0 g of sugar" off a photo
+      the model could not judge would be a measurement claim, not an estimate.
+    */
+    saturatedFatGrams: z.number().min(0).max(1_000).nullable(),
+    fiberGrams: z.number().min(0).max(500).nullable(),
+    sugarGrams: z.number().min(0).max(1_000).nullable(),
+    sodiumMilligrams: z.number().min(0).max(50_000).nullable(),
   }),
   confidence: z.enum(["low", "medium", "high"]),
   warnings: z.array(z.string().max(240)).max(10),
@@ -92,12 +104,22 @@ export const analyzeMeal = action({
               {
                 type: "input_text",
                 text: [
-                  "Estimate the visible meal's components, portions, calories, protein, carbohydrates, and fat.",
+                  "Estimate the nutrition of the meal in this photo.",
+                  "Read the whole image, not just the main dish: include every plate, bowl, side, sauce, topping and drink that is visible, and list each one as its own component with its estimated portion.",
+                  "Give totals for the entire meal shown: calories, protein, carbohydrates, and fat.",
+                  "Also give saturated fat, fibre, sugar, and sodium. Use null for any of those four you cannot judge from the photo rather than guessing a number or returning zero.",
                   `Write all text in the "${locale}" language.`,
-                  "Be conservative, never claim precision, and include warnings for low confidence.",
+                  "Be conservative, never claim precision, and include warnings for low confidence, hidden ingredients such as cooking oil or dressing, and portions that are hard to judge without a size reference.",
                 ].join(" "),
               },
-              { type: "input_image", image_url: imageUrl, detail: "low" },
+              /*
+                `high` detail, so the model receives the full 1,600px upload
+                rather than a 512px thumbnail. Portion size, side dishes and
+                garnishes are the first things to disappear at low detail, and
+                they are exactly what the estimate depends on. It costs more
+                image tokens per scan; the fair-use limits in `aiDb` bound that.
+              */
+              { type: "input_image", image_url: imageUrl, detail: "high" },
             ],
           },
         ],

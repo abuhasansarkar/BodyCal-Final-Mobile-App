@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { AppScreen } from "@/components/app-screen";
+import { NutritionDetail } from "@/components/nutrition-detail";
 import { NutritionSummary } from "@/components/nutrition-summary";
 import { PrimaryButton } from "@/components/primary-button";
 import { SectionCard, SectionHeader, ScreenTitle } from "@/components/ui/section-card";
@@ -65,6 +66,8 @@ export default function ScanResultRoute() {
       <ScreenTitle description={t(CONFIDENCE_KEY[estimate.confidence])} title={estimate.mealName} />
 
       <NutritionSummary {...estimate.nutrition} />
+
+      <NutritionDetail nutrition={estimate.nutrition} />
 
       <SectionCard>
         <View className="gap-2.5">

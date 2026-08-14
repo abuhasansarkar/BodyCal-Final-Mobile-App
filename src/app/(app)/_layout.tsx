@@ -22,7 +22,7 @@ function ProtectedAppLayout() {
   });
 
   if (decision === appAccessDestinations.loading) return <StartupScreen />;
-  if (decision === appAccessDestinations.signIn) return <Redirect href={appAccessDestinations.signIn} />;
+  if (decision === appAccessDestinations.signedOut) return <Redirect href={appAccessDestinations.signedOut} />;
   if (decision === appAccessDestinations.onboarding) return <Redirect href={appAccessDestinations.onboarding} />;
   return <AppStack />;
 }
