@@ -120,6 +120,7 @@ function buildBundle(language: SupportedLanguage) {
       deleteAccount: screens.deleteAccount,
       foodSearch: screens.foodSearch,
       foodDetail: screens.foodDetail,
+      nutritionBreakdown: screens.nutritionBreakdown,
       manualFood: screens.manualFood,
       foodHeadline: screens.foodHeadline,
       foodCategories: screens.foodCategories,

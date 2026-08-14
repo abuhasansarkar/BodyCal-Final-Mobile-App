@@ -77,7 +77,7 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
   };
 }
 
-/** Internal entry point used by `ai.analyzeMeal` when the mirror is stale. */
+/** Internal entry point used by `ai.startScan` when the mirror is stale. */
 export const verifyForCurrentUser = internalAction({
   args: {},
   handler: async (ctx): Promise<EntitlementResult> => {

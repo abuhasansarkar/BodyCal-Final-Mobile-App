@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -7,40 +7,72 @@ import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
 import { Field, FieldGroup, SegmentedControl } from "@/components/ui/form";
 import { ScreenTitle, SectionCard } from "@/components/ui/section-card";
-import { InlineNotice } from "@/components/ui/states";
-import { nutritionEstimateSchema } from "@/domain/schemas";
+import { InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId, currentLocalDate, currentTimezone } from "@/lib/local-day";
 import { View } from "@/tw";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { MealType } from "@/types/domain";
 
+/**
+ * Turns the estimate's meal-type hint into a meal the app actually logs against.
+ *
+ * A drink, or a photo the model could not place, falls back to the time of day
+ * rather than to a fixed guess — logging a 9 a.m. coffee as lunch is a worse
+ * default than reading the clock. It is a preselection either way, and the user
+ * can change it before saving.
+ */
+function mealTypeFromEstimate(hint: string): MealType {
+  if (hint === "breakfast" || hint === "lunch" || hint === "dinner" || hint === "snack") {
+    return hint;
+  }
+  const hour = new Date().getHours();
+  if (hour < 11) return "breakfast";
+  if (hour < 15) return "lunch";
+  if (hour < 21) return "dinner";
+  return "snack";
+}
+
 /** Edits an AI estimate before it is saved. Every value stays correctable. */
 export default function EditScanRoute() {
   const { t } = useTranslation();
-  const { estimate: rawEstimate, scanId } = useLocalSearchParams<{
-    estimate?: string;
-    scanId?: string;
-  }>();
+  const { scanId } = useLocalSearchParams<{ scanId?: string }>();
 
-  const parsed = React.useMemo(() => {
-    try {
-      return nutritionEstimateSchema.parse(JSON.parse(rawEstimate ?? "null"));
-    } catch {
-      return null;
-    }
-  }, [rawEstimate]);
+  // Read from the scan rather than from a navigation param, so the values being
+  // corrected are the ones actually stored against the scan.
+  const scan = useQuery(
+    api.aiDb.getScan,
+    scanId ? { scanId: scanId as Id<"aiScans"> } : "skip",
+  );
+  const parsed = scan?.estimate ?? null;
 
   const create = useMutation(api.foodLogs.create);
 
-  const [name, setName] = React.useState(parsed?.mealName ?? "");
+  const [name, setName] = React.useState("");
   const [mealType, setMealType] = React.useState<MealType>("lunch");
-  const [calories, setCalories] = React.useState(String(parsed?.nutrition.calories ?? ""));
-  const [protein, setProtein] = React.useState(String(parsed?.nutrition.proteinGrams ?? ""));
-  const [carbs, setCarbs] = React.useState(String(parsed?.nutrition.carbsGrams ?? ""));
-  const [fat, setFat] = React.useState(String(parsed?.nutrition.fatGrams ?? ""));
+  const [calories, setCalories] = React.useState("");
+  const [protein, setProtein] = React.useState("");
+  const [carbs, setCarbs] = React.useState("");
+  const [fat, setFat] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  /*
+    Seed the fields once the estimate arrives, and only once: these are edit
+    fields, and a later re-render of the same scan must never overwrite what the
+    user has typed into them.
+  */
+  const seeded = React.useRef(false);
+  React.useEffect(() => {
+    if (!parsed || seeded.current) return;
+    seeded.current = true;
+    setName(parsed.mealName);
+    setMealType(mealTypeFromEstimate(parsed.mealType));
+    setCalories(String(Math.round(parsed.nutrition.calories)));
+    setProtein(String(Math.round(parsed.nutrition.proteinGrams)));
+    setCarbs(String(Math.round(parsed.nutrition.carbsGrams)));
+    setFat(String(Math.round(parsed.nutrition.fatGrams)));
+  }, [parsed]);
 
   const rangeError = (value: string, max: number) => {
     const number = Number(value);
@@ -65,7 +97,9 @@ export default function EditScanRoute() {
         mealType,
         source: "ai",
         foodName: name.trim(),
-        serving: "1 estimated meal",
+        // Shown on the entry afterwards, so it has to come from the active
+        // language rather than being pinned to English at write time.
+        serving: t("scan.estimatedServing"),
         servingUnit: "serving",
         quantity: 1,
         calories: Number(calories),
@@ -82,6 +116,14 @@ export default function EditScanRoute() {
       setSaving(false);
     }
   };
+
+  if (scanId && scan === undefined) {
+    return (
+      <AppScreen>
+        <ScreenSkeleton />
+      </AppScreen>
+    );
+  }
 
   return (
     <AppScreen>

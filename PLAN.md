@@ -162,7 +162,13 @@ design/           Supplied design sources and audit artifacts
 - [x] Camera/gallery selection and permission handling.
 - [x] Client image resize/compression that steps quality down until it fits the 4 MB limit.
 - [x] Direct Convex storage upload.
-- [x] Server-only OpenAI provider call with structured Zod output.
+- [x] Server-only OpenAI provider call with structured Zod output, sent as an inline image with `store: false`.
+- [x] Analysis runs on the scheduler, not inside the client's request: the scan is durable before any provider call, and the client follows `aiDb.getScan` reactively through `pending → processing → completed`.
+- [x] Reopening or resuming a scan rejoins it by id instead of starting a second one.
+- [x] Per-food breakdown (preparation, estimated grams, per-item calories and macros), meal totals, calorie range, assumptions, and portion confidence.
+- [x] Server-side plausibility checks: totals must agree with the sum of items, and an implausible or self-contradicting estimate fails rather than being rewritten to zeroes.
+- [x] `isFood: false` is reported as "no food detected" instead of a fabricated empty meal.
+- [x] Bounded provider retries with backoff, reusing the same scan id so a retry never creates a second scan or a duplicate meal entry.
 - [x] Server-side RevenueCat verification when the entitlement mirror is stale or missing, rather than on every request.
 - [x] Upload ownership is recorded and verified before a blob is analysed or attached.
 - [x] Daily/monthly quota enforcement and idempotent requests.
@@ -440,11 +446,13 @@ CLERK_SECRET_KEY
 REVENUECAT_SECRET_KEY
 REVENUECAT_WEBHOOK_SECRET
 AI_PROVIDER
-AI_API_KEY
+AI_API_KEY          # or OPENAI_API_KEY; exactly one must be set
 AI_MODEL
 EXPO_ACCESS_TOKEN
 SENTRY_AUTH_TOKEN
 ```
+
+The AI variables must be set on the **Convex deployment** (`npx convex env set AI_API_KEY …`). Deployed actions do not read a local `.env` file, so a key that only lives there produces the same failure as no key at all. `aiDb.getProviderStatus` reports whether the running deployment can see one.
 
 Never commit `.env` or real keys. Development, preview, and production must have separate deployments, keys, analytics projects, and Sentry environments.
 

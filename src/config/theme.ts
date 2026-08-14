@@ -45,6 +45,21 @@ export const macroColors = {
   calories: "#FF6B00",
 } as const;
 
+/**
+ * Calorie-goal status ring on the dashboard week strip.
+ *
+ * Deliberately separate from `colors` above: the supplied `design/` references
+ * show no goal-status colours, so unlike everything else in this file these two
+ * were not observed — they were added on explicit product request. Both clear
+ * the 3:1 contrast ratio against white required of non-text graphics.
+ */
+export const calendarStatusColors = {
+  /** Calorie goal reached for that day. */
+  met: "#16A34A",
+  /** Calories logged but the goal not yet reached. */
+  partial: "#D97706",
+} as const;
+
 /** Used only on the paywall free-trial timeline. */
 export const paywallColors = {
   trialMilestone: "#FF8A00",

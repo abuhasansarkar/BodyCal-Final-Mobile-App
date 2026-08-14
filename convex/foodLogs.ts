@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
 import { attachOwnedUpload, loadOwned, requireCurrentUser, requireOwned } from "./lib/auth";
+import { confidenceValidator, nullableNumber, readStoredEstimate } from "./lib/estimate";
 import {
   assertBoundedString,
   assertEntryNutrition,
@@ -150,6 +151,63 @@ export const getById = query({
     }
 
     return { ...log, imageUrl: storageId ? await ctx.storage.getUrl(storageId) : null };
+  },
+});
+
+/**
+ * The detail an AI scan produced beyond the four values that drive a day's
+ * totals: what the model saw on the plate, the nutrition it could not fold into
+ * those four, how sure it was, and what it warned about.
+ *
+ * `foodLogs` deliberately stores only the four macros — they are the numbers the
+ * day is built from, and they stay editable. Everything else lives on the scan,
+ * so this reads through `aiScanId` rather than duplicating it onto the log.
+ *
+ * Returns null for a log with no scan behind it, and for one whose scan image and
+ * estimate have aged out. `estimate` is `v.any()` in the schema, so every field
+ * is re-narrowed here rather than trusted: rows written before a field existed
+ * simply have nothing to read.
+ */
+export const getScanDetail = query({
+  args: { id: v.id("foodLogs") },
+  returns: v.union(
+    v.object({
+      components: v.array(v.object({ name: v.string(), portion: v.string() })),
+      confidence: v.union(confidenceValidator, v.null()),
+      saturatedFatGrams: nullableNumber,
+      fiberGrams: nullableNumber,
+      sugarGrams: nullableNumber,
+      sodiumMilligrams: nullableNumber,
+      warnings: v.array(v.string()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { id }) => {
+    const user = await requireCurrentUser(ctx);
+    const log = await loadOwned(ctx, id, user._id);
+    if (!log?.aiScanId) return null;
+
+    const scan = await ctx.db.get(log.aiScanId);
+    // The ownership check is repeated deliberately: `aiScanId` is a stored
+    // reference, and a log must never be able to read another user's scan.
+    if (!scan || scan.userId !== user._id) return null;
+
+    // Narrowed by the shared reader, so a saved entry and a live scan result
+    // describe the same estimate rather than two hand-rolled readings of it.
+    const estimate = readStoredEstimate(scan.correctedEstimate ?? scan.estimate, scan.confidence);
+    if (!estimate) return null;
+
+    return {
+      // Mapped down deliberately: this screen shows the plate as chips, so it
+      // takes the two fields it renders rather than whatever the reader grows.
+      components: estimate.components.map(({ name, portion }) => ({ name, portion })),
+      confidence: estimate.confidence,
+      saturatedFatGrams: estimate.nutrition.saturatedFatGrams,
+      fiberGrams: estimate.nutrition.fiberGrams,
+      sugarGrams: estimate.nutrition.sugarGrams,
+      sodiumMilligrams: estimate.nutrition.sodiumMilligrams,
+      warnings: estimate.warnings,
+    };
   },
 });
 

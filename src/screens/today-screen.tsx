@@ -9,8 +9,9 @@ import { AppScreen } from "@/components/app-screen";
 import { DashboardRecentUploads, type RecentUpload } from "@/components/dashboard-recent-uploads";
 import { DashboardWeekCarousel } from "@/components/dashboard-week-carousel";
 import { FoodThumbnail } from "@/components/food-thumbnail";
+import { ProgressRing } from "@/components/progress-ring";
 import { hasBackendConfiguration } from "@/config/env";
-import { atLocalNoon } from "@/features/dashboard/week-range";
+import { atLocalNoon, getDashboardWeeks } from "@/features/dashboard/week-range";
 import { api } from "@/lib/convex-api";
 import { currentLocalDate } from "@/lib/local-day";
 import { Image, Link, Pressable, Text, View } from "@/tw";
@@ -31,14 +32,46 @@ const mealTypes = ["breakfast", "lunch", "dinner", "snack"] as const;
 function ConfiguredToday() {
   const [selectedDate, setSelectedDate] = React.useState(() => atLocalNoon(new Date()));
   const localDate = currentLocalDate(selectedDate);
+  // The week strip spans the same three weeks the carousel renders, so one
+  // range read covers every day it can show.
+  const weeks = React.useMemo(() => getDashboardWeeks(new Date()), []);
+  const fromDate = currentLocalDate(weeks[0][0]);
+  const toDate = currentLocalDate(weeks[weeks.length - 1][6]);
   const logs = useQuery(api.foodLogs.getDay, { localDate });
   const summary = useQuery(api.foodLogs.getDaySummary, { localDate });
   const goal = useQuery(api.nutritionGoals.getActive, { localDate });
   const recentUploads = useQuery(api.dashboard.getRecentUploads, { limit: 3 });
   const loggingStreak = useQuery(api.dashboard.getLoggingStreak, { todayLocalDate: currentLocalDate() });
+  const calorieSeries = useQuery(api.dashboard.getDailyCalorieSeries, { fromDate, toDate });
+  const goalHistory = useQuery(api.nutritionGoals.getHistory, {});
   const connection = useConvexConnectionState();
 
-  if (logs === undefined || summary === undefined || goal === undefined || recentUploads === undefined || loggingStreak === undefined) {
+  /*
+    Goals are effective-dated and history must never be re-scored against a
+    newer target, so each day resolves the goal that was active *on that day*.
+    `getHistory` returns newest first, making the first entry effective on or
+    before a date the right one.
+  */
+  const progressByDate = React.useMemo(() => {
+    const map = new Map<string, number>();
+    if (!calorieSeries || !goalHistory) return map;
+    for (const day of calorieSeries) {
+      const goalForDay = goalHistory.find((entry) => entry.effectiveFrom <= day.localDate);
+      if (!goalForDay?.calories) continue;
+      map.set(day.localDate, Math.min(100, Math.max(0, (day.calories / goalForDay.calories) * 100)));
+    }
+    return map;
+  }, [calorieSeries, goalHistory]);
+
+  if (
+    logs === undefined ||
+    summary === undefined ||
+    goal === undefined ||
+    recentUploads === undefined ||
+    loggingStreak === undefined ||
+    calorieSeries === undefined ||
+    goalHistory === undefined
+  ) {
     return <DashboardLoading />;
   }
 
@@ -49,6 +82,7 @@ function ConfiguredToday() {
       loggingStreak={loggingStreak}
       logs={logs}
       onSelectDate={setSelectedDate}
+      progressByDate={progressByDate}
       recentUploads={recentUploads}
       selectedDate={selectedDate}
       summary={summary}
@@ -124,8 +158,13 @@ function GreetingHeader() {
 
   return (
     <View className="min-w-0 flex-1">
+      {/*
+        A non-breaking space keeps the wave attached to the final word. A plain
+        space let it wrap onto a line of its own once a long display name pushed
+        the greeting to two lines, which read as a rendering fault.
+      */}
       <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.5px] text-app-text" numberOfLines={2} selectable>
-        {`${t(`dashboard.greeting.${period}`, { name })} 👋`}
+        {`${t(`dashboard.greeting.${period}`, { name })} 👋`}
       </Text>
       <Text className="text-sm font-medium text-app-muted" selectable>
         {t("dashboard.encouragement")}
@@ -139,6 +178,7 @@ function TodayContent({
   loggingStreak = 0,
   logs = [],
   onSelectDate,
+  progressByDate,
   recentUploads = [],
   selectedDate,
   summary = emptyNutrition,
@@ -148,6 +188,7 @@ function TodayContent({
   loggingStreak?: number;
   logs?: FoodLog[];
   onSelectDate: (date: Date) => void;
+  progressByDate?: ReadonlyMap<string, number>;
   recentUploads?: RecentUpload[];
   selectedDate: Date;
   summary?: Nutrition;
@@ -179,7 +220,7 @@ function TodayContent({
         </View>
       ) : null}
 
-      <DashboardWeekCarousel locale={locale} onSelectDate={onSelectDate} selectedDate={selectedDate} />
+      <DashboardWeekCarousel locale={locale} onSelectDate={onSelectDate} progressByDate={progressByDate} selectedDate={selectedDate} />
       <CalorieCard goal={goal?.calories ?? 0} progress={calorieProgress} remaining={remaining} summary={summary.calories} />
 
       <View className="flex-row gap-3">
@@ -276,7 +317,9 @@ function CalorieCard({ goal, progress, remaining, summary }: { goal: number; pro
 }
 
 function MacroCard({ color, goal, image, label, value }: { color: string; goal?: number; image: number; label: string; value: number }) {
+  const { t } = useTranslation();
   const progress = goal ? Math.min(100, Math.max(0, ((goal - value) / goal) * 100)) : 0;
+  const percent = Math.round(progress);
   return (
     <View
       className="min-h-40 min-w-0 flex-1 gap-2 rounded-3xl border border-app-border bg-white p-3.5"
@@ -288,26 +331,29 @@ function MacroCard({ color, goal, image, label, value }: { color: string; goal?:
       <Text className="text-xs font-semibold leading-4 text-app-muted" numberOfLines={2} selectable>
         {label}
       </Text>
-      <View className="h-1.5 overflow-hidden rounded-full bg-[#E8E8E8]">
-        <View className="h-full rounded-full" style={{ backgroundColor: color, width: `${progress}%` }} />
-      </View>
       {/*
-        `main-dashbaord.png` seats each macro photo in a circular tinted well at
-        the card's lower-left.
+        The macro photo sits inside its own progress ring, echoing the calorie
+        card above. Ring 64pt with a 5pt stroke leaves 54pt inside, so the 48pt
+        tinted well from `main-dashbaord.png` still clears the stroke.
 
-        The image needs a concrete size: `h-full` resolved to nothing here and the
-        well rendered empty. Every image that renders in this app is sized with
-        fixed classes, so this follows that. `contain` at 48pt inside the 56pt
-        well suits the sources, which are transparent cut-outs with padding — a
-        cover fit would crop into the middle of the food.
+        The image needs a concrete size: `h-full` resolves to nothing here. The
+        sources are transparent cut-outs with their own padding, so `contain`
+        keeps them whole where `cover` would crop into the food.
+
+        `mt-auto` pins the ring to the card's base so all three line up when a
+        translated label wraps to two lines in one card but not its neighbours.
       */}
-      <View className="mt-auto h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-app-surface">
-        <Image
-          accessible={false}
-          className="h-12 w-12"
-          contentFit="contain"
-          source={image}
-        />
+      <View
+        accessibilityLabel={t("dashboard.macroProgress", { label, percent })}
+        accessibilityRole="progressbar"
+        accessibilityValue={{ min: 0, max: 100, now: percent }}
+        className="mt-auto self-center"
+      >
+        <ProgressRing color={color} size={64} thickness={5} value={progress}>
+          <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-app-surface">
+            <Image accessible={false} className="h-9 w-9" contentFit="contain" source={image} />
+          </View>
+        </ProgressRing>
       </View>
     </View>
   );

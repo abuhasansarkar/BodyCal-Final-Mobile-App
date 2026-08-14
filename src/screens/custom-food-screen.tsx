@@ -95,7 +95,9 @@ function ConfiguredCustomFood() {
     const payload = {
       ...nutrition,
       foodName: name.trim(),
-      serving: serving.trim() || "1 serving",
+      // Displayed on the entry afterwards, so the default follows the active
+      // language rather than being pinned to English at write time.
+      serving: serving.trim() || t("manualFood.defaultServing"),
       servingUnit: "serving",
       quantity: 1,
       mealType,

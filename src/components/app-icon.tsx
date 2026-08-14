@@ -41,6 +41,28 @@ const appSymbols = {
   homeOutline: { ios: "house", android: "home", web: "home" },
   hydration: { ios: "drop.fill", android: "water_drop", web: "water_drop" },
   info: { ios: "info.circle.fill", android: "info", web: "info" },
+  /*
+    Ingredient glyphs for the food-detail list.
+
+    SF Symbols carries no meat, grain or nut glyph, so those iOS entries settle
+    on the nearest honest stand-in (a pan, a laurel, a seed grid) while Android
+    uses Material's literal food symbols. Everything here is available at the
+    project's iOS 16.4 deployment target — SF Symbols 5 additions such as
+    `waterbottle.fill` are deliberately avoided, because an unavailable symbol
+    renders as nothing at all.
+  */
+  ingredientBeverage: { ios: "cup.and.saucer.fill", android: "local_cafe", web: "local_cafe" },
+  ingredientDairy: { ios: "mug.fill", android: "local_drink", web: "local_drink" },
+  ingredientEgg: { ios: "oval.fill", android: "egg", web: "egg" },
+  ingredientFat: { ios: "drop.fill", android: "opacity", web: "opacity" },
+  ingredientFish: { ios: "fish.fill", android: "set_meal", web: "set_meal" },
+  ingredientFruit: { ios: "leaf.fill", android: "nutrition", web: "nutrition" },
+  ingredientGrain: { ios: "laurel.leading", android: "grain", web: "grain" },
+  ingredientMeat: { ios: "frying.pan.fill", android: "kebab_dining", web: "kebab_dining" },
+  ingredientNut: { ios: "circle.grid.2x2.fill", android: "spa", web: "spa" },
+  ingredientSupplement: { ios: "dumbbell.fill", android: "fitness_center", web: "fitness_center" },
+  ingredientSweetener: { ios: "birthday.cake.fill", android: "icecream", web: "icecream" },
+  ingredientVegetable: { ios: "carrot.fill", android: "eco", web: "eco" },
   language: { ios: "globe", android: "language", web: "language" },
   light: { ios: "sun.max.fill", android: "light_mode", web: "light_mode" },
   lightActivity: { ios: "figure.walk", android: "directions_walk", web: "directions_walk" },

@@ -17,7 +17,7 @@ import {
   type ReminderKey,
 } from "@/features/notifications/scheduler";
 import { api } from "@/lib/convex-api";
-import { currentTimezone } from "@/lib/local-day";
+import { currentLocalDate, currentTimezone } from "@/lib/local-day";
 import { i18n } from "@/locales/i18n";
 import { OnboardingStageScreen } from "@/screens/onboarding/onboarding-stage-screen";
 import { View } from "@/tw";
@@ -86,7 +86,14 @@ function ConfiguredNotificationRoute() {
         goalPace: draft.pace,
         locale,
         timezone,
-        effectiveFrom: new Date().toISOString().slice(0, 10),
+        /*
+          The user's local day, not the UTC one. `nutritionGoals.getActive`
+          matches on `effectiveFrom <= localDate`, so a UTC date resolved west of
+          Greenwich in the evening lands a day ahead of the day the dashboard
+          asks about — and the brand-new plan reads as "no targets" until local
+          midnight.
+        */
+        effectiveFrom: currentLocalDate(),
         suggestedTargets: draft.aiPlan
           ? {
               calories: draft.aiPlan.calories,

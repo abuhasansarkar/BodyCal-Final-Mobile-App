@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { internal } from "./_generated/api";
 import { action } from "./_generated/server";
+import { logProviderMisconfiguration, readProviderConfig } from "./lib/aiProvider";
 import {
   assertNutritionInput,
   calculateNutritionPlan,
@@ -24,16 +25,23 @@ import {
  * Copy-only AI output. The numbers are advisory: `clampTargetsToBaseline` keeps
  * every value within 10% of the locally computed Mifflin–St Jeor baseline, so the
  * safety floors and adjustment caps always hold.
+ *
+ * As in `ai.ts`, the string fields carry no length bounds: OpenAI's strict
+ * Structured Outputs mode rejects `minLength`/`maxLength` outright, which made
+ * every generation fail and fall back to the local baseline. Numeric bounds are
+ * permitted and stay. Lengths are applied after parsing instead.
  */
-const planSchema = z.object({
+export const planSchema = z.object({
   calories: z.number().int().min(1_000).max(5_000),
   proteinGrams: z.number().int().min(30).max(500),
   carbsGrams: z.number().int().min(0).max(1_500),
   fatGrams: z.number().int().min(20).max(500),
-  goalTitle: z.string().min(1).max(120),
-  goalDescription: z.string().min(1).max(280),
-  reasoning: z.string().max(500),
+  goalTitle: z.string(),
+  goalDescription: z.string(),
+  reasoning: z.string(),
 });
+
+const COPY_LIMITS = { goalDescription: 280, goalTitle: 120, reasoning: 500 } as const;
 
 const SUPPORTED_LOCALES = ["en", "es", "de", "fr", "pt-BR", "it", "ja", "ko"] as const;
 type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
@@ -155,10 +163,12 @@ export const generate = action({
 
     const locale = resolveLocale(args.locale);
     const baseline = calculateNutritionPlan(input);
-    const apiKey = process.env.AI_API_KEY;
-    if (!apiKey) return localBaselineResult(input, locale);
-
-    const model = process.env.AI_MODEL ?? "gpt-4o-mini";
+    const provider = readProviderConfig();
+    if (!provider) {
+      logProviderMisconfiguration("planGeneration.generate");
+      return localBaselineResult(input, locale);
+    }
+    const { apiKey, model } = provider;
     const activityLabel = {
       sedentary: "sedentary (little or no exercise)",
       light: "lightly active (light exercise 1-3 days/week)",
@@ -204,16 +214,32 @@ export const generate = action({
 
       const parsed = planSchema.parse(response.output_parsed);
       const clamped = clampTargetsToBaseline(parsed, baseline);
+      const fallbackCopy = FALLBACK_COPY[locale][input.goal];
+      const bounded = (value: string, max: number) => value.trim().slice(0, max);
 
       return {
         ...clamped,
-        goalTitle: parsed.goalTitle,
-        goalDescription: parsed.goalDescription,
-        reasoning: parsed.reasoning,
+        // Empty copy falls back rather than rendering a blank headline.
+        goalTitle: bounded(parsed.goalTitle, COPY_LIMITS.goalTitle) || fallbackCopy.title,
+        goalDescription:
+          bounded(parsed.goalDescription, COPY_LIMITS.goalDescription) || fallbackCopy.description,
+        reasoning: bounded(parsed.reasoning, COPY_LIMITS.reasoning),
         paceWasCapped: baseline.paceWasCapped,
         formulaVersion: "openai-v1",
       };
-    } catch {
+    } catch (cause) {
+      /*
+        The local baseline is a safe answer, so this failure is invisible by
+        design — which is exactly why a rejected request schema went unnoticed
+        here for as long as it did. Log enough to tell "provider said no" from
+        "provider was slow", using only the API error's own request-level fields.
+      */
+      const apiError = cause instanceof OpenAI.APIError ? cause : null;
+      console.error("[planGeneration.generate] falling back to the local baseline", {
+        code: apiError?.code ?? null,
+        message: apiError?.message ?? null,
+        status: apiError?.status ?? null,
+      });
       return localBaselineResult(input, locale);
     }
   },

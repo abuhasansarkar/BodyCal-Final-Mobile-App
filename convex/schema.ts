@@ -199,6 +199,12 @@ export default defineSchema({
     outputTokens: v.optional(v.number()),
     estimatedCostUsd: v.optional(v.number()),
     failureCategory: v.optional(v.string()),
+    /**
+     * Provider attempts spent on this scan. Retries reuse the same row, so a
+     * transient provider error never mints a second scan — and never a second
+     * charge beyond the retry itself. Absent on rows written before retries.
+     */
+    attempts: v.optional(v.number()),
     retentionUntil: v.number(),
     imageDeletedAt: v.optional(v.number()),
     createdAt: v.number(),
