@@ -160,8 +160,10 @@ export function normalizeEstimate(raw: MealEstimateShape) {
 
   // Clamped rather than rejected: a range that does not bracket its own midpoint
   // is a presentation problem, not evidence that the estimate is wrong.
-  const minCalories = Math.min(raw.calorieRange.minCalories, raw.nutrition.calories);
-  const maxCalories = Math.max(raw.calorieRange.maxCalories, raw.nutrition.calories);
+  const rawMin = Number.isFinite(raw.calorieRange.minCalories) ? Math.max(0, raw.calorieRange.minCalories) : 0;
+  const rawMax = Number.isFinite(raw.calorieRange.maxCalories) ? Math.max(0, raw.calorieRange.maxCalories) : raw.nutrition.calories;
+  const minCalories = Math.min(rawMin, raw.nutrition.calories);
+  const maxCalories = Math.max(rawMax, raw.nutrition.calories, minCalories);
 
   const boundedList = (values: string[], max: number) =>
     values

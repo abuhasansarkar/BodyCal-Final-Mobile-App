@@ -375,3 +375,26 @@ export const retryScan = mutation({
     return { requeued: true };
   },
 });
+
+/**
+ * Records a user correction on a completed scan so their adjustments can be
+ * preserved alongside the original estimate for model review.
+ */
+export const recordCorrection = mutation({
+  args: {
+    scanId: v.id("aiScans"),
+    correctedEstimate: v.any(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    const scan = await loadOwned(ctx, args.scanId, user._id);
+    if (!scan) throw new ConvexError("Scan not found");
+
+    await ctx.db.patch(args.scanId, {
+      correctedEstimate: args.correctedEstimate,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});

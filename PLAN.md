@@ -189,7 +189,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Webhook replay protection, out-of-order-event guard, and replay of events that arrive before the Convex user exists.
 - [~] Fixture tests cover purchase, renewal, cancellation, billing issue, expiration, trial, replay, and stale ordering; transfer and refund semantics still need store-side validation.
 - [x] Offline entitlement is reported as `offlineUnknown` and premium stays unlocked from the last known status.
-- [ ] Cached-entitlement hard expiry policy while offline for an extended period.
+- [x] Cached-entitlement hard expiry policy while offline for an extended period.
 - [!] Product creation, pricing, trials, entitlement, offering, transfer policy, and sandbox lifecycle tests require store and RevenueCat accounts.
 
 ### Notifications
@@ -305,7 +305,7 @@ Required workflow:
 - [x] Add full entitlement/quota/failure UX.
 - [x] Validate actual MIME signature in addition to storage metadata.
 - [ ] Add no-food and implausible-combination policy fixtures.
-- [ ] Add correction persistence and attached-log linkage tests.
+- [x] Add correction persistence and attached-log linkage tests.
 - [ ] Add cost controls, alerts, and provider kill switch.
 - Exit: camera, gallery, timeout, retry, quota, no-food, low-confidence, manual fallback, and retention cases pass.
 
@@ -322,7 +322,7 @@ Required workflow:
 
 - [x] Client and server integration baseline.
 - [ ] Verify all webhook event mappings against signed fixtures.
-- [ ] Add cached active-entitlement behavior for offline launch.
+- [x] Add cached active-entitlement behavior for offline launch.
 - [ ] Add cancellation, billing issue, refund, expiration, transfer, and resubscription tests.
 - [ ] Add purchase-cancelled, pending, interrupted, unavailable, and restore-empty user states.
 - [!] Configure App Store and Play products and RevenueCat dashboard.

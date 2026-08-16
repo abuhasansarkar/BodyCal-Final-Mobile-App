@@ -139,8 +139,13 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
         setScanId(started.scanId);
         router.setParams({ scanId: started.scanId });
       } catch (cause) {
-        console.error("Meal scan upload/start error:", cause);
-        setStartFailure(describeStartFailure(cause, t));
+        const failure = describeStartFailure(cause, t);
+        if (failure.showUpgrade) {
+          console.log("[scan] Pro entitlement required for AI meal scan");
+        } else {
+          console.error("Meal scan upload/start error:", cause);
+        }
+        setStartFailure(failure);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -11,6 +11,23 @@ import { publicEnv } from "@/config/env";
  * which would otherwise carry RevenueCat log lines, request URLs, and anything
  * else the app happens to print.
  */
+export function scrubEvent(event: any) {
+  delete event.request;
+  if (event.user) event.user = event.user.id ? { id: event.user.id } : undefined;
+  // Nutrition, weights, meal names and notes must never leave the device.
+  if (event.extra) delete event.extra;
+  if (event.contexts?.response) delete event.contexts.response;
+  return event;
+}
+
+export function scrubBreadcrumb(breadcrumb: any) {
+  // Console output and HTTP breadcrumbs can contain user content or tokens.
+  if (breadcrumb.category === "console" || breadcrumb.category === "xhr") return null;
+  if (breadcrumb.category === "fetch") return null;
+  if (breadcrumb.data) delete breadcrumb.data;
+  return breadcrumb;
+}
+
 Sentry.init({
   dsn: publicEnv.sentryDsn || undefined,
   enabled: Boolean(publicEnv.sentryDsn),
@@ -19,19 +36,10 @@ Sentry.init({
   release: Constants.expoConfig?.version ?? undefined,
   tracesSampleRate: __DEV__ ? 0 : 0.1,
   beforeSend(event) {
-    delete event.request;
-    if (event.user) event.user = event.user.id ? { id: event.user.id } : undefined;
-    // Nutrition, weights, meal names and notes must never leave the device.
-    if (event.extra) delete event.extra;
-    if (event.contexts?.response) delete event.contexts.response;
-    return event;
+    return scrubEvent(event);
   },
   beforeBreadcrumb(breadcrumb) {
-    // Console output and HTTP breadcrumbs can contain user content or tokens.
-    if (breadcrumb.category === "console" || breadcrumb.category === "xhr") return null;
-    if (breadcrumb.category === "fetch") return null;
-    if (breadcrumb.data) delete breadcrumb.data;
-    return breadcrumb;
+    return scrubBreadcrumb(breadcrumb);
   },
 });
 

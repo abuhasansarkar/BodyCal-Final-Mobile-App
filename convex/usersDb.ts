@@ -32,6 +32,8 @@ export const collectExport = internalQuery({
 export const completeExport = internalMutation({
   args: { jobId: v.id("exportJobs"), storageId: v.id("_storage"), expiresAt: v.number() },
   handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job) return;
     await ctx.db.patch(args.jobId, {
       status: "complete",
       storageId: args.storageId,
@@ -44,6 +46,8 @@ export const completeExport = internalMutation({
 export const failExport = internalMutation({
   args: { jobId: v.id("exportJobs"), errorCategory: v.string() },
   handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job) return;
     await ctx.db.patch(args.jobId, {
       status: "failed",
       errorCategory: args.errorCategory,

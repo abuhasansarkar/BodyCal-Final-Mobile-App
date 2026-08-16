@@ -928,6 +928,17 @@ export const seedHistoryForUser = internalMutation({
       userSettings = "created";
     }
 
+    // ---- Pro Subscription Mirror for Testing -----------------------------------
+    await ctx.runMutation(internal.subscriptions.applyVerification, {
+      customerId: user.clerkUserId,
+      active: true,
+      trial: false,
+      productId: "bodycal_annual",
+      periodType: "annual",
+      expirationAt: now + 365 * 24 * 60 * 60 * 1_000,
+      willRenew: true,
+    });
+
     return {
       days,
       goalsInserted,
@@ -937,6 +948,36 @@ export const seedHistoryForUser = internalMutation({
       favoritesInserted,
       notificationPreferences,
       userSettings,
+      proGranted: true,
     };
+  },
+});
+
+/**
+ * Grants Pro entitlement to a user by Clerk ID for development/testing.
+ * Run via CLI:
+ *   npx convex run seed:grantProForUser '{"clerkUserId":"user_..."}'
+ */
+export const grantProForUser = internalMutation({
+  args: { clerkUserId: v.string(), days: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .unique();
+    if (!user) throw new Error(`User with clerkUserId "${args.clerkUserId}" not found`);
+    const durationDays = args.days ?? 365;
+    const expirationAt = Date.now() + durationDays * 24 * 60 * 60 * 1_000;
+
+    await ctx.runMutation(internal.subscriptions.applyVerification, {
+      customerId: args.clerkUserId,
+      active: true,
+      trial: false,
+      productId: "bodycal_annual",
+      periodType: "annual",
+      expirationAt,
+      willRenew: true,
+    });
+    return { success: true, clerkUserId: args.clerkUserId, expirationAt };
   },
 });

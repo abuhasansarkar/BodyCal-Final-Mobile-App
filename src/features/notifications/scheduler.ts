@@ -64,7 +64,7 @@ function parseClockTime(value: string) {
 }
 
 /** Shifts a time out of quiet hours rather than dropping the reminder. */
-function respectQuietHours(
+export function calculateQuietHoursAdjustedTime(
   time: { hour: number; minute: number },
   quietStart?: string,
   quietEnd?: string,
@@ -84,6 +84,14 @@ function respectQuietHours(
       : minutes >= startMinutes || minutes < endMinutes;
 
   return inQuietHours ? { hour: end.hour, minute: end.minute } : time;
+}
+
+function respectQuietHours(
+  time: { hour: number; minute: number },
+  quietStart?: string,
+  quietEnd?: string,
+) {
+  return calculateQuietHoursAdjustedTime(time, quietStart, quietEnd);
 }
 
 async function cancel(identifiers: string[]) {

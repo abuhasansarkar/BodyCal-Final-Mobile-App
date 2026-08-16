@@ -6,6 +6,7 @@ import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
 import { ScreenTitle } from "@/components/ui/section-card";
 import { InlineNotice } from "@/components/ui/states";
+import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
 import { prepareMealImage } from "@/features/scan/prepare-image";
 import { Image } from "@/tw/image";
 
@@ -19,11 +20,17 @@ export function ScanPreviewScreen({
   height?: string;
 }) {
   const { t } = useTranslation();
+  const { state } = useSubscription();
+  const isPro = isProState(state);
   const [error, setError] = React.useState<string | null>(null);
   const [preparing, setPreparing] = React.useState(false);
 
   const analyze = async () => {
     if (!uri) return;
+    if (!isPro) {
+      router.push("/(app)/paywall");
+      return;
+    }
     setPreparing(true);
     setError(null);
     try {
@@ -52,11 +59,23 @@ export function ScanPreviewScreen({
         contentFit="cover"
         source={{ uri }}
       />
+      {!isPro ? (
+        <InlineNotice
+          message={t("scan.errorEntitlement")}
+          tone="info"
+        />
+      ) : null}
       {error ? <InlineNotice message={error} tone="error" /> : null}
       <PrimaryButton
         disabled={preparing}
-        icon="analysis"
-        label={preparing ? t("scan.preparing") : t("scan.analyzeAction")}
+        icon={isPro ? "analysis" : "subscription"}
+        label={
+          preparing
+            ? t("scan.preparing")
+            : isPro
+              ? t("scan.analyzeAction")
+              : t("scan.upgradeAction")
+        }
         onPress={() => void analyze()}
       />
       <PrimaryButton icon="refresh" label={t("scan.retake")} onPress={() => router.back()} />

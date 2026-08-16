@@ -13,4 +13,28 @@ describe("subscription state", () => {
   it("unlocks a trial", () => expect(deriveSubscriptionState(customerInfo({ periodType: "TRIAL" }))).toBe("trial"));
   it("keeps cancelled access active until entitlement expiration", () => expect(deriveSubscriptionState(customerInfo({ willRenew: false, unsubscribeDetectedAt: "2026-08-01" }))).toBe("cancelledActive"));
   it("surfaces active billing issues", () => expect(deriveSubscriptionState(customerInfo({ billingIssueDetectedAt: "2026-08-01" }))).toBe("billingIssueActive"));
+  it("enforces hard expiry when expirationDate has elapsed", () => {
+    const past = new Date(Date.now() - 1000 * 60 * 60).toISOString();
+    expect(deriveSubscriptionState(customerInfo({ expirationDate: past }))).toBe("expired");
+  });
+  it("maintains active status when expirationDate is in the future", () => {
+    const future = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+    expect(deriveSubscriptionState(customerInfo({ expirationDate: future }))).toBe("active");
+  });
+  it("identifies expired subscriptions from historical entitlements", () => {
+    const info = {
+      entitlements: {
+        active: {},
+        all: {
+          pro: {
+            isActive: false,
+            willRenew: false,
+            periodType: "NORMAL",
+            expirationDate: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+          } as unknown as PurchasesEntitlementInfo,
+        },
+      },
+    } as unknown as CustomerInfo;
+    expect(deriveSubscriptionState(info)).toBe("expired");
+  });
 });
