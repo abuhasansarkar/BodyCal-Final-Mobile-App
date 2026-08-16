@@ -178,6 +178,7 @@ export const ko: ScreenTranslations = {
     resetToCalculated: "계산된 목표 사용",
     resetDone: "계산된 목표로 되돌렸습니다.",
     estimateNote: "목표치는 추정값입니다. 의학적 조언이 아닙니다.",
+    carbWarning: "하루 100g 미만의 탄수화물 목표는 감독된 저탄수화물 식단이 아닌 경우 피로를 유발할 수 있습니다.",
   },
   notificationSettings: {
     title: "알림",

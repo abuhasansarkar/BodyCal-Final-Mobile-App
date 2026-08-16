@@ -253,20 +253,20 @@ Required workflow:
 ### Phase 1 — Foundation hardening
 
 - [x] SDK, routing, styling, configuration, providers, and test harness.
-- [ ] Add font loading and splash-screen hold/release behavior.
-- [ ] Add a user-visible fatal configuration/error boundary.
-- [ ] Make production builds reject missing required public variables.
-- [ ] Add CI for install, lint, typecheck, tests, Expo Doctor, secret scanning, and dependency review.
+- [x] Add font loading and splash-screen hold/release behavior.
+- [x] Add a user-visible fatal configuration/error boundary.
+- [x] Make production builds reject missing required public variables.
+- [x] Add CI for install, lint, typecheck, tests, Expo Doctor, secret scanning, and dependency review.
 - Exit: clean install and CI checks pass on Windows/macOS runners.
 
 ### Phase 2 — Calculation and onboarding acceptance
 
 - [x] Calculation engine and primary tests.
 - [x] Onboarding persistence and server migration.
-- [ ] Add boundary/table tests for every activity, goal, pace, cap, minimum, and maximum.
-- [ ] Replace approximate year-only birthday persistence with an explicitly approved age/date model.
-- [ ] Add manual-target review when carbohydrates cannot remain at least 100 g.
-- [ ] Add effective-dated recalculation UX after goal/profile changes.
+- [x] Add boundary/table tests for every activity, goal, pace, cap, minimum, and maximum.
+- [~] Replace approximate year-only birthday persistence with an explicitly approved age/date model.
+- [x] Add manual-target review when carbohydrates cannot remain at least 100 g.
+- [x] Add effective-dated recalculation UX after goal/profile changes.
 - Exit: calculation fixtures approved by product and wellness/legal review.
 
 ### Phase 3 — Authentication and identity
@@ -282,8 +282,8 @@ Required workflow:
 
 - [x] Schema and function baseline.
 - [x] Replace generic function builders and `anyApi` usage with generated typed APIs everywhere.
-- [ ] Add Zod/Convex validators for all external webhook and action payload boundaries.
-- [ ] Add `convex-test` coverage for happy paths, anonymous callers, wrong-user access, idempotency, and history limits.
+- [x] Add Zod/Convex validators for all external webhook and action payload boundaries.
+- [x] Add `convex-test` coverage for happy paths, anonymous callers, wrong-user access, idempotency, and history limits.
 - [ ] Run Convex reviewer and authorization audits before release.
 - [ ] Add backup schedule and documented restore drill.
 - Exit: zero known cross-user access paths and backend verification suite passes.
@@ -291,7 +291,7 @@ Required workflow:
 ### Phase 5 — Food tracking and discovery
 
 - [x] Manual logging and daily totals.
-- [~] Custom-food create, list and delete are implemented and reachable from Food search; editing an existing custom food is still missing.
+- [x] Custom-food create, list, delete, and edit are implemented and reachable from Food search and manual entry.
 - [x] Implement search across curated, custom, recent, and favorites.
 - [x] Favorites mutations plus UI: a favourite toggle on catalog rows and a Favourites section in Food search.
 - [x] Add editable portions, meal selection, dates, and quantities.
@@ -303,7 +303,7 @@ Required workflow:
 
 - [x] Functional server-provider path and editable result.
 - [x] Add full entitlement/quota/failure UX.
-- [ ] Validate actual MIME signature in addition to storage metadata.
+- [x] Validate actual MIME signature in addition to storage metadata.
 - [ ] Add no-food and implausible-combination policy fixtures.
 - [ ] Add correction persistence and attached-log linkage tests.
 - [ ] Add cost controls, alerts, and provider kill switch.
@@ -315,7 +315,7 @@ Required workflow:
 - [x] Build accessible weight chart.
 - [x] Add Week, Month, 3 Months, and All ranges with entitlement rules.
 - [x] Implement start/current/goal completion, streak, and calorie-consistency calculations.
-- [ ] Add timezone-boundary and sparse-data tests.
+- [x] Add timezone-boundary and sparse-data tests.
 - Exit: 30-day free view and complete Pro analytics match backend fixtures.
 
 ### Phase 8 — Commerce

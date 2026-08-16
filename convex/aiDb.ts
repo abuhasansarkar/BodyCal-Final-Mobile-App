@@ -318,6 +318,7 @@ export const getScan = query({
       ),
       estimate: v.union(storedEstimateValidator, v.null()),
       imageUrl: v.union(v.string(), v.null()),
+      imageStorageId: v.optional(v.id("_storage")),
       failureCategory: v.union(v.string(), v.null()),
       retryable: v.boolean(),
       createdAt: v.number(),
@@ -338,6 +339,7 @@ export const getScan = query({
       // Read from storage rather than stored, so a swept image reports as gone
       // instead of handing the client a dead URL.
       imageUrl: scan.imageDeletedAt ? null : await ctx.storage.getUrl(scan.imageStorageId),
+      imageStorageId: scan.imageDeletedAt ? undefined : scan.imageStorageId,
       failureCategory: scan.failureCategory ?? null,
       retryable: scan.status === "failed" && (scan.attempts ?? 0) < MAX_SCAN_ATTEMPTS,
       createdAt: scan.createdAt,

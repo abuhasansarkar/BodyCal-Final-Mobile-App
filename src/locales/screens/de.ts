@@ -179,6 +179,7 @@ export const de: ScreenTranslations = {
     resetToCalculated: "Berechnete Zielwerte verwenden",
     resetDone: "Berechnete Zielwerte wiederhergestellt.",
     estimateNote: "Zielwerte sind Schätzungen. Sie sind keine medizinische Beratung.",
+    carbWarning: "Kohlenhydratziele unter 100g täglich können zu Müdigkeit führen, es sei denn, Sie folgen einem ärztlich betreuten Low-Carb-Plan.",
   },
   notificationSettings: {
     title: "Mitteilungen",

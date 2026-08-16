@@ -1,5 +1,5 @@
 import NetInfo from "@react-native-community/netinfo";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -9,12 +9,13 @@ import { PrimaryButton } from "@/components/primary-button";
 import { Field, FieldGroup, SegmentedControl } from "@/components/ui/form";
 import { RowGroup, ToggleRow } from "@/components/ui/rows";
 import { ScreenTitle, SectionCard } from "@/components/ui/section-card";
-import { InlineNotice } from "@/components/ui/states";
+import { InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { enqueueOutbox } from "@/features/outbox/outbox";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId, currentLocalDate, currentTimezone } from "@/lib/local-day";
 import { View } from "@/tw";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { MealType } from "@/types/domain";
 
 export function CustomFoodScreen() {
@@ -30,15 +31,15 @@ export function CustomFoodScreen() {
 }
 
 /**
- * Manual food entry.
+ * Manual food entry and custom food editor.
  *
- * Optionally saves the food to the user's own library as well as logging it, which
- * is what the previously unused `customFoods` table is for. Success and error
- * states are localized rather than compared against an English literal.
+ * Supports creating new custom/manual entries as well as editing existing library items
+ * when `customFoodId` is present.
  */
 function ConfiguredCustomFood() {
   const { t } = useTranslation();
   const params = useLocalSearchParams<{
+    customFoodId?: string;
     name?: string;
     serving?: string;
     calories?: string;
@@ -47,8 +48,15 @@ function ConfiguredCustomFood() {
     fat?: string;
   }>();
 
+  const customFoodId = params.customFoodId as Id<"customFoods"> | undefined;
+  const customFood = useQuery(
+    api.foods.getCustomFoodById,
+    customFoodId ? { id: customFoodId } : "skip",
+  );
+
   const createLog = useMutation(api.foodLogs.create);
   const createCustomFood = useMutation(api.foods.createCustomFood);
+  const updateCustomFood = useMutation(api.foods.updateCustomFood);
 
   const [name, setName] = React.useState(params.name ?? "");
   const [serving, setServing] = React.useState(params.serving ?? "1 serving");
@@ -60,6 +68,26 @@ function ConfiguredCustomFood() {
   const [alsoSave, setAlsoSave] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "error" } | null>(null);
+
+  const seeded = React.useRef(false);
+  React.useEffect(() => {
+    if (!customFood || seeded.current) return;
+    seeded.current = true;
+    setName(customFood.name);
+    setServing(customFood.serving);
+    setCalories(String(customFood.calories));
+    setProtein(String(customFood.proteinGrams));
+    setCarbs(String(customFood.carbsGrams));
+    setFat(String(customFood.fatGrams));
+  }, [customFood]);
+
+  if (customFoodId && customFood === undefined) {
+    return (
+      <AppScreen>
+        <ScreenSkeleton lines={4} />
+      </AppScreen>
+    );
+  }
 
   const numberError = (value: string, max: number) => {
     if (value.trim() === "") return null;
@@ -95,8 +123,6 @@ function ConfiguredCustomFood() {
     const payload = {
       ...nutrition,
       foodName: name.trim(),
-      // Displayed on the entry afterwards, so the default follows the active
-      // language rather than being pinned to English at write time.
       serving: serving.trim() || t("manualFood.defaultServing"),
       servingUnit: "serving",
       quantity: 1,
@@ -117,7 +143,16 @@ function ConfiguredCustomFood() {
       }
 
       await createLog(payload);
-      if (alsoSave) {
+
+      if (customFoodId) {
+        await updateCustomFood({
+          id: customFoodId,
+          ...nutrition,
+          name: payload.foodName,
+          serving: payload.serving,
+          servingUnit: payload.servingUnit,
+        }).catch(() => undefined);
+      } else if (alsoSave) {
         await createCustomFood({
           ...nutrition,
           name: payload.foodName,
@@ -199,17 +234,19 @@ function ConfiguredCustomFood() {
         </View>
       </SectionCard>
 
-      <RowGroup>
-        {[
-          <ToggleRow
-            icon="heart"
-            key="library"
-            onValueChange={setAlsoSave}
-            title={t("manualFood.saveToLibrary")}
-            value={alsoSave}
-          />,
-        ]}
-      </RowGroup>
+      {!customFoodId ? (
+        <RowGroup>
+          {[
+            <ToggleRow
+              icon="heart"
+              key="library"
+              onValueChange={setAlsoSave}
+              title={t("manualFood.saveToLibrary")}
+              value={alsoSave}
+            />,
+          ]}
+        </RowGroup>
+      ) : null}
 
       {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
 

@@ -179,6 +179,7 @@ export const fr: ScreenTranslations = {
     resetToCalculated: "Utiliser les objectifs calculés",
     resetDone: "Objectifs calculés rétablis.",
     estimateNote: "Les objectifs sont des estimations. Ce n'est pas un avis médical.",
+    carbWarning: "Les objectifs en glucides inférieurs à 100g par jour peuvent provoquer de la fatigue sauf si vous suivez un plan faible en glucides supervisé.",
   },
   notificationSettings: {
     title: "Notifications",

@@ -14,9 +14,51 @@ import schema from "../schema";
  * compiles to CommonJS.
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
+const modulePaths = [
+  "../_generated/api",
+  "../_generated/server",
+  "../ai",
+  "../aiDb",
+  "../dashboard",
+  "../feedback",
+  "../foodLogs",
+  "../foods",
+  "../http",
+  "../maintenance",
+  "../notifications",
+  "../nutritionGoals",
+  "../onboarding",
+  "../planGeneration",
+  "../planGenerationDb",
+  "../profiles",
+  "../seed",
+  "../settings",
+  "../subscriptions",
+  "../subscriptionsActions",
+  "../subscriptionsDb",
+  "../uploads",
+  "../users",
+  "../usersActions",
+  "../usersDb",
+  "../weights",
+];
+
+const moduleCache = new Map<string, any>();
+for (const p of modulePaths) {
+  try {
+    const m = require(p);
+    moduleCache.set(p, { ...m, default: m });
+  } catch {
+    // ignore
+  }
+}
+
 function loadModule(relPath: string) {
-  const m = require(relPath);
-  return Promise.resolve({ ...m, default: m });
+  if (!moduleCache.has(relPath)) {
+    const m = require(relPath);
+    moduleCache.set(relPath, { ...m, default: m });
+  }
+  return Promise.resolve(moduleCache.get(relPath));
 }
 
 export const modules = {

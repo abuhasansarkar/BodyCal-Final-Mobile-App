@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api } from "../_generated/api";
-import { claimUpload, createUser, FOOD_ENTRY, setupTest} from "./setup";
+import { claimUpload, createUser, FOOD_ENTRY, settle, setupTest } from "./setup";
 
 /**
  * Authorization coverage.
@@ -146,6 +146,7 @@ describe("authorization", () => {
     const { asUser } = await createUser(t, "user_leaving");
 
     await asUser.mutation(api.users.requestDeletion, {});
+    await settle(t);
 
     // requireCurrentUser rejects a non-active lifecycle state.
     await expect(asUser.query(api.foodLogs.getDay, { localDate: "2026-08-13" })).rejects.toThrow(

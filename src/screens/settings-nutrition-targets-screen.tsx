@@ -187,6 +187,9 @@ function TargetsForm({ activeGoal, inputs }: { activeGoal: Goal; inputs: Inputs 
       </SectionCard>
 
       {macroMismatch ? <InlineNotice message={t("nutritionTargets.estimateNote")} /> : null}
+      {!hasErrors && Number(carbs) < 100 ? (
+        <InlineNotice message={t("nutritionTargets.carbWarning")} tone="error" />
+      ) : null}
       {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
 
       <PrimaryButton

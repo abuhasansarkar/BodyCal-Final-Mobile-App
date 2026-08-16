@@ -179,6 +179,7 @@ export const es: ScreenTranslations = {
     resetToCalculated: "Usar metas calculadas",
     resetDone: "Metas calculadas restauradas.",
     estimateNote: "Las metas son estimaciones. No son consejo médico.",
+    carbWarning: "Los objetivos de carbohidratos inferiores a 100g diarios pueden causar fatiga a menos que siga un plan supervisado bajo en carbohidratos.",
   },
   notificationSettings: {
     title: "Notificaciones",

@@ -179,6 +179,7 @@ export const ptBR: ScreenTranslations = {
     resetToCalculated: "Usar metas calculadas",
     resetDone: "Metas calculadas restauradas.",
     estimateNote: "As metas são estimativas. Não são orientação médica.",
+    carbWarning: "Metas de carboidratos abaixo de 100g por dia podem causar fadiga, a menos que você siga um plano supervisionado com pouco carboidrato.",
   },
   notificationSettings: {
     title: "Notificações",

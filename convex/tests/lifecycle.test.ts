@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api, internal } from "../_generated/api";
-import { claimUpload, createUser, FOOD_ENTRY, ONBOARDING_INPUT, setupTest} from "./setup";
+import { claimUpload, createUser, FOOD_ENTRY, ONBOARDING_INPUT, settle, setupTest } from "./setup";
 
 /**
  * Account lifecycle: export and deletion.
@@ -42,6 +42,7 @@ describe("data export", () => {
     const first = await asUser.mutation(api.users.requestExport, {});
     const second = await asUser.mutation(api.users.requestExport, {});
     expect(second).toBe(first);
+    await settle(t);
   });
 
   it("rate limits repeated export requests", async () => {
@@ -57,6 +58,7 @@ describe("data export", () => {
     }
 
     await expect(asUser.mutation(api.users.requestExport, {})).rejects.toThrow();
+    await settle(t);
   });
 });
 
@@ -128,12 +130,14 @@ describe("account deletion", () => {
     const { asUser } = await createUser(t, "user_retry");
 
     const jobId = await asUser.mutation(api.users.requestDeletion, {});
+    await settle(t);
     await t.run(async (ctx) => {
       await ctx.db.patch(jobId, { status: "failed", errorCategory: "clerk_delete_failed" });
     });
 
     // requireUserRecord, not requireCurrentUser, so a deletionPending user is not locked out.
     await expect(asUser.mutation(api.users.requestDeletion, {})).resolves.toBe(jobId);
+    await settle(t);
 
     const status = await asUser.query(api.users.getDeletionStatus, {});
     expect(status?.status).toBe("pending");
@@ -144,6 +148,7 @@ describe("account deletion", () => {
     const { asUser } = await createUser(t, "user_cancel");
 
     const jobId = await asUser.mutation(api.users.requestDeletion, {});
+    await settle(t);
     await t.run(async (ctx) => {
       await ctx.db.patch(jobId, { status: "failed" });
     });
@@ -160,6 +165,7 @@ describe("account deletion", () => {
 
     await asUser.mutation(api.users.requestDeletion, {});
     await expect(asUser.mutation(api.users.cancelDeletion, {})).rejects.toThrow(/in progress/i);
+    await settle(t);
   });
 
   it("refuses to finalize before the data is cleared", async () => {
@@ -167,6 +173,7 @@ describe("account deletion", () => {
     const { asUser, userId } = await createUser(t);
     await asUser.mutation(api.onboarding.complete, ONBOARDING_INPUT);
     const jobId = await asUser.mutation(api.users.requestDeletion, {});
+    await settle(t);
 
     await expect(t.mutation(internal.usersDb.finalizeDeletion, { jobId, userId })).rejects.toThrow(
       /not_cleared/,

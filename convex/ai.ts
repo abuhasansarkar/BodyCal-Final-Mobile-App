@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalAction } from "./_generated/server";
 import { logProviderMisconfiguration, readProviderConfig } from "./lib/aiProvider";
+import { detectImageMimeType } from "./lib/validation";
 
 /** Text bounds, applied after parsing rather than on the wire. See `estimateSchema`. */
 const TEXT_LIMITS = { component: 100, mealName: 120, warning: 240 } as const;
@@ -332,8 +333,11 @@ export const runScanAnalysis = internalAction({
       const blob = await ctx.storage.get(claim.storageId);
       if (!blob) throw new ImageUnavailableError("Image is unavailable");
 
-      const contentType = SUPPORTED_IMAGE_TYPES.has(blob.type) ? blob.type : "image/jpeg";
-      const base64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      const detectedType = detectImageMimeType(bytes);
+      const contentType = detectedType ?? (SUPPORTED_IMAGE_TYPES.has(blob.type) ? blob.type : "image/jpeg");
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
       // Sent inline rather than as a storage URL, so the analysis does not
       // depend on the provider's fetcher reaching a Convex URL, and no meal
       // photo URL is handed out at all.

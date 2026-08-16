@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AppIcon } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
+import { ProgressRing } from "@/components/progress-ring";
 import { hasBackendConfiguration } from "@/config/env";
 import { useSubscription } from "@/features/subscription/subscription-provider";
 import { api } from "@/lib/convex-api";
@@ -16,6 +17,12 @@ type WeightLogItem = {
   _id: string;
   normalizedKg: number;
   localDate: string;
+};
+
+type CalorieSeriesItem = {
+  localDate: string;
+  calories: number;
+  entryCount: number;
 };
 
 /** Shape returned by `weights.getProgress`, which no longer reads the whole history. */
@@ -36,6 +43,12 @@ type RangeOption = "week" | "month" | "3m" | "all";
 
 export function ProgressScreen() {
   return hasBackendConfiguration ? <ConfiguredProgress /> : <UnconfiguredProgress />;
+}
+
+function dateDaysAgo(days: number) {
+  const value = new Date();
+  value.setDate(value.getDate() - days);
+  return currentLocalDate(value);
 }
 
 function ProgressSkeleton() {
@@ -63,12 +76,24 @@ function ConfiguredProgress() {
   const progress = useQuery(api.weights.getProgress, {});
   const history = useQuery(api.weights.getHistory, { limit: isPro ? 365 : 30 });
   const streak = useQuery(api.dashboard.getLoggingStreak, { todayLocalDate: currentLocalDate() });
+  const calorieSeries = useQuery(api.dashboard.getDailyCalorieSeries, {
+    fromDate: dateDaysAgo(30),
+    toDate: currentLocalDate(),
+  });
 
-  if (progress === undefined || history === undefined || streak === undefined) {
+  if (progress === undefined || history === undefined || streak === undefined || calorieSeries === undefined) {
     return <ProgressSkeleton />;
   }
 
-  return <ProgressContent history={history} isPro={isPro} progress={progress} streak={streak} />;
+  return (
+    <ProgressContent
+      calorieSeries={calorieSeries}
+      history={history}
+      isPro={isPro}
+      progress={progress}
+      streak={streak}
+    />
+  );
 }
 
 function UnconfiguredProgress() {
@@ -78,15 +103,23 @@ function UnconfiguredProgress() {
 function ProgressContent({
   progress,
   history = [],
+  calorieSeries = [],
   streak = 0,
 }: {
   progress?: ProgressData;
   history?: WeightLogItem[];
+  calorieSeries?: CalorieSeriesItem[];
   streak?: number;
   isPro: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [range, setRange] = React.useState<RangeOption>("month");
+
+  const avgCalories = React.useMemo(() => {
+    if (!calorieSeries || calorieSeries.length === 0) return null;
+    const sum = calorieSeries.reduce((acc, curr) => acc + curr.calories, 0);
+    return Math.round(sum / calorieSeries.length);
+  }, [calorieSeries]);
 
   const rangeOptions: { key: RangeOption; label: string }[] = [
     { key: "week", label: t("progress.rangeWeek") },
@@ -232,22 +265,14 @@ function ProgressContent({
             accessibilityLabel={t("progress.pctOfGoal", { pct: pctGoal })}
             accessibilityRole="progressbar"
             accessibilityValue={{ min: 0, max: 100, now: pctGoal }}
-            className="h-24 w-24 items-center justify-center"
+            className="items-center justify-center"
           >
-            <View className="absolute inset-0 rounded-full border-[7px] border-[#E8E8E8]" />
-            {pctGoal > 0 && pctGoal <= 50 ? (
-              <View
-                className="absolute inset-0 rounded-full border-[7px] border-transparent"
-                style={{ borderRightColor: "#111111", borderTopColor: "#111111", transform: [{ rotate: `${pctGoal * 3.6 - 135}deg` }] }}
-              />
-            ) : pctGoal > 50 ? (
-              <>
-                <View className="absolute inset-0 rounded-full border-[7px] border-transparent" style={{ borderRightColor: "#111111", borderTopColor: "#111111", transform: [{ rotate: "45deg" }] }} />
-                <View className="absolute inset-0 rounded-full border-[7px] border-transparent" style={{ borderLeftColor: "#111111", borderBottomColor: "#111111", transform: [{ rotate: `${(pctGoal - 50) * 3.6 - 135}deg` }] }} />
-              </>
-            ) : null}
-            <Text className="text-xl font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>{pctGoal}%</Text>
-            <Text className="text-xs font-semibold text-app-muted">{t("progress.ofGoalShort")}</Text>
+            <ProgressRing color="#111111" size={92} thickness={8} trackColor="#E8E8E8" value={pctGoal}>
+              <View className="items-center justify-center">
+                <Text className="text-xl font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>{pctGoal}%</Text>
+                <Text className="text-xs font-semibold text-app-muted">{t("progress.ofGoalShort")}</Text>
+              </View>
+            </ProgressRing>
           </View>
         </View>
       </View>
@@ -354,8 +379,12 @@ function ProgressContent({
             <AppIcon color="#111111" name="protein" size={22} />
           </View>
           <Text className="text-sm font-semibold text-app-muted">{t("progress.avgCalories")}</Text>
-          <Text className="text-xl font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>—</Text>
-          <Text className="text-xs font-medium text-app-muted">{t("progress.comingSoon")}</Text>
+          <Text className="text-xl font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
+            {avgCalories !== null ? new Intl.NumberFormat(i18n.resolvedLanguage ?? "en").format(avgCalories) : "—"}
+          </Text>
+          <Text className="text-xs font-medium text-app-muted">
+            {avgCalories !== null ? t("dashboard.kcal") : t("progress.startLogging")}
+          </Text>
         </View>
       </View>
 

@@ -178,6 +178,7 @@ export const ja: ScreenTranslations = {
     resetToCalculated: "算出された目標を使う",
     resetDone: "算出された目標に戻しました。",
     estimateNote: "目標値は推定値です。医学的助言ではありません。",
+    carbWarning: "炭水化物の目標が1日100g未満の場合、管理された低糖質プランでない限り疲労を引き起こす可能性があります。",
   },
   notificationSettings: {
     title: "通知",

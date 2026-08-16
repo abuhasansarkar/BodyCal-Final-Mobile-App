@@ -184,6 +184,7 @@ export const en = {
     resetToCalculated: "Use calculated targets",
     resetDone: "Calculated targets restored.",
     estimateNote: "Targets are estimates. They are not medical advice.",
+    carbWarning: "Carbohydrate targets below 100g daily may cause fatigue unless you are on a supervised low-carb plan.",
   },
   notificationSettings: {
     title: "Notifications",

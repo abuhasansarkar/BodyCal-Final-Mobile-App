@@ -339,6 +339,49 @@ export const createCustomFood = mutation({
   },
 });
 
+export const getCustomFoodById = query({
+  args: { id: v.id("customFoods") },
+  returns: v.union(customFood, v.null()),
+  handler: async (ctx, { id }) => {
+    const user = await requireCurrentUser(ctx);
+    const record = await ctx.db.get(id);
+    if (!record || record.userId !== user._id) return null;
+    return record;
+  },
+});
+
+export const updateCustomFood = mutation({
+  args: {
+    id: v.id("customFoods"),
+    name: v.string(),
+    serving: v.string(),
+    servingUnit: v.string(),
+    calories: v.number(),
+    proteinGrams: v.number(),
+    carbsGrams: v.number(),
+    fatGrams: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    const record = await ctx.db.get(args.id);
+    if (!record || record.userId !== user._id) throw new ConvexError("Food not found");
+    assertEntryNutrition({ ...args, quantity: 1 });
+
+    await ctx.db.patch(args.id, {
+      name: assertBoundedString(args.name, LIMITS.foodName, "name"),
+      serving: assertBoundedString(args.serving, LIMITS.serving, "serving"),
+      servingUnit: assertBoundedString(args.servingUnit, LIMITS.servingUnit, "servingUnit"),
+      calories: args.calories,
+      proteinGrams: args.proteinGrams,
+      carbsGrams: args.carbsGrams,
+      fatGrams: args.fatGrams,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
 export const removeCustomFood = mutation({
   args: { id: v.id("customFoods") },
   returns: v.null(),

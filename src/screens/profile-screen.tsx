@@ -13,10 +13,11 @@ import { useSubscription } from "@/features/subscription/subscription-provider";
 import { api } from "@/lib/convex-api";
 import { Image, Pressable, Text, View } from "@/tw";
 
-type SettingsRoute = "goal" | "nutrition-targets" | "notifications" | "units" | "appearance" | "language" | "subscription" | "help" | "privacy" | "terms" | "delete-account";
+type SettingsRoute = "personal-details" | "goal" | "nutrition-targets" | "notifications" | "units" | "appearance" | "language" | "subscription" | "help" | "privacy" | "terms" | "delete-account";
 type Setting = { icon: AppIconName; route: SettingsRoute; titleKey: string; destructive?: boolean };
 
 const primarySettings: Setting[] = [
+  { icon: "personalDetails", route: "personal-details", titleKey: "personalDetails" },
   { icon: "goal", route: "goal", titleKey: "goals" },
   { icon: "nutrition", route: "nutrition-targets", titleKey: "nutritionTargets" },
   { icon: "notification", route: "notifications", titleKey: "notifications" },

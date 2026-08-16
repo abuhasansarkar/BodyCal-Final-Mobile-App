@@ -179,6 +179,7 @@ export const it: ScreenTranslations = {
     resetToCalculated: "Usa gli obiettivi calcolati",
     resetDone: "Obiettivi calcolati ripristinati.",
     estimateNote: "Gli obiettivi sono stime. Non sono consigli medici.",
+    carbWarning: "Obiettivi di carboidrati inferiori a 100g al giorno possono causare affaticamento se non segui una dieta a basso contenuto di carboidrati controllata.",
   },
   notificationSettings: {
     title: "Notifiche",
