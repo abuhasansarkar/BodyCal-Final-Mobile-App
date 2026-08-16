@@ -173,6 +173,7 @@ function GreetingHeader() {
   );
 }
 
+
 function TodayContent({
   isOffline = false,
   loggingStreak = 0,

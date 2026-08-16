@@ -521,13 +521,100 @@ export const seedDemoDataForUser = internalMutation({
   },
 });
 
+/** Grants Pro entitlement to a specific user for testing/demo purposes. */
+export const seedProSubscriptionForUser = internalMutation({
+  args: { clerkUserId: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, { clerkUserId }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", clerkUserId))
+      .unique();
+    if (!user) return { success: false };
+
+    const existing = await ctx.db
+      .query("subscriptionMirror")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    const now = Date.now();
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+    const value = {
+      userId: user._id,
+      revenueCatCustomerId: clerkUserId,
+      state: "active" as const,
+      productId: "bodycal_annual_pro",
+      periodType: "ANNUAL",
+      expirationAt: now + oneYear,
+      willRenew: true,
+      trial: false,
+      lastEventAt: now,
+      eventId: `seed_sub_${now}`,
+      verifiedAt: now,
+      updatedAt: now,
+    };
+
+    if (existing) {
+      await ctx.db.replace(existing._id, value);
+    } else {
+      await ctx.db.insert("subscriptionMirror", value);
+    }
+
+    return { success: true };
+  },
+});
+
+/** Grants Pro entitlement to all existing users in the current development database. */
+export const grantProToAllDevUsers = internalMutation({
+  args: {},
+  returns: v.object({ count: v.number() }),
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    const now = Date.now();
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+
+    for (const user of users) {
+      const existing = await ctx.db
+        .query("subscriptionMirror")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .unique();
+
+      const value = {
+        userId: user._id,
+        revenueCatCustomerId: user.clerkUserId,
+        state: "active" as const,
+        productId: "bodycal_annual_pro",
+        periodType: "ANNUAL",
+        expirationAt: now + oneYear,
+        willRenew: true,
+        trial: false,
+        lastEventAt: now,
+        eventId: `seed_sub_${user._id}`,
+        verifiedAt: now,
+        updatedAt: now,
+      };
+
+      if (existing) {
+        await ctx.db.replace(existing._id, value);
+      } else {
+        await ctx.db.insert("subscriptionMirror", value);
+      }
+    }
+
+    return { count: users.length };
+  },
+});
+
 /** Convenience wrapper for local setup: catalog plus one named demo account. */
 export const seedAll = internalMutation({
   args: { clerkUserId: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, { clerkUserId }) => {
     await ctx.runMutation(internal.seed.seedCatalog, {});
-    if (clerkUserId) await ctx.runMutation(internal.seed.seedDemoDataForUser, { clerkUserId });
+    if (clerkUserId) {
+      await ctx.runMutation(internal.seed.seedDemoDataForUser, { clerkUserId });
+      await ctx.runMutation(internal.seed.seedProSubscriptionForUser, { clerkUserId });
+    }
     return null;
   },
 });

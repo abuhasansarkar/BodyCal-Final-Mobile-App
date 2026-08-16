@@ -1,5 +1,4 @@
-import * as ImageManipulator from "expo-image-manipulator";
-import { SaveFormat } from "expo-image-manipulator";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 /**
  * Prepares a meal photo for upload: long edge at most 1,600px, JPEG quality
@@ -22,9 +21,13 @@ export type PreparedImage = {
 };
 
 async function byteSize(uri: string) {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  return blob.size;
+  try {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return blob.size;
+  } catch {
+    return 0;
+  }
 }
 
 export async function prepareMealImage(input: {
@@ -32,7 +35,7 @@ export async function prepareMealImage(input: {
   width?: number;
   height?: number;
 }): Promise<PreparedImage> {
-  const context = ImageManipulator.ImageManipulator.manipulate(input.uri);
+  const context = ImageManipulator.manipulate(input.uri);
   const probe = await context.renderAsync();
 
   // Prefer the rendered dimensions; the caller's hints are only a fast path.
@@ -40,7 +43,7 @@ export async function prepareMealImage(input: {
   const sourceHeight = probe.height || input.height || 0;
   const longEdge = Math.max(sourceWidth, sourceHeight);
 
-  let working = ImageManipulator.ImageManipulator.manipulate(input.uri);
+  let working = ImageManipulator.manipulate(input.uri);
   if (longEdge > MAX_LONG_EDGE) {
     if (sourceWidth >= sourceHeight) working.resize({ width: MAX_LONG_EDGE, height: null });
     else working.resize({ width: null, height: MAX_LONG_EDGE });
@@ -57,7 +60,7 @@ export async function prepareMealImage(input: {
 
   // Still too large: halve the long edge once and retry at the lowest quality.
   if (size > MAX_BYTES) {
-    working = ImageManipulator.ImageManipulator.manipulate(input.uri);
+    working = ImageManipulator.manipulate(input.uri);
     const target = Math.max(640, Math.floor(MAX_LONG_EDGE / 2));
     if (sourceWidth >= sourceHeight) working.resize({ width: target, height: null });
     else working.resize({ width: null, height: target });

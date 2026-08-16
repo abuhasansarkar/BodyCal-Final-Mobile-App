@@ -283,7 +283,7 @@ function CameraEducation({ canAskAgain, onBack, onContinue }: { canAskAgain: boo
           <View className="h-12 w-12" />
         </View>
 
-        <Image accessibilityLabel={t("camera.heroLabel")} className="min-h-[310px] w-full flex-1 rounded-[28px]" contentFit="cover" source={scanHero} />
+        <Image accessibilityLabel={t("camera.heroLabel")} className="w-full rounded-[28px]" contentFit="cover" source={scanHero} style={{ aspectRatio: 1122 / 1402 }} />
 
         <View className="gap-1 rounded-[28px] border border-[#EEEEEE] bg-white p-5" style={{ borderCurve: "continuous", boxShadow: "0 8px 28px rgba(0, 0, 0, 0.06)" }}>
           <Text accessibilityRole="header" className="pb-2 text-[28px] font-bold tracking-[-0.6px] text-[#111111]" selectable>{t("camera.bestScan")}</Text>

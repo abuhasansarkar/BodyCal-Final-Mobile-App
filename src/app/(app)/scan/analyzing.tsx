@@ -13,6 +13,7 @@ import { hasBackendConfiguration } from "@/config/env";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId } from "@/lib/local-day";
 import { i18n } from "@/locales/i18n";
+import { uploadImageToStorage } from "@/features/scan/upload-image";
 import { FeatureScreen } from "@/screens/feature-screen";
 import { Pressable, Text } from "@/tw";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -143,20 +144,8 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
 
     void (async () => {
       try {
-        const blob = await (await fetch(uri)).blob();
-        if (blob.size > 4_000_000) throw new Error("image_too_large");
-
         const uploadUrl = await generateUploadUrl({});
-        const upload = await fetch(uploadUrl, {
-          method: "POST",
-          // The blob's own type, so a PNG or WebP pick is not mislabelled as
-          // JPEG on the way into storage and then sent to the provider as one.
-          headers: { "Content-Type": blob.type || "image/jpeg" },
-          body: blob,
-        });
-        if (!upload.ok) throw new Error("upload_failed");
-
-        const { storageId } = (await upload.json()) as { storageId: Id<"_storage"> };
+        const { storageId } = await uploadImageToStorage(uploadUrl, uri);
 
         // Claim the blob before it is used, so the server can prove ownership
         // before attaching it to a scan or serving a URL for it.
@@ -176,6 +165,7 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
         // analysis instead of paying for a second one.
         router.setParams({ scanId: started.scanId });
       } catch (cause) {
+        console.error("Meal scan upload/start error:", cause);
         setStartFailure(describeStartFailure(cause, t));
       }
     })();
