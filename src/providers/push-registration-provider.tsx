@@ -1,4 +1,5 @@
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useUser } from "@clerk/expo";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
@@ -22,19 +23,21 @@ import { i18n } from "@/locales/i18n";
  * stops targeting a device that can no longer receive anything.
  */
 export function PushRegistrationProvider({ children }: PropsWithChildren) {
+  const { user } = useUser();
   const { isAuthenticated } = useConvexAuth();
   const preferences = useQuery(api.notifications.getPreferences, isAuthenticated ? {} : "skip");
   const registerDevice = useMutation(api.notifications.registerDevice);
   const unregisterDevice = useMutation(api.notifications.unregisterDevice);
-  const lastToken = React.useRef<string | null>(null);
+  const lastRegistration = React.useRef<string | null>(null);
+  const userId = user?.id;
 
   const reconcile = React.useCallback(async () => {
     const installationId = await getInstallationId();
     const status = await getPermissionStatus();
 
     if (status !== "granted" || !Device.isDevice) {
-      if (lastToken.current !== null) {
-        lastToken.current = null;
+      if (lastRegistration.current !== null) {
+        lastRegistration.current = null;
         await unregisterDevice({ installationId }).catch(() => undefined);
       }
       return;
@@ -47,7 +50,8 @@ export function PushRegistrationProvider({ children }: PropsWithChildren) {
       const token = await Notifications.getExpoPushTokenAsync(
         projectId ? { projectId } : undefined,
       );
-      if (token.data === lastToken.current) return;
+      const registrationKey = `${userId ?? "signed-out"}:${token.data}`;
+      if (registrationKey === lastRegistration.current) return;
 
       await registerDevice({
         installationId,
@@ -56,12 +60,12 @@ export function PushRegistrationProvider({ children }: PropsWithChildren) {
         locale: i18n.resolvedLanguage ?? "en",
         timezone: currentTimezone(),
       });
-      lastToken.current = token.data;
+      lastRegistration.current = registrationKey;
     } catch {
       // A missing EAS project id or an offline device is not an error the user
       // needs to see; reminders remain best-effort either way.
     }
-  }, [registerDevice, unregisterDevice]);
+  }, [registerDevice, unregisterDevice, userId]);
 
   // Re-check whenever preferences change: enabling reminders is what makes a
   // token available, and revoking permission must remove the device row.

@@ -97,6 +97,24 @@ describe("normalizeEstimate", () => {
     ).not.toThrow();
   });
 
+  it("refuses macro totals that contradict the item breakdown", () => {
+    expect(() =>
+      normalizeEstimate({
+        ...RAW,
+        nutrition: { ...RAW.nutrition, proteinGrams: 240 },
+      }),
+    ).toThrow(/proteinGrams/i);
+  });
+
+  it("uses null instead of a zero estimated weight", () => {
+    expect(() =>
+      normalizeEstimate({
+        ...RAW,
+        components: [{ ...COMPONENT, estimatedWeightGrams: 0 }, RAW.components[1]],
+      }),
+    ).toThrow(/positive or unknown/i);
+  });
+
   it("refuses food identified with no energy at all", () => {
     expect(() =>
       normalizeEstimate({

@@ -18,6 +18,8 @@ export const ja: ScreenTranslations = {
     notSet: "未設定",
   },
   errors: {
+    fatalTitle: "問題が発生しました",
+    fatalBody: "予期しないエラーが発生しました。BodyCalを引き続き使用するには、もう一度お試しください。",
     generic: "問題が発生しました。もう一度お試しください。",
     network: "接続がありません。ネットワークを確認してもう一度お試しください。",
     accountSyncFailed: "アカウントの設定を完了できませんでした。もう一度お試しください。",
@@ -478,6 +480,7 @@ export const ja: ScreenTranslations = {
   },
   weight: {
     addTitle: "体重を記録",
+    editTitle: "体重を編集",
     addSubtitle: "1 日 1 回の記録で十分です。",
     weightLabel: "体重",
     noteLabel: "メモ",

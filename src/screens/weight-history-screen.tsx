@@ -10,14 +10,20 @@ import { EmptyState, InlineNotice, ScreenSkeleton } from "@/components/ui/states
 import { hasBackendConfiguration } from "@/config/env";
 import { colors } from "@/config/theme";
 import { kilogramsToPounds } from "@/domain/nutrition-calculator";
-import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
+import { useServerProAccess } from "@/features/subscription/server-pro-access";
 import { api } from "@/lib/convex-api";
+import { currentLocalDate } from "@/lib/local-day";
 import { Pressable, Text, View } from "@/tw";
 import type { Id } from "../../convex/_generated/dataModel";
 
+function dateDaysAgo(days: number) {
+  const value = new Date();
+  value.setDate(value.getDate() - days);
+  return currentLocalDate(value);
+}
+
 export function WeightHistoryScreen() {
   const { t } = useTranslation();
-  const { state } = useSubscription();
 
   if (!hasBackendConfiguration) {
     return (
@@ -26,13 +32,18 @@ export function WeightHistoryScreen() {
       </AppScreen>
     );
   }
-  return <ConfiguredWeightHistory isPro={isProState(state)} />;
+  return <ConfiguredWeightHistory />;
 }
 
 /** Weight history with per-entry deletion. Free accounts see a shorter window. */
-function ConfiguredWeightHistory({ isPro }: { isPro: boolean }) {
+function ConfiguredWeightHistory() {
   const { i18n, t } = useTranslation();
-  const weights = useQuery(api.weights.getHistory, { limit: isPro ? 365 : 30 });
+  const isPro = useServerProAccess();
+  const weights = useQuery(api.weights.getHistory, {
+    fromDate: dateDaysAgo(isPro ? 3_650 : 29),
+    toDate: currentLocalDate(),
+    limit: isPro ? 500 : 100,
+  });
   const profile = useQuery(api.profiles.getCurrent, {});
   const removeWeight = useMutation(api.weights.remove);
 
@@ -115,6 +126,15 @@ function ConfiguredWeightHistory({ isPro }: { isPro: boolean }) {
                         </Text>
                       ) : null}
                     </View>
+
+                    <Pressable
+                      accessibilityLabel={t("common.edit")}
+                      accessibilityRole="button"
+                      className="h-11 w-11 items-center justify-center rounded-full active:bg-app-surface"
+                      onPress={() => router.push({ pathname: "/(app)/weight/add", params: { id: entry._id } })}
+                    >
+                      <AppIcon color={colors.muted} name="edit" size={19} />
+                    </Pressable>
 
                     <Pressable
                       accessibilityLabel={t("weight.deleteEntry")}

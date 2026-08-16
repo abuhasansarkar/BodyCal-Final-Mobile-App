@@ -18,6 +18,7 @@ import type * as foods from "../foods.js";
 import type * as http from "../http.js";
 import type * as lib_aiProvider from "../lib/aiProvider.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_estimate from "../lib/estimate.js";
 import type * as lib_nutrition from "../lib/nutrition.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/aiProvider": typeof lib_aiProvider;
   "lib/auth": typeof lib_auth;
+  "lib/entitlements": typeof lib_entitlements;
   "lib/estimate": typeof lib_estimate;
   "lib/nutrition": typeof lib_nutrition;
   "lib/rateLimit": typeof lib_rateLimit;

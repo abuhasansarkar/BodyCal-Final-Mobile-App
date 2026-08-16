@@ -1,4 +1,6 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import type { TFunction } from "i18next";
+import { withTranslation } from "react-i18next";
 import { SafeAreaView, StyleSheet } from "react-native";
 
 import { AppIcon } from "@/components/app-icon";
@@ -8,6 +10,7 @@ import { Text, View } from "@/tw";
 
 type Props = {
   children: ReactNode;
+  t: TFunction;
 };
 
 type State = {
@@ -15,7 +18,7 @@ type State = {
   error: Error | null;
 };
 
-export class FatalErrorBoundary extends Component<Props, State> {
+class FatalErrorBoundaryImpl extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -44,11 +47,11 @@ export class FatalErrorBoundary extends Component<Props, State> {
               </View>
 
               <Text className="text-center text-2xl font-bold text-[#111111]">
-                Something went wrong
+                {this.props.t("errors.fatalTitle")}
               </Text>
 
               <Text className="max-w-[320px] text-center text-base leading-6 text-[#737373]">
-                An unexpected error occurred. You can restart the app to continue tracking your nutrition.
+                {this.props.t("errors.fatalBody")}
               </Text>
 
               {__DEV__ && this.state.error ? (
@@ -63,7 +66,7 @@ export class FatalErrorBoundary extends Component<Props, State> {
             <View className="w-full">
               <PrimaryButton
                 icon="back"
-                label="Restart App"
+                label={this.props.t("common.retry")}
                 onPress={this.handleRestart}
               />
             </View>
@@ -75,6 +78,8 @@ export class FatalErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export const FatalErrorBoundary = withTranslation()(FatalErrorBoundaryImpl);
 
 const styles = StyleSheet.create({
   container: {

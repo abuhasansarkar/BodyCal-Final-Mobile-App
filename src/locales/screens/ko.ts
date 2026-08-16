@@ -18,6 +18,8 @@ export const ko: ScreenTranslations = {
     notSet: "설정되지 않음",
   },
   errors: {
+    fatalTitle: "문제가 발생했습니다",
+    fatalBody: "예기치 않은 오류가 발생했습니다. BodyCal을 계속 사용하려면 다시 시도해 주세요.",
     generic: "문제가 발생했습니다. 다시 시도해 주세요.",
     network: "연결이 없습니다. 네트워크를 확인하고 다시 시도해 주세요.",
     accountSyncFailed: "계정 설정을 완료하지 못했습니다. 다시 시도해 주세요.",
@@ -478,6 +480,7 @@ export const ko: ScreenTranslations = {
   },
   weight: {
     addTitle: "체중 기록",
+    editTitle: "체중 수정",
     addSubtitle: "하루에 한 번 기록하면 충분합니다.",
     weightLabel: "체중",
     noteLabel: "메모",

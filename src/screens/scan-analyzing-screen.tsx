@@ -13,7 +13,7 @@ import { hasBackendConfiguration } from "@/config/env";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId } from "@/lib/local-day";
 import { i18n } from "@/locales/i18n";
-import { uploadImageToStorage } from "@/features/scan/upload-image";
+import { uploadImageToStorage } from "../features/scan/upload-image";
 import { FeatureScreen } from "@/screens/feature-screen";
 import { Pressable, Text } from "@/tw";
 import type { Id } from "../../convex/_generated/dataModel";

@@ -31,6 +31,14 @@ export type EntitlementResult = {
   willRenew?: boolean;
 };
 
+const entitlementResultValidator = v.object({
+  active: v.boolean(),
+  trial: v.boolean(),
+  expirationAt: v.optional(v.number()),
+  productId: v.optional(v.string()),
+  willRenew: v.optional(v.boolean()),
+});
+
 async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementResult> {
   const secret = process.env.REVENUECAT_SECRET_KEY;
   if (!secret) throw new ConvexError("RevenueCat verification is not configured");
@@ -80,6 +88,7 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
 /** Internal entry point used by `ai.startScan` when the mirror is stale. */
 export const verifyForCurrentUser = internalAction({
   args: {},
+  returns: entitlementResultValidator,
   handler: async (ctx): Promise<EntitlementResult> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Authentication required");
@@ -90,6 +99,7 @@ export const verifyForCurrentUser = internalAction({
 /** Client-callable refresh, rate limited per identity. */
 export const verifyEntitlement = action({
   args: {},
+  returns: entitlementResultValidator,
   handler: async (ctx): Promise<EntitlementResult> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Authentication required");
@@ -102,5 +112,6 @@ export const verifyEntitlement = action({
 
 export const reconcileCustomer = internalAction({
   args: { clerkUserId: v.string() },
+  returns: entitlementResultValidator,
   handler: async (ctx, args): Promise<EntitlementResult> => await verify(ctx, args.clerkUserId),
 });

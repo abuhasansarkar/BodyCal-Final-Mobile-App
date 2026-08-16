@@ -18,6 +18,8 @@ export const ptBR: ScreenTranslations = {
     notSet: "Não definido",
   },
   errors: {
+    fatalTitle: "Algo deu errado",
+    fatalBody: "Ocorreu um erro inesperado. Tente novamente para continuar usando o BodyCal.",
     generic: "Algo deu errado. Tente novamente.",
     network: "Sem conexão. Verifique sua rede e tente novamente.",
     accountSyncFailed: "Não conseguimos concluir a configuração da sua conta. Tente novamente.",
@@ -482,6 +484,7 @@ export const ptBR: ScreenTranslations = {
   },
   weight: {
     addTitle: "Registrar peso",
+    editTitle: "Editar peso",
     addSubtitle: "Um registro por dia já é suficiente.",
     weightLabel: "Peso",
     noteLabel: "Nota",

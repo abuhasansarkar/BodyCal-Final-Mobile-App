@@ -10,14 +10,19 @@ import { Field } from "@/components/ui/form";
 import { ScreenTitle, SectionCard } from "@/components/ui/section-card";
 import { InlineNotice } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
-import { NUTRITION_LIMITS, poundsToKilograms } from "@/domain/nutrition-calculator";
+import {
+  kilogramsToPounds,
+  NUTRITION_LIMITS,
+  poundsToKilograms,
+} from "@/domain/nutrition-calculator";
 import { enqueueOutbox } from "@/features/outbox/outbox";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId, currentLocalDate, currentTimezone } from "@/lib/local-day";
 import { View } from "@/tw";
 import type { WeightUnit } from "@/types/domain";
+import type { Id } from "../../convex/_generated/dataModel";
 
-export function WeightAddScreen() {
+export function WeightAddScreen({ id }: { id?: string }) {
   const { t } = useTranslation();
   if (!hasBackendConfiguration) {
     return (
@@ -26,7 +31,7 @@ export function WeightAddScreen() {
       </AppScreen>
     );
   }
-  return <ConfiguredWeightForm />;
+  return <ConfiguredWeightForm id={id as Id<"weightLogs"> | undefined} />;
 }
 
 /**
@@ -35,17 +40,27 @@ export function WeightAddScreen() {
  * Values are entered in the user's display unit and normalised to kilograms
  * before they are stored, per the storage rules in AGENTS.md.
  */
-function ConfiguredWeightForm() {
+function ConfiguredWeightForm({ id }: { id?: Id<"weightLogs"> }) {
   const { t } = useTranslation();
   const profile = useQuery(api.profiles.getCurrent, {});
+  const entry = useQuery(api.weights.getById, id ? { id } : "skip");
   const create = useMutation(api.weights.create);
+  const update = useMutation(api.weights.update);
 
   const [value, setValue] = React.useState("");
   const [note, setNote] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "error" } | null>(null);
+  const hydratedId = React.useRef<string | null>(null);
 
   const unit: WeightUnit = profile?.weightUnit ?? "kg";
+  React.useEffect(() => {
+    if (!id || !entry || !profile || hydratedId.current === id) return;
+    const display = unit === "lb" ? kilogramsToPounds(entry.normalizedKg) : entry.normalizedKg;
+    setValue(String(Number(display.toFixed(1))));
+    setNote(entry.note ?? "");
+    hydratedId.current = id;
+  }, [entry, id, profile, unit]);
   const entered = Number(value);
   const kilograms = unit === "lb" ? poundsToKilograms(entered) : entered;
   const inRange =
@@ -59,17 +74,25 @@ function ConfiguredWeightForm() {
     setSaving(true);
     setNotice(null);
 
-    const payload = {
+    const values = {
       normalizedKg: Number(kilograms.toFixed(2)),
       displayValue: entered,
       displayUnit: unit,
+      note: note.trim() || undefined,
+    };
+    const payload = {
+      ...values,
       localDate: currentLocalDate(),
       timezone: currentTimezone(),
-      note: note.trim() || undefined,
       clientRequestId: createClientRequestId(),
     };
 
     try {
+      if (id) {
+        await update({ id, ...values });
+        router.back();
+        return;
+      }
       const network = await NetInfo.fetch();
       if (!network.isConnected) {
         await enqueueOutbox({ id: payload.clientRequestId, kind: "weight.create", payload });
@@ -88,7 +111,10 @@ function ConfiguredWeightForm() {
 
   return (
     <AppScreen>
-      <ScreenTitle description={t("weight.addSubtitle")} title={t("weight.addTitle")} />
+      <ScreenTitle
+        description={t("weight.addSubtitle")}
+        title={t(id ? "weight.editTitle" : "weight.addTitle")}
+      />
 
       <SectionCard>
         <View className="gap-4">

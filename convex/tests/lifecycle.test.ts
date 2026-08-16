@@ -26,7 +26,8 @@ describe("data export", () => {
       clientRequestId: "w-1",
     });
 
-    const data = await t.query(internal.usersDb.collectExport, { userId });
+    const raw = await t.query(internal.usersDb.collectExport, { userId });
+    const data = raw ? (JSON.parse(raw) as Record<string, unknown[]>) : null;
 
     expect(data).not.toBeNull();
     expect(data?.foodLogs).toHaveLength(1);
@@ -65,7 +66,7 @@ describe("data export", () => {
 describe("account deletion", () => {
   it("clears every user-scoped table", async () => {
     const t = setupTest();
-    const { asUser, userId } = await createUser(t);
+    const { asUser, userId, subject } = await createUser(t);
 
     await asUser.mutation(api.onboarding.complete, ONBOARDING_INPUT);
     await asUser.mutation(api.foodLogs.create, FOOD_ENTRY);
@@ -78,10 +79,29 @@ describe("account deletion", () => {
       clientRequestId: "w-1",
     });
     await claimUpload(t, asUser, "mealPhoto");
+    await t.run(async (ctx) => {
+      await ctx.db.insert("subscriptionEvents", {
+        eventId: "event-delete-me",
+        customerId: subject,
+        eventType: "INITIAL_PURCHASE",
+        eventAt: Date.now(),
+        applied: true,
+        payload: {},
+        receivedAt: Date.now(),
+      });
+      await ctx.db.insert("rateLimits", {
+        key: `planGeneration:${subject}`,
+        windowStart: Date.now(),
+        count: 1,
+      });
+    });
 
     // Drive the batch loop the way the action does.
     for (let guard = 0; guard < 50; guard += 1) {
-      const result = await t.mutation(internal.usersDb.clearUserDataBatch, { userId });
+      const result = await t.mutation(internal.usersDb.clearUserDataBatch, {
+        userId,
+        clerkUserId: subject,
+      });
       if (result.done) break;
     }
 
@@ -91,6 +111,8 @@ describe("account deletion", () => {
       goals: await ctx.db.query("nutritionGoals").collect(),
       profiles: await ctx.db.query("userProfiles").collect(),
       uploads: await ctx.db.query("imageUploads").collect(),
+      subscriptionEvents: await ctx.db.query("subscriptionEvents").collect(),
+      rateLimits: await ctx.db.query("rateLimits").collect(),
     }));
 
     expect(remaining.foodLogs).toHaveLength(0);
@@ -98,17 +120,22 @@ describe("account deletion", () => {
     expect(remaining.goals).toHaveLength(0);
     expect(remaining.profiles).toHaveLength(0);
     expect(remaining.uploads).toHaveLength(0);
+    expect(remaining.subscriptionEvents).toHaveLength(0);
+    expect(remaining.rateLimits).toHaveLength(0);
   });
 
   /** M-19: feedback used to survive deletion, pointing at a user that no longer existed. */
   it("clears post-purchase feedback", async () => {
     const t = setupTest();
-    const { asUser, userId } = await createUser(t);
+    const { asUser, userId, subject } = await createUser(t);
 
     await asUser.mutation(api.feedback.submit, { rating: 5, locale: "en", feedback: "Great" });
 
     for (let guard = 0; guard < 50; guard += 1) {
-      const result = await t.mutation(internal.usersDb.clearUserDataBatch, { userId });
+      const result = await t.mutation(internal.usersDb.clearUserDataBatch, {
+        userId,
+        clerkUserId: subject,
+      });
       if (result.done) break;
     }
 
@@ -118,11 +145,11 @@ describe("account deletion", () => {
 
   it("is idempotent: clearing an already-empty account reports done", async () => {
     const t = setupTest();
-    const { userId } = await createUser(t);
+    const { userId, subject } = await createUser(t);
 
-    await expect(t.mutation(internal.usersDb.clearUserDataBatch, { userId })).resolves.toMatchObject(
-      { done: true },
-    );
+    await expect(
+      t.mutation(internal.usersDb.clearUserDataBatch, { userId, clerkUserId: subject }),
+    ).resolves.toMatchObject({ done: true });
   });
 
   it("lets a user retry after a failed deletion", async () => {

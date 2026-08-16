@@ -960,6 +960,7 @@ export const seedHistoryForUser = internalMutation({
  */
 export const grantProForUser = internalMutation({
   args: { clerkUserId: v.string(), days: v.optional(v.number()) },
+  returns: v.object({ success: v.boolean(), clerkUserId: v.string(), expirationAt: v.number() }),
   handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")

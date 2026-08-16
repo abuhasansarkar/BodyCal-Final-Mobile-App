@@ -75,7 +75,7 @@ describe("authorization", () => {
     expect(log?.foodName).toBe(FOOD_ENTRY.foodName);
   });
 
-  it("refuses to delete another user's weight entry", async () => {
+  it("refuses to read, update, or delete another user's weight entry", async () => {
     const t = setupTest();
     const owner = await createUser(t, "user_owner");
     const other = await createUser(t, "user_other");
@@ -88,6 +88,16 @@ describe("authorization", () => {
       timezone: "Europe/Berlin",
       clientRequestId: "w-1",
     });
+
+    await expect(other.asUser.query(api.weights.getById, { id: weightId })).resolves.toBeNull();
+    await expect(
+      other.asUser.mutation(api.weights.update, {
+        id: weightId,
+        normalizedKg: 50,
+        displayValue: 50,
+        displayUnit: "kg",
+      }),
+    ).rejects.toThrow(/not found/i);
 
     await expect(other.asUser.mutation(api.weights.remove, { id: weightId })).rejects.toThrow(
       /not found/i,

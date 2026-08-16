@@ -18,6 +18,8 @@ export const es: ScreenTranslations = {
     notSet: "Sin definir",
   },
   errors: {
+    fatalTitle: "Algo salió mal",
+    fatalBody: "Ocurrió un error inesperado. Inténtalo de nuevo para seguir usando BodyCal.",
     generic: "Algo salió mal. Inténtalo de nuevo.",
     network: "Sin conexión. Revisa tu red e inténtalo de nuevo.",
     accountSyncFailed: "No pudimos terminar de configurar tu cuenta. Inténtalo de nuevo.",
@@ -482,6 +484,7 @@ export const es: ScreenTranslations = {
   },
   weight: {
     addTitle: "Registrar peso",
+    editTitle: "Editar peso",
     addSubtitle: "Con un registro al día es suficiente.",
     weightLabel: "Peso",
     noteLabel: "Nota",

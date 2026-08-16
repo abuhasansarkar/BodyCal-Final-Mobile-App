@@ -151,7 +151,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Convex-backed Today totals and meal sections.
 - [x] Manual food entry and weight entry.
 - [x] Offline queue for manual food and weight records.
-- [x] Free seven-day vs Pro extended food history query behavior.
+- [x] Free vs Pro history windows are enforced by Convex for food, weight, and progress queries; client range controls cannot bypass entitlement checks.
 - [x] Progress summary, weight chart with functional range selection, streak tracking, and goal progress analytics.
 - [x] Full food-log editing/deletion UI.
 - [x] Full weight history editing/deletion UI.
@@ -161,12 +161,12 @@ design/           Supplied design sources and audit artifacts
 
 - [x] Camera/gallery selection and permission handling.
 - [x] Client image resize/compression that steps quality down until it fits the 4 MB limit.
-- [x] Direct Convex storage upload.
+- [x] Direct Convex storage upload with one-shot byte-preserving POST, client JPEG signature/size checks, timeout handling, and independent server signature/size verification.
 - [x] Server-only OpenAI provider call with structured Zod output, sent as an inline image with `store: false`.
 - [x] Analysis runs on the scheduler, not inside the client's request: the scan is durable before any provider call, and the client follows `aiDb.getScan` reactively through `pending → processing → completed`.
 - [x] Reopening or resuming a scan rejoins it by id instead of starting a second one.
 - [x] Per-food breakdown (preparation, estimated grams, per-item calories and macros), meal totals, calorie range, assumptions, and portion confidence.
-- [x] Server-side plausibility checks: totals must agree with the sum of items, and an implausible or self-contradicting estimate fails rather than being rewritten to zeroes.
+- [x] Server-side plausibility checks: calorie and macro totals must agree with the sum of items, estimated weights must be positive or unknown, and an implausible result fails rather than being rewritten to zeroes.
 - [x] `isFood: false` is reported as "no food detected" instead of a fabricated empty meal.
 - [x] Bounded provider retries with backoff, reusing the same scan id so a retry never creates a second scan or a duplicate meal entry.
 - [x] Server-side RevenueCat verification when the entitlement mirror is stale or missing, rather than on every request.
@@ -304,7 +304,7 @@ Required workflow:
 - [x] Functional server-provider path and editable result.
 - [x] Add full entitlement/quota/failure UX.
 - [x] Validate actual MIME signature in addition to storage metadata.
-- [ ] Add no-food and implausible-combination policy fixtures.
+- [x] Add no-food and implausible-combination policy fixtures.
 - [x] Add correction persistence and attached-log linkage tests.
 - [ ] Add cost controls, alerts, and provider kill switch.
 - Exit: camera, gallery, timeout, retry, quota, no-food, low-confidence, manual fallback, and retention cases pass.
@@ -323,7 +323,7 @@ Required workflow:
 - [x] Client and server integration baseline.
 - [ ] Verify all webhook event mappings against signed fixtures.
 - [x] Add cached active-entitlement behavior for offline launch.
-- [ ] Add cancellation, billing issue, refund, expiration, transfer, and resubscription tests.
+- [~] Cancellation, billing issue, expiration, trial, replay, and stale-ordering fixtures exist; refund, transfer, resubscription, and store-side validation remain.
 - [ ] Add purchase-cancelled, pending, interrupted, unavailable, and restore-empty user states.
 - [!] Configure App Store and Play products and RevenueCat dashboard.
 - Exit: physical-device sandbox matrix passes for both stores.
@@ -331,8 +331,8 @@ Required workflow:
 ### Phase 9 — Notifications
 
 - [x] Local baseline.
-- [ ] Implement installation identity and Expo token registration.
-- [ ] Implement token refresh and invalid receipt cleanup.
+- [x] Implement installation identity and account-bound Expo token registration.
+- [~] Implement token refresh; invalid receipt cleanup still requires the server sender.
 - [ ] Add server-driven reminder selection, quiet hours, and deduplication.
 - [ ] Reconcile schedules after timezone, locale, preference, and subscription changes.
 - [ ] Add trial reminder server fallback.
@@ -343,7 +343,7 @@ Required workflow:
 - [x] Complete all settings routes rather than placeholder feature screens.
 - [x] Implement language, units, appearance, nutrition target, and notification controls.
 - [x] Complete export download/share workflow.
-- [x] Account deletion backend exists; add status/retry UX and end-to-end evidence.
+- [x] Account deletion backend, status/retry UX, resumable cleanup tests, and identity-linked event/rate-limit cleanup.
 - [ ] Finalize Sentry source-map upload and environment tagging.
 - [ ] Implement consent controls and analytics reset/deletion.
 - [ ] Add operational dashboards and alert thresholds.

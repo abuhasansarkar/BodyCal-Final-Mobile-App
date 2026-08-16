@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 import { query } from "./_generated/server";
 import { requireCurrentUser } from "./lib/auth";
+import { requireHistoryAccess } from "./lib/entitlements";
 import { assertLocalDate, boundedLimit } from "./lib/validation";
 import { mealTypeValidator } from "./schema";
 
@@ -118,11 +119,18 @@ export const getDailyCalorieSeries = query({
     const user = await requireCurrentUser(ctx);
     assertLocalDate(args.fromDate, "fromDate");
     assertLocalDate(args.toDate, "toDate");
+    const fromDate = await requireHistoryAccess(
+      ctx,
+      user._id,
+      args.fromDate,
+      args.toDate,
+      30,
+    );
 
     const logs = await ctx.db
       .query("foodLogs")
       .withIndex("by_user_date", (q) =>
-        q.eq("userId", user._id).gte("localDate", args.fromDate).lte("localDate", args.toDate),
+        q.eq("userId", user._id).gte("localDate", fromDate).lte("localDate", args.toDate),
       )
       .collect();
 

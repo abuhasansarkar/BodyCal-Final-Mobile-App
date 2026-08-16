@@ -11,7 +11,8 @@ import { ScreenTitle, SectionCard, SectionHeader } from "@/components/ui/section
 import { ErrorState, InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { colors } from "@/config/theme";
-import { leaveUserScope } from "@/features/auth/session-scope";
+import { getInstallationId, leaveUserScope } from "@/features/auth/session-scope";
+import { releaseRevenueCatIdentity } from "@/features/subscription/subscription-provider";
 import { api } from "@/lib/convex-api";
 import { Pressable, Text, View } from "@/tw";
 
@@ -33,14 +34,17 @@ function ConfiguredDeleteAccount() {
   const status = useQuery(api.users.getDeletionStatus, {});
   const requestDeletion = useMutation(api.users.requestDeletion);
   const cancelDeletion = useMutation(api.users.cancelDeletion);
+  const unregisterDevice = useMutation(api.notifications.unregisterDevice);
 
   const [confirmation, setConfirmation] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "error" } | null>(null);
 
   const start = useReverification(async () => {
+    const installationId = await getInstallationId();
+    await unregisterDevice({ installationId }).catch(() => undefined);
     await requestDeletion({});
-    await leaveUserScope();
+    await Promise.all([leaveUserScope(), releaseRevenueCatIdentity()]);
     await signOut();
   });
 

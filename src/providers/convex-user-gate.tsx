@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppIcon } from "@/components/app-icon";
 import { PrimaryButton } from "@/components/primary-button";
 import { colors } from "@/config/theme";
-import { enterUserScope } from "@/features/auth/session-scope";
+import { enterUserScope, leaveUserScope } from "@/features/auth/session-scope";
 import { api } from "@/lib/convex-api";
 import { StartupScreen } from "@/screens/startup-screen";
 import { Text, View } from "@/tw";
@@ -52,6 +52,7 @@ export function ConvexUserGate({ children }: PropsWithChildren) {
     if (!isSignedIn) {
       syncingUserId.current = null;
       scopedUserId.current = null;
+      void leaveUserScope();
       return;
     }
 

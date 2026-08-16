@@ -107,8 +107,8 @@ function bounded(value: string, max: number) {
  */
 const TOTAL_TOLERANCE = { ratio: 0.25, floor: 60 } as const;
 
-function totalsDisagree(total: number, sum: number) {
-  return Math.abs(total - sum) > Math.max(TOTAL_TOLERANCE.floor, total * TOTAL_TOLERANCE.ratio);
+function totalsDisagree(total: number, sum: number, floor: number = TOTAL_TOLERANCE.floor) {
+  return Math.abs(total - sum) > Math.max(floor, total * TOTAL_TOLERANCE.ratio);
 }
 
 /** Raised when the provider's own numbers contradict each other. */
@@ -146,6 +146,9 @@ export function normalizeEstimate(raw: MealEstimateShape) {
   if (components.length === 0) {
     throw new ImplausibleEstimateError("The estimate has no usable components");
   }
+  if (components.some((component) => component.estimatedWeightGrams === 0)) {
+    throw new ImplausibleEstimateError("An estimated weight must be positive or unknown");
+  }
 
   // Food was identified, so the meal has to carry energy. A zero here means the
   // model filled the shape in without reading the photo.
@@ -156,6 +159,15 @@ export function normalizeEstimate(raw: MealEstimateShape) {
   const summed = components.reduce((total, component) => total + component.nutrition.calories, 0);
   if (totalsDisagree(raw.nutrition.calories, summed)) {
     throw new ImplausibleEstimateError("The meal total does not match its items");
+  }
+  for (const key of ["proteinGrams", "carbsGrams", "fatGrams"] as const) {
+    const componentTotal = components.reduce(
+      (total, component) => total + component.nutrition[key],
+      0,
+    );
+    if (totalsDisagree(raw.nutrition[key], componentTotal, 10)) {
+      throw new ImplausibleEstimateError(`The meal ${key} total does not match its items`);
+    }
   }
 
   // Clamped rather than rejected: a range that does not bracket its own midpoint
@@ -204,6 +216,7 @@ export const startScan = action({
     locale: v.string(),
     requestId: v.string(),
   },
+  returns: v.object({ scanId: v.id("aiScans"), duplicate: v.boolean() }),
   // Explicit return type: this action calls into `internal`, which includes this
   // module, so inference would otherwise be circular.
   handler: async (ctx, args): Promise<{ scanId: Id<"aiScans">; duplicate: boolean }> => {
@@ -251,11 +264,9 @@ export const startScan = action({
 /**
  * MIME types the provider accepts.
  *
- * The stored content type comes from a header the client supplied, so it is
- * treated as a hint. Anything unrecognised is labelled JPEG, which is what the
- * bytes actually are: `prepareMealImage` re-encodes every camera capture and
- * gallery pick to JPEG before upload, so a HEIC or a missing header describes
- * the header, not the file.
+ * The stored content type comes from a client header and is never trusted. The
+ * action detects the signature from the bytes and rejects anything it cannot
+ * prove is one of these provider-supported formats.
  */
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
@@ -337,8 +348,13 @@ export const runScanAnalysis = internalAction({
 
       const arrayBuffer = await blob.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
-      const detectedType = detectImageMimeType(bytes);
-      const contentType = detectedType ?? (SUPPORTED_IMAGE_TYPES.has(blob.type) ? blob.type : "image/jpeg");
+      if (blob.size <= 0 || blob.size > 4_000_000) {
+        throw new ImageUnavailableError("Image size is invalid");
+      }
+      const contentType = detectImageMimeType(bytes);
+      if (!contentType || !SUPPORTED_IMAGE_TYPES.has(contentType)) {
+        throw new ImageUnavailableError("Image bytes are not a supported format");
+      }
       const base64 = Buffer.from(arrayBuffer).toString("base64");
       // Sent inline rather than as a storage URL, so the analysis does not
       // depend on the provider's fetcher reaching a Convex URL, and no meal
@@ -371,6 +387,7 @@ export const runScanAnalysis = internalAction({
                   "Judge portions from plate size, food volume, common serving sizes and the visible cooking method. Account for hidden energy that is visually reasonable — frying and cooking oil, butter, cheese, dressing, cream, sugar, breading — without inventing ingredients you cannot see.",
                   "If a nutrition label is clearly legible, prefer what the label states for that product.",
                   "Then give totals for the entire meal: calories, protein, carbohydrates, and fat. The totals must agree with the sum of the individual items.",
+                  "Do not double-count shared sauces, oils, toppings, or ingredients: assign each visible item once, then sum those same items into the meal totals.",
                   "Also give saturated fat, fibre, sugar, and sodium for the meal. Use null for any of those four you cannot judge from the photo rather than guessing a number or returning zero.",
                   "Give a calorie range that honestly brackets your total, and a portionConfidence between 0 and 1. If portion size cannot be judged confidently, widen the range and lower the confidence rather than guessing precisely.",
                   "List the assumptions you relied on separately from the warnings.",

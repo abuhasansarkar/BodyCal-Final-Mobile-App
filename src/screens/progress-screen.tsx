@@ -8,7 +8,9 @@ import { AppScreen } from "@/components/app-screen";
 import { PrimaryButton } from "@/components/primary-button";
 import { ProgressRing } from "@/components/progress-ring";
 import { hasBackendConfiguration } from "@/config/env";
-import { useSubscription } from "@/features/subscription/subscription-provider";
+import { calculateGoalProgress } from "@/features/progress/goal-progress";
+import { inclusiveWindowStart } from "@/features/progress/history-window";
+import { useServerProAccess } from "@/features/subscription/server-pro-access";
 import { api } from "@/lib/convex-api";
 import { currentLocalDate } from "@/lib/local-day";
 import { Pressable, Text, View } from "@/tw";
@@ -71,13 +73,17 @@ function ProgressSkeleton() {
 }
 
 function ConfiguredProgress() {
-  const { state } = useSubscription();
-  const isPro = ["trial", "active", "cancelledActive", "billingIssueActive"].includes(state);
+  const isPro = useServerProAccess();
   const progress = useQuery(api.weights.getProgress, {});
-  const history = useQuery(api.weights.getHistory, { limit: isPro ? 365 : 30 });
+  const history = useQuery(api.weights.getHistory, {
+    fromDate: dateDaysAgo(isPro ? 3_650 : 29),
+    toDate: currentLocalDate(),
+    limit: isPro ? 500 : 100,
+  });
   const streak = useQuery(api.dashboard.getLoggingStreak, { todayLocalDate: currentLocalDate() });
   const calorieSeries = useQuery(api.dashboard.getDailyCalorieSeries, {
-    fromDate: dateDaysAgo(30),
+    // Both endpoints are inclusive. Thirty dates means today plus 29 prior days.
+    fromDate: inclusiveWindowStart(currentLocalDate(), 30),
     toDate: currentLocalDate(),
   });
 
@@ -105,6 +111,7 @@ function ProgressContent({
   history = [],
   calorieSeries = [],
   streak = 0,
+  isPro,
 }: {
   progress?: ProgressData;
   history?: WeightLogItem[];
@@ -121,12 +128,15 @@ function ProgressContent({
     return Math.round(sum / calorieSeries.length);
   }, [calorieSeries]);
 
-  const rangeOptions: { key: RangeOption; label: string }[] = [
+  const allRangeOptions: { key: RangeOption; label: string }[] = [
     { key: "week", label: t("progress.rangeWeek") },
     { key: "month", label: t("progress.rangeMonth") },
     { key: "3m", label: t("progress.range3M") },
     { key: "all", label: t("progress.rangeAll") },
   ];
+  const rangeOptions = allRangeOptions.filter(
+    ({ key }) => isPro || key === "week" || key === "month",
+  );
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "—";
@@ -162,9 +172,10 @@ function ProgressContent({
   };
 
   const diffKg = latestKg !== null && firstKg !== null ? latestKg - firstKg : null;
-  const totalTargetDiff = goalKg !== null && firstKg !== null ? Math.abs(goalKg - firstKg) || 1 : null;
-  const currentDiff = diffKg !== null ? Math.abs(diffKg) : 0;
-  const pctGoal = totalTargetDiff ? Math.min(100, Math.max(0, Math.round((currentDiff / totalTargetDiff) * 100))) : 0;
+  const pctGoal =
+    firstKg !== null && latestKg !== null && goalKg !== null
+      ? calculateGoalProgress(firstKg, latestKg, goalKg)
+      : 0;
   const diffFormatted = diffKg !== null ? `${diffKg > 0 ? "+" : ""}${formatNum(diffKg)}` : "—";
 
   // Filter history by selected range
@@ -369,7 +380,7 @@ function ProgressContent({
           </View>
           <Text className="text-sm font-semibold text-app-muted">{t("progress.goalProgress")}</Text>
           <Text className="text-xl font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
-            {totalTargetDiff ? `${pctGoal}%` : "—"}
+            {firstKg !== null && latestKg !== null && goalKg !== null ? `${pctGoal}%` : "—"}
           </Text>
           <Text className="text-xs font-medium text-app-muted">{t("progress.towardGoal")}</Text>
         </View>

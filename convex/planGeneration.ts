@@ -43,6 +43,18 @@ export const planSchema = z.object({
 
 const COPY_LIMITS = { goalDescription: 280, goalTitle: 120, reasoning: 500 } as const;
 
+const aiPlanResultValidator = v.object({
+  calories: v.number(),
+  proteinGrams: v.number(),
+  carbsGrams: v.number(),
+  fatGrams: v.number(),
+  goalTitle: v.string(),
+  goalDescription: v.string(),
+  reasoning: v.string(),
+  paceWasCapped: v.boolean(),
+  formulaVersion: v.union(v.literal("openai-v1"), v.literal("mifflin-st-jeor-v1")),
+});
+
 const SUPPORTED_LOCALES = ["en", "es", "de", "fr", "pt-BR", "it", "ja", "ko"] as const;
 type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -138,6 +150,7 @@ export const generate = action({
     pace: goalPaceValidator,
     locale: v.string(),
   },
+  returns: aiPlanResultValidator,
   handler: async (ctx, args): Promise<AiPlanResult> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Authentication required");

@@ -18,6 +18,8 @@ export const de: ScreenTranslations = {
     notSet: "Nicht festgelegt",
   },
   errors: {
+    fatalTitle: "Etwas ist schiefgelaufen",
+    fatalBody: "Ein unerwarteter Fehler ist aufgetreten. Versuche es erneut, um BodyCal weiter zu verwenden.",
     generic: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
     network: "Keine Verbindung. Prüfe dein Netzwerk und versuche es erneut.",
     accountSyncFailed: "Wir konnten die Einrichtung deines Kontos nicht abschließen. Bitte versuche es erneut.",
@@ -484,6 +486,7 @@ export const de: ScreenTranslations = {
   },
   weight: {
     addTitle: "Gewicht erfassen",
+    editTitle: "Gewicht bearbeiten",
     addSubtitle: "Ein Eintrag pro Tag genügt.",
     weightLabel: "Gewicht",
     noteLabel: "Notiz",

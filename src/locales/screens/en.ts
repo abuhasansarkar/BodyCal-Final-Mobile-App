@@ -24,6 +24,8 @@ export const en = {
     notSet: "Not set",
   },
   errors: {
+    fatalTitle: "Something went wrong",
+    fatalBody: "An unexpected error occurred. Try again to continue using BodyCal.",
     generic: "Something went wrong. Please try again.",
     network: "No connection. Check your network and try again.",
     accountSyncFailed: "We could not finish setting up your account. Please try again.",
@@ -482,6 +484,7 @@ export const en = {
   },
   weight: {
     addTitle: "Log weight",
+    editTitle: "Edit weight",
     addSubtitle: "One entry per day is plenty.",
     weightLabel: "Weight",
     noteLabel: "Note",

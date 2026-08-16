@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { attachOwnedUpload, loadOwned, requireCurrentUser, requireOwned } from "./lib/auth";
 import { confidenceValidator, nullableNumber, readStoredEstimate } from "./lib/estimate";
+import { requireHistoryAccess } from "./lib/entitlements";
 import {
   assertBoundedString,
   assertEntryNutrition,
@@ -88,6 +89,8 @@ export const getDay = query({
   handler: async (ctx, { localDate }) => {
     assertLocalDate(localDate, "localDate");
     const user = await requireCurrentUser(ctx);
+    const fromDate = await requireHistoryAccess(ctx, user._id, localDate, localDate, 7);
+    if (fromDate !== localDate) return [];
     return await ctx.db
       .query("foodLogs")
       .withIndex("by_user_date", (q) => q.eq("userId", user._id).eq("localDate", localDate))
@@ -107,6 +110,10 @@ export const getDaySummary = query({
   handler: async (ctx, { localDate }) => {
     assertLocalDate(localDate, "localDate");
     const user = await requireCurrentUser(ctx);
+    const fromDate = await requireHistoryAccess(ctx, user._id, localDate, localDate, 7);
+    if (fromDate !== localDate) {
+      return { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0, entryCount: 0 };
+    }
     const logs = await ctx.db
       .query("foodLogs")
       .withIndex("by_user_date", (q) => q.eq("userId", user._id).eq("localDate", localDate))
@@ -218,12 +225,13 @@ export const getHistory = query({
   handler: async (ctx, args) => {
     const { fromDate, toDate } = assertLocalDateRange(args.fromDate, args.toDate);
     const user = await requireCurrentUser(ctx);
+    const accessibleFromDate = await requireHistoryAccess(ctx, user._id, fromDate, toDate, 7);
     const limit = boundedLimit(args.limit, 200, 500);
 
     return await ctx.db
       .query("foodLogs")
       .withIndex("by_user_date", (q) =>
-        q.eq("userId", user._id).gte("localDate", fromDate).lte("localDate", toDate),
+        q.eq("userId", user._id).gte("localDate", accessibleFromDate).lte("localDate", toDate),
       )
       .order("desc")
       .take(limit);

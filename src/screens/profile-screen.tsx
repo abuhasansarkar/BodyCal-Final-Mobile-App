@@ -1,5 +1,5 @@
 import { useClerk, useUser } from "@clerk/expo";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Link } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -7,10 +7,13 @@ import { useTranslation } from "react-i18next";
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
 import { hasBackendConfiguration } from "@/config/env";
-import { clearBodyCalNotifications } from "@/features/notifications/scheduler";
-import { clearOutbox } from "@/features/outbox/outbox";
-import { useSubscription } from "@/features/subscription/subscription-provider";
+import { getInstallationId, leaveUserScope } from "@/features/auth/session-scope";
+import {
+  releaseRevenueCatIdentity,
+  useSubscription,
+} from "@/features/subscription/subscription-provider";
 import { api } from "@/lib/convex-api";
+import { currentLocalDate } from "@/lib/local-day";
 import { Image, Pressable, Text, View } from "@/tw";
 
 type SettingsRoute = "personal-details" | "goal" | "nutrition-targets" | "notifications" | "units" | "appearance" | "language" | "subscription" | "help" | "privacy" | "terms" | "delete-account";
@@ -40,7 +43,13 @@ const accountSettings: Setting[] = [
 function ConfiguredProfile() {
   const { user } = useUser();
   const profile = useQuery(api.profiles.getCurrent, {});
-  const latestWeights = useQuery(api.weights.getHistory, { limit: 1 });
+  const recentDate = new Date();
+  recentDate.setDate(recentDate.getDate() - 29);
+  const latestWeights = useQuery(api.weights.getHistory, {
+    fromDate: currentLocalDate(recentDate),
+    toDate: currentLocalDate(),
+    limit: 1,
+  });
 
   if (profile === undefined || latestWeights === undefined) return <ProfileLoading />;
   return <ProfileContent identity={{ email: user?.primaryEmailAddress?.emailAddress ?? null, imageUrl: user?.imageUrl ?? null, name: user?.fullName || user?.firstName || null }} latestWeightKg={latestWeights[0]?.normalizedKg ?? null} profile={profile} />;
@@ -181,6 +190,7 @@ function SettingsSection({ items, title }: { items: Setting[]; title?: string })
 
 function SignOutRow() {
   const { signOut } = useClerk();
+  const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const { t } = useTranslation();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(false);
@@ -189,7 +199,9 @@ function SignOutRow() {
     setBusy(true);
     setError(false);
     try {
-      await Promise.all([clearOutbox(), clearBodyCalNotifications()]);
+      const installationId = await getInstallationId();
+      await unregisterDevice({ installationId }).catch(() => undefined);
+      await Promise.all([leaveUserScope(), releaseRevenueCatIdentity()]);
       await signOut();
     } catch {
       setError(true);

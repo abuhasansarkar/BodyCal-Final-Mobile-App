@@ -18,6 +18,8 @@ export const fr: ScreenTranslations = {
     notSet: "Non défini",
   },
   errors: {
+    fatalTitle: "Une erreur est survenue",
+    fatalBody: "Une erreur inattendue est survenue. Réessayez pour continuer à utiliser BodyCal.",
     generic: "Une erreur est survenue. Veuillez réessayer.",
     network: "Pas de connexion. Vérifiez votre réseau et réessayez.",
     accountSyncFailed: "Nous n'avons pas pu finaliser la configuration de votre compte. Veuillez réessayer.",
@@ -484,6 +486,7 @@ export const fr: ScreenTranslations = {
   },
   weight: {
     addTitle: "Enregistrer un poids",
+    editTitle: "Modifier le poids",
     addSubtitle: "Une entrée par jour suffit.",
     weightLabel: "Poids",
     noteLabel: "Note",

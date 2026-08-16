@@ -21,13 +21,10 @@ export type PreparedImage = {
 };
 
 async function byteSize(uri: string) {
-  try {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return blob.size;
-  } catch {
-    return 0;
-  }
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  if (blob.size <= 0) throw new Error("image_unreadable");
+  return blob.size;
 }
 
 export async function prepareMealImage(input: {
@@ -42,6 +39,7 @@ export async function prepareMealImage(input: {
   const sourceWidth = probe.width || input.width || 0;
   const sourceHeight = probe.height || input.height || 0;
   const longEdge = Math.max(sourceWidth, sourceHeight);
+  if (!Number.isFinite(longEdge) || longEdge <= 0) throw new Error("image_unreadable");
 
   let working = ImageManipulator.manipulate(input.uri);
   if (longEdge > MAX_LONG_EDGE) {
@@ -72,6 +70,7 @@ export async function prepareMealImage(input: {
     size = await byteSize(saved.uri);
   }
 
+  if (size <= 0) throw new Error("image_unreadable");
   if (size > MAX_BYTES) throw new Error("image_too_large");
 
   return { uri: saved.uri, width: saved.width, height: saved.height, byteSize: size };

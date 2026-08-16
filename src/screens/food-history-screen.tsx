@@ -8,7 +8,7 @@ import { PrimaryButton } from "@/components/primary-button";
 import { ScreenTitle, SectionCard } from "@/components/ui/section-card";
 import { EmptyState, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
-import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
+import { useServerProAccess } from "@/features/subscription/server-pro-access";
 import { api } from "@/lib/convex-api";
 import { currentLocalDate } from "@/lib/local-day";
 import { Pressable, Text, View } from "@/tw";
@@ -37,8 +37,7 @@ function dateDaysAgo(days: number) {
 /** Food history, grouped by day, with the free-tier window made explicit. */
 function ConfiguredHistory() {
   const { i18n, t } = useTranslation();
-  const { state } = useSubscription();
-  const isPro = isProState(state);
+  const isPro = useServerProAccess();
 
   const logs = useQuery(api.foodLogs.getHistory, {
     fromDate: dateDaysAgo(isPro ? PRO_DAYS : FREE_DAYS),

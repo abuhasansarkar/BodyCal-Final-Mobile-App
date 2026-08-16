@@ -18,6 +18,8 @@ export const it: ScreenTranslations = {
     notSet: "Non impostato",
   },
   errors: {
+    fatalTitle: "Si è verificato un problema",
+    fatalBody: "Si è verificato un errore imprevisto. Riprova per continuare a usare BodyCal.",
     generic: "Si è verificato un problema. Riprova.",
     network: "Nessuna connessione. Controlla la rete e riprova.",
     accountSyncFailed: "Non abbiamo potuto completare la configurazione del tuo account. Riprova.",
@@ -484,6 +486,7 @@ export const it: ScreenTranslations = {
   },
   weight: {
     addTitle: "Registra peso",
+    editTitle: "Modifica peso",
     addSubtitle: "Una registrazione al giorno è sufficiente.",
     weightLabel: "Peso",
     noteLabel: "Nota",

@@ -9,6 +9,7 @@ const DELETE_BATCH = 200;
 
 export const collectExport = internalQuery({
   args: { userId: v.id("users") },
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, { userId }) => {
     const user = await ctx.db.get(userId);
     if (!user) return null;
@@ -25,34 +26,38 @@ export const collectExport = internalQuery({
         .collect();
     }
 
-    return records;
+    return JSON.stringify(records, null, 2);
   },
 });
 
 export const completeExport = internalMutation({
   args: { jobId: v.id("exportJobs"), storageId: v.id("_storage"), expiresAt: v.number() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
-    if (!job) return;
+    if (!job) return null;
     await ctx.db.patch(args.jobId, {
       status: "complete",
       storageId: args.storageId,
       expiresAt: args.expiresAt,
       updatedAt: Date.now(),
     });
+    return null;
   },
 });
 
 export const failExport = internalMutation({
   args: { jobId: v.id("exportJobs"), errorCategory: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
-    if (!job) return;
+    if (!job) return null;
     await ctx.db.patch(args.jobId, {
       status: "failed",
       errorCategory: args.errorCategory,
       updatedAt: Date.now(),
     });
+    return null;
   },
 });
 
@@ -74,9 +79,9 @@ async function deleteStoredImage(ctx: MutationCtx, storageId: Id<"_storage"> | u
  * and the job row are removed only on the final pass.
  */
 export const clearUserDataBatch = internalMutation({
-  args: { userId: v.id("users") },
+  args: { userId: v.id("users"), clerkUserId: v.string() },
   returns: v.object({ done: v.boolean(), deleted: v.number(), table: v.optional(v.string()) }),
-  handler: async (ctx, { userId }) => {
+  handler: async (ctx, { userId, clerkUserId }) => {
     for (const table of USER_SCOPED_TABLES) {
       const records = await ctx.db
         .query(table)
@@ -106,6 +111,36 @@ export const clearUserDataBatch = internalMutation({
       return { done: false, deleted: exportJobs.length, table: "exportJobs" };
     }
 
+    // RevenueCat's append-only event log and the fixed-window rate limiter do
+    // not carry a userId, but both still contain stable account identifiers.
+    const subscriptionEvents = await ctx.db
+      .query("subscriptionEvents")
+      .withIndex("by_customer", (q) => q.eq("customerId", clerkUserId))
+      .take(DELETE_BATCH);
+    if (subscriptionEvents.length > 0) {
+      for (const event of subscriptionEvents) await ctx.db.delete(event._id);
+      return {
+        done: false,
+        deleted: subscriptionEvents.length,
+        table: "subscriptionEvents",
+      };
+    }
+
+    const identities = [clerkUserId, String(userId)];
+    const names = ["planGeneration", "entitlementVerification", "aiScan", "export"] as const;
+    for (const identity of identities) {
+      for (const name of names) {
+        const rateLimit = await ctx.db
+          .query("rateLimits")
+          .withIndex("by_key", (q) => q.eq("key", `${name}:${identity}`))
+          .unique();
+        if (rateLimit) {
+          await ctx.db.delete(rateLimit._id);
+          return { done: false, deleted: 1, table: "rateLimits" };
+        }
+      }
+    }
+
     return { done: true, deleted: 0 };
   },
 });
@@ -117,6 +152,7 @@ export const clearUserDataBatch = internalMutation({
  */
 export const finalizeDeletion = internalMutation({
   args: { jobId: v.id("deletionJobs"), userId: v.id("users") },
+  returns: v.null(),
   handler: async (ctx, { jobId, userId }) => {
     const remaining = await ctx.db
       .query("userProfiles")
@@ -128,40 +164,47 @@ export const finalizeDeletion = internalMutation({
     if (job) await ctx.db.delete(jobId);
     const user = await ctx.db.get(userId);
     if (user) await ctx.db.delete(userId);
+    return null;
   },
 });
 
 export const markDataCleared = internalMutation({
   args: { jobId: v.id("deletionJobs"), clearedTableCount: v.number() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.patch(args.jobId, {
       status: "dataCleared",
       clearedTableCount: args.clearedTableCount,
       updatedAt: Date.now(),
     });
+    return null;
   },
 });
 
 export const failDeletion = internalMutation({
   args: { jobId: v.id("deletionJobs"), errorCategory: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
-    if (!job) return;
+    if (!job) return null;
     await ctx.db.patch(args.jobId, {
       status: "failed",
       errorCategory: args.errorCategory,
       updatedAt: Date.now(),
     });
+    return null;
   },
 });
 
 /** Restores app access when deletion failed, so the user is never locked out. */
 export const reactivateUser = internalMutation({
   args: { userId: v.id("users") },
+  returns: v.null(),
   handler: async (ctx, { userId }) => {
     const user = await ctx.db.get(userId);
     if (user && user.lifecycleState !== "active") {
       await ctx.db.patch(userId, { lifecycleState: "active", updatedAt: Date.now() });
     }
+    return null;
   },
 });

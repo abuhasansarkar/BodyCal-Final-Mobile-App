@@ -11,13 +11,14 @@ const MAX_DELETE_BATCHES = 500;
 
 export const buildExport = internalAction({
   args: { jobId: v.id("exportJobs"), userId: v.id("users") },
+  returns: v.null(),
   handler: async (ctx, args) => {
     try {
       const data = await ctx.runQuery(internal.usersDb.collectExport, { userId: args.userId });
       if (!data) throw new Error("missing_user");
 
       const storageId = await ctx.storage.store(
-        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
+        new Blob([data], { type: "application/json" }),
       );
       await ctx.runMutation(internal.usersDb.completeExport, {
         jobId: args.jobId,
@@ -30,6 +31,7 @@ export const buildExport = internalAction({
         errorCategory: "export_failed",
       });
     }
+    return null;
   },
 });
 
@@ -46,12 +48,14 @@ export const buildExport = internalAction({
  */
 export const executeDeletion = internalAction({
   args: { jobId: v.id("deletionJobs"), userId: v.id("users"), clerkUserId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     let batches = 0;
     try {
       for (;;) {
         const result = await ctx.runMutation(internal.usersDb.clearUserDataBatch, {
           userId: args.userId,
+          clerkUserId: args.clerkUserId,
         });
         if (result.done) break;
         batches += 1;
@@ -76,6 +80,7 @@ export const executeDeletion = internalAction({
       });
       await ctx.runMutation(internal.usersDb.reactivateUser, { userId: args.userId });
     }
+    return null;
   },
 });
 
