@@ -27,7 +27,9 @@
  * configured" and the app reports that it could not analyse the meal.
  */
 
-export const DEFAULT_AI_MODEL = "gpt-4o-mini";
+// Current image-input model with Structured Outputs support. Keep this behind
+// AI_MODEL so deployments can pin a snapshot or choose a different cost tier.
+export const DEFAULT_AI_MODEL = "gpt-5.4-mini";
 
 /** Key variables in precedence order. The first non-empty one wins. */
 const KEY_VARIABLES = ["AI_API_KEY", "OPENAI_API_KEY"] as const;

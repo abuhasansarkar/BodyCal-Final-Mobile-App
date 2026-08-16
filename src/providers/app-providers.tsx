@@ -55,8 +55,10 @@ function LocalizationGate({ children }: PropsWithChildren) {
 function AuthenticatedProviders({ children }: PropsWithChildren) {
   const { user } = useUser();
   return (
-    <ConvexUserGate>
-      <SubscriptionProvider userId={user?.id}>
+    <ConvexUserGate key={user?.id ?? "signed-out"}>
+      {/* Remount on account changes so no cached entitlement or offering from
+          one Clerk user can be rendered for the next user. */}
+      <SubscriptionProvider key={user?.id ?? "signed-out"} userId={user?.id}>
         <SubscriptionMirrorSync userId={user?.id} />
         <PushRegistrationProvider>
           <OutboxSyncProvider>{children}</OutboxSyncProvider>

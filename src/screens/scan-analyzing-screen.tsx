@@ -34,7 +34,13 @@ function describeStartFailure(cause: unknown, t: (key: string) => string): Failu
   if (message.includes("image_too_large") || message.includes("4 MB")) {
     return { text: t("scan.errorTooLarge"), showUpgrade: false, canRetry: false };
   }
-  if (message.includes("upload_failed")) {
+  if (message.includes("image_unreadable")) {
+    return { text: t("scan.errorImageGone"), showUpgrade: false, canRetry: false };
+  }
+  if (message.includes("upload_timeout")) {
+    return { text: t("scan.errorTimeout"), showUpgrade: false, canRetry: true };
+  }
+  if (message.includes("upload_failed") || message.includes("upload_invalid_response")) {
     return { text: t("scan.errorUpload"), showUpgrade: false, canRetry: true };
   }
   if (message.includes("not configured")) {

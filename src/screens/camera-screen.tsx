@@ -40,18 +40,48 @@ export function CameraScreen() {
   // preview twice and left a duplicate screen behind the first.
   const [busy, setBusy] = React.useState(false);
 
-  const continueWith = (asset: { uri: string; width?: number; height?: number }) =>
-    router.push({
-      pathname: "/(app)/scan/preview",
-      params: { uri: asset.uri, width: String(asset.width ?? ""), height: String(asset.height ?? "") },
-    });
+  const continueWith = React.useCallback(
+    (asset: { uri: string; width?: number; height?: number }) =>
+      router.push({
+        pathname: "/(app)/scan/preview",
+        params: {
+          uri: asset.uri,
+          width: String(asset.width ?? ""),
+          height: String(asset.height ?? ""),
+        },
+      }),
+    [],
+  );
+
+  React.useEffect(() => {
+    let active = true;
+    void ImagePicker.getPendingResultAsync()
+      .then((result) => {
+        if (!active || !result) return;
+        const asset = "assets" in result ? result.assets?.[0] : undefined;
+        if (asset) {
+          setBusy(true);
+          continueWith(asset);
+        } else {
+          setError(t("camera.pickError"));
+        }
+      })
+      .catch(() => {
+        if (active) setError(t("camera.pickError"));
+      });
+    return () => {
+      active = false;
+    };
+  }, [continueWith, t]);
 
   const capture = async () => {
     if (busy || !ready) return;
     setBusy(true);
     setError(null);
     try {
-      const picture = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
+      // Preserve capture detail here. The preview step performs the one
+      // deliberate resize/re-encode used for the provider upload.
+      const picture = await cameraRef.current?.takePictureAsync({ quality: 1 });
       if (picture) continueWith(picture);
       else setError(t("camera.captureError"));
     } catch {
@@ -69,7 +99,13 @@ export function CameraScreen() {
     setBusy(true);
     setError(null);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+        // iOS otherwise returns cloud-only assets without downloading bytes the
+        // manipulator can read.
+        shouldDownloadFromNetwork: true,
+      });
       const asset = result.assets?.[0];
       if (asset) continueWith(asset);
     } catch {

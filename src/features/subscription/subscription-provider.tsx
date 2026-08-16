@@ -138,13 +138,21 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
           if (nextState === "active") void refresh();
         });
 
-        const [info, offerings] = await Promise.all([
-          Purchases.getCustomerInfo(),
-          Purchases.getOfferings(),
-        ]);
+        // CustomerInfo is the access decision. Apply it independently so a
+        // missing/slow offering cannot make an already-paid user look free.
+        const info = await Purchases.getCustomerInfo();
+        if (cancelled) return;
+        applyCustomerInfo(info);
+
+        let offerings: Awaited<ReturnType<typeof Purchases.getOfferings>>;
+        try {
+          offerings = await Purchases.getOfferings();
+        } catch {
+          if (!cancelled) setError("Unable to load subscription options.");
+          return;
+        }
         if (cancelled) return;
 
-        applyCustomerInfo(info);
         const packages = offerings.current?.availablePackages ?? [];
         const annual = packages.find((item) => item.packageType === PACKAGE_TYPE.ANNUAL) ?? null;
         const monthly = packages.find((item) => item.packageType === PACKAGE_TYPE.MONTHLY) ?? null;
@@ -186,7 +194,13 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
       const selected = plan === "annual" ? annualPackage : monthlyPackage;
       if (!selected) throw new Error("This subscription option is unavailable.");
       const result = await Purchases.purchasePackage(selected);
+      const purchasedState = deriveSubscriptionState(result.customerInfo);
       applyCustomerInfo(result.customerInfo);
+      if (!isProState(purchasedState)) {
+        throw new Error(
+          'The store purchase completed, but it is not attached to the RevenueCat entitlement "pro".',
+        );
+      }
     },
     [annualPackage, applyCustomerInfo, monthlyPackage],
   );
@@ -196,7 +210,7 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
     if (!key || !userId) throw new Error("RevenueCat is not configured.");
     const info = await Purchases.restorePurchases();
     applyCustomerInfo(info);
-    return { restored: Object.keys(info.entitlements.active).length > 0 };
+    return { restored: info.entitlements.active.pro?.isActive === true };
   }, [applyCustomerInfo, key, userId]);
 
   const effectiveState: SubscriptionState = !key || !userId ? "free" : state;

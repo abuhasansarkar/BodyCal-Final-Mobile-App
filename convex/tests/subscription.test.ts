@@ -149,6 +149,19 @@ describe("subscription mirror", () => {
     expect(mirror?.willRenew).toBe(false);
   });
 
+  it("keeps a paused subscription active until RevenueCat sends expiration", async () => {
+    const t = setupTest();
+    const { asUser } = await createUser(t, "user_sub");
+
+    await t.mutation(
+      internal.subscriptions.applyWebhook,
+      event({ eventType: "SUBSCRIPTION_PAUSED", expirationAt: Date.now() + HOUR }),
+    );
+
+    const mirror = await asUser.query(api.subscriptions.getMirror, {});
+    expect(mirror?.state).toBe("cancelledActive");
+  });
+
   /** Verification must never claim `willRenew` just because the sub is active. */
   it("reports willRenew false for an active but cancelled subscription", async () => {
     const t = setupTest();

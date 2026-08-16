@@ -60,12 +60,12 @@ function stateFromEvent(eventType: string, periodType: string | undefined): Mirr
   const trial = periodType?.toUpperCase() === "TRIAL";
   switch (eventType.toUpperCase()) {
     case "EXPIRATION":
-    case "SUBSCRIPTION_PAUSED":
       return "expired";
     case "BILLING_ISSUE":
       return "billingIssueActive";
     case "CANCELLATION":
     case "UNSUBSCRIBE":
+    case "SUBSCRIPTION_PAUSED":
       return "cancelledActive";
     case "TRANSFER":
       return "expired";

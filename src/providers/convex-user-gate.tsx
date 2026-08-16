@@ -24,27 +24,39 @@ export function ConvexUserGate({ children }: PropsWithChildren) {
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const { isLoaded: userLoaded, user } = useUser();
   const { isAuthenticated, isLoading: convexLoading } = useConvexAuth();
-  const currentUser = useQuery(api.users.getCurrent, isAuthenticated ? {} : "skip");
   const syncFromClerk = useMutation(api.users.syncFromClerk);
 
+  const [syncedUserId, setSyncedUserId] = React.useState<string | null>(null);
   const [syncErrorUserId, setSyncErrorUserId] = React.useState<string | null>(null);
   const syncingUserId = React.useRef<string | null>(null);
   const scopedUserId = React.useRef<string | null>(null);
+  // Do not even subscribe to profile-dependent app data until the identity row
+  // has been synchronized. This prevents a newly authenticated session (or an
+  // account switch) from briefly mounting screens that all fail with
+  // "User profile is unavailable" before `syncFromClerk` finishes.
+  const userSynchronized = Boolean(user?.id && syncedUserId === user.id);
+  const currentUser = useQuery(
+    api.users.getCurrent,
+    isAuthenticated && userSynchronized ? {} : "skip",
+  );
   const syncError = syncErrorUserId === user?.id;
 
   const synchronize = React.useCallback(async () => {
     if (!user || !isAuthenticated) return;
-    syncingUserId.current = user.id;
+    const targetUserId = user.id;
+    syncingUserId.current = targetUserId;
     try {
       await syncFromClerk({
         email: user.primaryEmailAddress?.emailAddress ?? "",
         name: user.fullName ?? undefined,
         avatarUrl: user.imageUrl ?? undefined,
       });
+      setSyncedUserId(targetUserId);
       setSyncErrorUserId(null);
     } catch {
-      syncingUserId.current = null;
-      setSyncErrorUserId(user.id);
+      setSyncErrorUserId(targetUserId);
+    } finally {
+      if (syncingUserId.current === targetUserId) syncingUserId.current = null;
     }
   }, [isAuthenticated, syncFromClerk, user]);
 
@@ -61,13 +73,13 @@ export function ConvexUserGate({ children }: PropsWithChildren) {
       userLoaded &&
       isAuthenticated &&
       user &&
-      currentUser === null &&
+      syncedUserId !== user.id &&
       syncingUserId.current !== user.id &&
       !syncError
     ) {
       void synchronize();
     }
-  }, [clerkLoaded, currentUser, isAuthenticated, isSignedIn, syncError, synchronize, user, userLoaded]);
+  }, [clerkLoaded, isAuthenticated, isSignedIn, syncError, syncedUserId, synchronize, user, userLoaded]);
 
   // Bind local caches to this account as soon as its identity is known.
   React.useEffect(() => {
@@ -78,8 +90,6 @@ export function ConvexUserGate({ children }: PropsWithChildren) {
 
   if (!clerkLoaded || !userLoaded) return <StartupScreen />;
   if (!isSignedIn) return children;
-  if (convexLoading || !isAuthenticated || currentUser === undefined) return <StartupScreen />;
-
   if (syncError) {
     return (
       <SafeAreaView
@@ -99,6 +109,10 @@ export function ConvexUserGate({ children }: PropsWithChildren) {
         </View>
       </SafeAreaView>
     );
+  }
+
+  if (convexLoading || !isAuthenticated || !userSynchronized || currentUser === undefined) {
+    return <StartupScreen />;
   }
 
   if (currentUser === null) return <StartupScreen />;

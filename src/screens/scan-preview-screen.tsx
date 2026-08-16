@@ -1,3 +1,4 @@
+import { useAction, useQuery } from "convex/react";
 import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -8,7 +9,11 @@ import { ScreenTitle } from "@/components/ui/section-card";
 import { InlineNotice } from "@/components/ui/states";
 import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
 import { prepareMealImage } from "@/features/scan/prepare-image";
+import { api } from "@/lib/convex-api";
 import { Image } from "@/tw/image";
+
+const SERVER_ENTITLEMENT_FRESHNESS_MS = 15 * 60 * 1_000;
+const SERVER_PRO_STATES = new Set(["trial", "active", "cancelledActive", "billingIssueActive"]);
 
 export function ScanPreviewScreen({
   uri,
@@ -22,18 +27,49 @@ export function ScanPreviewScreen({
   const { t } = useTranslation();
   const { state } = useSubscription();
   const isPro = isProState(state);
+  const verifyEntitlement = useAction(api.subscriptionsActions.verifyEntitlement);
+  const mirror = useQuery(api.subscriptions.getMirror, {});
   const [error, setError] = React.useState<string | null>(null);
+  const [serverDenied, setServerDenied] = React.useState(false);
   const [preparing, setPreparing] = React.useState(false);
+  const [checkedAt] = React.useState(Date.now);
+  const entitlementVerified = React.useRef(false);
+  const serverPro = Boolean(
+    mirror &&
+      SERVER_PRO_STATES.has(mirror.state) &&
+      checkedAt - mirror.verifiedAt <= SERVER_ENTITLEMENT_FRESHNESS_MS &&
+      (mirror.expirationAt === undefined || mirror.expirationAt > checkedAt),
+  );
+  const subscriptionChecking = state === "loading" && !serverPro;
+  const subscriptionUnknown = state === "offlineUnknown" || state === "error";
+  const canAnalyze = !serverDenied && (isPro || serverPro || subscriptionUnknown);
+  const shouldShowUpgrade =
+    serverDenied || (!serverPro && (state === "free" || state === "expired"));
 
   const analyze = async () => {
     if (!uri) return;
-    if (!isPro) {
+    if (subscriptionChecking) return;
+    if (shouldShowUpgrade) {
       router.push("/(app)/paywall");
       return;
     }
     setPreparing(true);
     setError(null);
     try {
+      // The SDK can temporarily report cached Pro access while the server mirror
+      // is missing or expired. Verify before creating an upload so a rejected
+      // entitlement never looks like a broken image scan or leaves an orphaned
+      // meal photo in storage.
+      if (!serverPro && !entitlementVerified.current) {
+        const entitlement = await verifyEntitlement({});
+        if (!entitlement.active) {
+          setServerDenied(true);
+          setError(t("scan.errorEntitlement"));
+          return;
+        }
+        entitlementVerified.current = true;
+      }
+
       const image = await prepareMealImage({
         uri,
         width: Number(width) || undefined,
@@ -42,7 +78,9 @@ export function ScanPreviewScreen({
       router.replace({ pathname: "/(app)/scan/analyzing", params: { uri: image.uri } });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "";
-      setError(message === "image_too_large" ? t("scan.errorTooLarge") : t("scan.errorGeneric"));
+      if (message === "image_too_large") setError(t("scan.errorTooLarge"));
+      else if (message.toLowerCase().includes("network")) setError(t("scan.errorOffline"));
+      else setError(t("scan.errorUnavailable"));
     } finally {
       setPreparing(false);
     }
@@ -59,7 +97,7 @@ export function ScanPreviewScreen({
         contentFit="cover"
         source={{ uri }}
       />
-      {!isPro ? (
+      {shouldShowUpgrade ? (
         <InlineNotice
           message={t("scan.errorEntitlement")}
           tone="info"
@@ -67,12 +105,14 @@ export function ScanPreviewScreen({
       ) : null}
       {error ? <InlineNotice message={error} tone="error" /> : null}
       <PrimaryButton
-        disabled={preparing}
-        icon={isPro ? "analysis" : "subscription"}
+        disabled={preparing || subscriptionChecking}
+        icon={canAnalyze ? "analysis" : "subscription"}
         label={
           preparing
             ? t("scan.preparing")
-            : isPro
+            : subscriptionChecking
+              ? t("common.loading")
+            : canAnalyze
               ? t("scan.analyzeAction")
               : t("scan.upgradeAction")
         }
