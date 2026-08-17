@@ -10,7 +10,7 @@ import {
   boundedLimit,
   LIMITS,
 } from "./lib/validation";
-import { goalTypeValidator, mealTypeValidator } from "./schema";
+import { foodSourceValidator, goalTypeValidator, mealTypeValidator } from "./schema";
 
 const catalogItem = v.object({
   _id: v.id("foodCatalog"),
@@ -138,7 +138,8 @@ export const getRecommendations = query({
       .take(200);
 
     const matching = foods.filter((food) => food.goalTypes.includes(args.goalType)).slice(0, limit);
-    return await Promise.all(matching.map((food) => present(ctx, food, locale, favoriteIds)));
+    const resultList = matching.length > 0 ? matching : foods.slice(0, limit);
+    return await Promise.all(resultList.map((food) => present(ctx, food, locale, favoriteIds)));
   },
 });
 
@@ -400,3 +401,91 @@ export const removeCustomFood = mutation({
     return null;
   },
 });
+
+const userFoodItem = v.object({
+  _id: v.string(),
+  foodName: v.string(),
+  serving: v.string(),
+  servingUnit: v.string(),
+  quantity: v.number(),
+  calories: v.number(),
+  proteinGrams: v.number(),
+  carbsGrams: v.number(),
+  fatGrams: v.number(),
+  mealType: mealTypeValidator,
+  source: foodSourceValidator,
+  imageUrl: v.union(v.string(), v.null()),
+  localDate: v.string(),
+  createdAt: v.number(),
+});
+
+/**
+ * Returns the current user's real AI-scanned meals and logged foods from the database,
+ * resolving authentic uploaded image URLs via Convex storage.
+ */
+export const getMyScannedAndLoggedFoods = query({
+  args: { limit: v.optional(v.number()) },
+  returns: v.array(userFoodItem),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    const limit = boundedLimit(args.limit, 30, 60);
+
+    const logs = await ctx.db
+      .query("foodLogs")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(limit);
+
+    // Identify referenced AI scans without a direct imageStorageId on the log
+    const missingScanIds = Array.from(
+      new Set(
+        logs
+          .filter((log) => !log.imageStorageId && log.aiScanId)
+          .map((log) => log.aiScanId!),
+      ),
+    );
+
+    const scanDocs = await Promise.all(missingScanIds.map((id) => ctx.db.get(id)));
+    const scanImageMap = new Map<string, string>();
+
+    await Promise.all(
+      scanDocs.map(async (scan) => {
+        if (scan && scan.userId === user._id && !scan.imageDeletedAt && scan.imageStorageId) {
+          const url = await ctx.storage.getUrl(scan.imageStorageId);
+          if (url) scanImageMap.set(scan._id, url);
+        }
+      }),
+    );
+
+    const items = await Promise.all(
+      logs.map(async (log) => {
+        let imageUrl: string | null = null;
+        if (log.imageStorageId) {
+          imageUrl = await ctx.storage.getUrl(log.imageStorageId);
+        } else if (log.aiScanId && scanImageMap.has(log.aiScanId)) {
+          imageUrl = scanImageMap.get(log.aiScanId) ?? null;
+        }
+
+        return {
+          _id: log._id,
+          foodName: log.foodName,
+          serving: log.serving,
+          servingUnit: log.servingUnit,
+          quantity: log.quantity,
+          calories: log.calories,
+          proteinGrams: log.proteinGrams,
+          carbsGrams: log.carbsGrams,
+          fatGrams: log.fatGrams,
+          mealType: log.mealType,
+          source: log.source,
+          imageUrl,
+          localDate: log.localDate,
+          createdAt: log.createdAt,
+        };
+      }),
+    );
+
+    return items;
+  },
+});
+

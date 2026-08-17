@@ -3,9 +3,10 @@ import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { setAppLanguage, type SupportedLanguage } from "@/locales/i18n";
 import { Pressable, Text, View } from "@/tw";
 
-const languages = [
+const languages: { code: SupportedLanguage; label: string; nativeName: string }[] = [
   { code: "en", label: "English", nativeName: "English" },
   { code: "es", label: "Spanish", nativeName: "Español" },
   { code: "de", label: "German", nativeName: "Deutsch" },
@@ -17,20 +18,20 @@ const languages = [
 ];
 
 export function SettingsLanguageScreen() {
-  const { i18n } = useTranslation();
-  const currentLang = i18n.resolvedLanguage || "en";
+  const { i18n, t } = useTranslation();
+  const currentLang = (i18n.resolvedLanguage || "en") as SupportedLanguage;
 
-  const handleSelect = (code: string) => {
-    void i18n.changeLanguage(code);
+  const handleSelect = (code: SupportedLanguage) => {
+    void setAppLanguage(code);
   };
 
   return (
     <AppScreen>
       <Text accessibilityRole="header" className="text-3xl font-bold text-app-text">
-        Language
+        {t("languageSettings.title")}
       </Text>
       <Text className="text-sm text-app-muted">
-        Select your preferred language. All app copy and date formats will update immediately.
+        {t("languageSettings.description")}
       </Text>
 
       <View className="overflow-hidden rounded-3xl border border-app-border bg-white" style={{ borderCurve: "continuous" }}>
