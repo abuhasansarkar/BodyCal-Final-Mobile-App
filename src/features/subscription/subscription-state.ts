@@ -3,7 +3,10 @@ import type { CustomerInfo } from "react-native-purchases";
 import type { SubscriptionState } from "@/types/domain";
 
 export function deriveSubscriptionState(customerInfo: CustomerInfo, now = Date.now()): SubscriptionState {
-  const activeEntitlement = customerInfo.entitlements.active.pro;
+  const activeEntries = Object.entries(customerInfo.entitlements.active ?? {});
+  const proEntry = activeEntries.find(([key]) => key.toLowerCase() === "pro") ?? activeEntries[0];
+  const activeEntitlement = proEntry ? proEntry[1] : undefined;
+
   if (activeEntitlement?.isActive) {
     // Hard expiry guard: even if marked active in a stale cache, an elapsed expiration date expires access.
     if (activeEntitlement.expirationDate) {
@@ -19,7 +22,9 @@ export function deriveSubscriptionState(customerInfo: CustomerInfo, now = Date.n
   }
 
   // Check if a previously active entitlement has expired
-  const allPro = customerInfo.entitlements.all?.pro;
+  const allEntries = Object.entries(customerInfo.entitlements.all ?? {});
+  const allProEntry = allEntries.find(([key]) => key.toLowerCase() === "pro") ?? allEntries[0];
+  const allPro = allProEntry ? allProEntry[1] : undefined;
   if (allPro && !allPro.isActive) {
     return "expired";
   }

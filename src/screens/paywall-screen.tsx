@@ -146,10 +146,38 @@ export function PaywallScreen() {
   const active = isProState(state);
 
   const close = () => router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)/today" as Href);
+  const isCancellation = (err: unknown) => {
+    if (!err) return false;
+    if (typeof err === "object") {
+      const errorObj = err as Record<string, unknown>;
+      if (errorObj.userCancelled === true) return true;
+      if (errorObj.code === 1 || errorObj.code === "1" || errorObj.code === "PURCHASE_CANCELLED_ERROR") return true;
+      if (typeof errorObj.message === "string") {
+        const msg = errorObj.message.toLowerCase();
+        if (msg.includes("cancel") || msg.includes("dismiss") || msg.includes("closed")) return true;
+      }
+    }
+    if (err instanceof Error) {
+      const msg = err.message.toLowerCase();
+      if (msg.includes("cancel") || msg.includes("dismiss") || msg.includes("closed")) return true;
+    }
+    return false;
+  };
+
   const run = async (operation: () => Promise<void>, success?: () => void) => {
     if (working) return;
-    setWorking(true); setNotice(null);
-    try { await operation(); success?.(); } catch { setNotice({ message: t("paywall.actionError"), tone: "error" }); } finally { setWorking(false); }
+    setWorking(true);
+    setNotice(null);
+    try {
+      await operation();
+      success?.();
+    } catch (err: unknown) {
+      if (!isCancellation(err)) {
+        setNotice({ message: t("paywall.actionError"), tone: "error" });
+      }
+    } finally {
+      setWorking(false);
+    }
   };
   const restorePurchases = () =>
     void run(async () => {

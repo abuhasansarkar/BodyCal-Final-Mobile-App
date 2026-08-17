@@ -50,7 +50,10 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
   if (!response.ok) throw new ConvexError("Unable to verify subscription");
 
   const payload = (await response.json()) as SubscriberResponse;
-  const entitlement = payload.subscriber?.entitlements?.pro;
+  const entitlements = payload.subscriber?.entitlements ?? {};
+  const entitlementKey =
+    Object.keys(entitlements).find((k) => k.toLowerCase() === "pro") ?? Object.keys(entitlements)[0];
+  const entitlement = entitlementKey ? entitlements[entitlementKey] : undefined;
   const expiresRaw = entitlement?.expires_date;
   const expirationAt = expiresRaw ? Date.parse(expiresRaw) : undefined;
   const active =

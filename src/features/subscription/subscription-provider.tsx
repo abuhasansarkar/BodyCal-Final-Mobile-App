@@ -210,7 +210,7 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
     if (!key || !userId) throw new Error("RevenueCat is not configured.");
     const info = await Purchases.restorePurchases();
     applyCustomerInfo(info);
-    return { restored: info.entitlements.active.pro?.isActive === true };
+    return { restored: isProState(deriveSubscriptionState(info)) };
   }, [applyCustomerInfo, key, userId]);
 
   const effectiveState: SubscriptionState = !key || !userId ? "free" : state;

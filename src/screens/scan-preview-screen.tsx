@@ -97,13 +97,14 @@ export function ScanPreviewScreen({
         contentFit="cover"
         source={{ uri }}
       />
-      {shouldShowUpgrade ? (
+      {error && error !== t("scan.errorEntitlement") ? (
+        <InlineNotice message={error} tone="error" />
+      ) : shouldShowUpgrade ? (
         <InlineNotice
           message={t("scan.errorEntitlement")}
           tone="info"
         />
       ) : null}
-      {error ? <InlineNotice message={error} tone="error" /> : null}
       <PrimaryButton
         disabled={preparing || subscriptionChecking}
         icon={canAnalyze ? "analysis" : "subscription"}
