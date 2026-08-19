@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
 import { router, type Href } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { PurchasesPackage } from "react-native-purchases";
@@ -7,6 +8,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { PrimaryButton } from "@/components/primary-button";
+import { legalUrls } from "@/config/env";
+import { isProEntitlementMissing } from "@/features/subscription/entitlement-error";
 import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
 import { freeTrialDays } from "@/features/subscription/trial-length";
 import { Link, Pressable, ScrollView, Text, View } from "@/tw";
@@ -146,6 +149,19 @@ export function PaywallScreen() {
   const active = isProState(state);
 
   const close = () => router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)/today" as Href);
+  /*
+    Moving through the flow or picking a different plan clears any previous
+    failure. A red banner that outlives the action it describes reads as a
+    verdict on whatever the user does next.
+  */
+  const goToStep = (next: Step) => {
+    setNotice(null);
+    setStep(next);
+  };
+  const selectPlan = (next: Plan) => {
+    setNotice(null);
+    setPlan(next);
+  };
   const isCancellation = (err: unknown) => {
     if (!err) return false;
     if (typeof err === "object") {
@@ -173,7 +189,39 @@ export function PaywallScreen() {
       success?.();
     } catch (err: unknown) {
       if (!isCancellation(err)) {
-        setNotice({ message: t("paywall.actionError"), tone: "error" });
+        /*
+          One sentence is the right thing to show a user, and the wrong thing to
+          leave in a log. This catch used to discard the cause entirely, so a
+          declined card, an unreachable store, a product missing from the
+          dashboard and a purchase that completed without granting the `pro`
+          entitlement were all indistinguishable — on screen *and* in the
+          console — and there was nothing to act on.
+
+          Only the SDK's own request-level fields are logged: an error code, its
+          message, and whether the store reported a cancellation. No account, no
+          receipt, no price. Console breadcrumbs are dropped before Sentry (see
+          `lib/sentry.ts`), so this stays on the device.
+        */
+        const rcError = typeof err === "object" && err !== null ? (err as Record<string, unknown>) : null;
+        const entitlementMissing = isProEntitlementMissing(err);
+        console.warn("[paywall] action failed", {
+          code: rcError?.code ?? null,
+          message: err instanceof Error ? err.message : String(err ?? ""),
+          userCancelled: rcError?.userCancelled ?? null,
+          // Names the one failure that is ours to fix rather than the store's.
+          entitlementMissing,
+        });
+        /*
+          "Please try again" is the wrong advice when the store already took the
+          money and RevenueCat simply did not grant `pro` — the next attempt buys
+          nothing and the one before it is unaccounted for. That case gets its own
+          sentence, pointing at Restore, which is the action that can actually
+          recover it once the entitlement is configured.
+        */
+        setNotice({
+          message: entitlementMissing ? t("paywall.entitlementError") : t("paywall.actionError"),
+          tone: "error",
+        });
       }
     } finally {
       setWorking(false);
@@ -199,7 +247,7 @@ export function PaywallScreen() {
   return (
     <SafeAreaView edges={["top", "right", "bottom", "left"]} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <ScrollView className="flex-1 bg-white" contentContainerClassName="flex-grow px-5 pb-5" contentInsetAdjustmentBehavior="automatic">
-        <BrandHeader onClose={step === 1 ? close : () => setStep((step - 1) as Step)} onRestore={restorePurchases} />
+        <BrandHeader onClose={step === 1 ? close : () => goToStep((step - 1) as Step)} onRestore={restorePurchases} />
         {/* Shared with every step: restore is reachable from step 1, so its result has to be too. */}
         {notice || error ? (
           <Text
@@ -210,17 +258,29 @@ export function PaywallScreen() {
             {notice?.message ?? t("paywall.loadError")}
           </Text>
         ) : null}
-        {step === 1 ? <StepOne cta={eligible ? t("paywallFlow.tryFree") : t("common.continue")} disclosure={eligible ? t("paywallFlow.thenPrice", { price: selectedPackage?.product.priceString ?? loadingPrice }) : t("paywall.storeDisclosure")} onContinue={() => setStep(2)} /> : null}
-        {step === 2 ? <StepTwo hasTrial={eligible} onContinue={() => setStep(3)} trialDays={days} /> : null}
+        {step === 1 ? <StepOne cta={eligible ? t("paywallFlow.tryFree") : t("common.continue")} disclosure={eligible ? t("paywallFlow.thenPrice", { price: selectedPackage?.product.priceString ?? loadingPrice }) : t("paywall.storeDisclosure")} onContinue={() => goToStep(2)} /> : null}
+        {step === 2 ? <StepTwo hasTrial={eligible} onContinue={() => goToStep(3)} trialDays={days} /> : null}
         {step === 3 ? (
           <View className="flex-1 gap-4">
             <View className="items-center gap-2 px-4"><Text accessibilityRole="header" className="text-center text-[29px] font-bold text-[#111111]">{t("paywallFlow.choosePlan")}</Text><Text className="text-center text-[15px] text-[#737373]">{eligible ? t("paywallFlow.chooseTrial", { count: days ?? 0 }) : t("paywallFlow.chooseSubtitle")}</Text></View>
             <View accessibilityRole="radiogroup" className="gap-3">
-              <PlanOption description={annualSavings ? t("paywall.annualSavings", { savings: annualSavings }) : t("paywall.bestValue")} disabled={!annualPackage} label={t("paywall.annual")} onPress={() => setPlan("annual")} price={annualPackage?.product.priceString ?? loadingPrice} selected={selectedPlan === "annual"} />
-              <PlanOption disabled={!monthlyPackage} label={t("paywall.monthly")} onPress={() => setPlan("monthly")} price={monthlyPackage?.product.priceString ?? loadingPrice} selected={selectedPlan === "monthly"} />
+              <PlanOption description={annualSavings ? t("paywall.annualSavings", { savings: annualSavings }) : t("paywall.bestValue")} disabled={!annualPackage} label={t("paywall.annual")} onPress={() => selectPlan("annual")} price={annualPackage?.product.priceString ?? loadingPrice} selected={selectedPlan === "annual"} />
+              <PlanOption disabled={!monthlyPackage} label={t("paywall.monthly")} onPress={() => selectPlan("monthly")} price={monthlyPackage?.product.priceString ?? loadingPrice} selected={selectedPlan === "monthly"} />
             </View>
-            <View className="gap-3 rounded-2xl border border-[#E8E8E8] bg-[#FAFAFA] p-4"><FeatureLine icon="unlock" left={eligible ? t("paywallFlow.daysFree", { count: days ?? 0 }) : t("paywallFlow.fullAccess")} right={t("paywallFlow.fullAccess")} /><FeatureLine icon="privacy" left={t("paywallFlow.cancelAnytimeShort")} right={t("paywallFlow.noCommitments")} /><FeatureLine icon="checkCircle" left={t("paywallFlow.securePrivate")} right={t("paywallFlow.storeProtected")} /></View>
-            <View className="mt-auto gap-3"><PrimaryButton className="min-h-[60px] rounded-2xl" disabled={working || !selectedPackage || active} label={active ? t("paywall.active") : working ? t("paywall.processing") : eligible ? t("paywall.startTrialDays", { count: days ?? 0 }) : t("common.continue")} labelClassName="text-[18px]" onPress={purchasePlan} /><Text className="text-center text-[13px] leading-[18px] text-[#737373]" selectable>{disclosure}</Text><View className="flex-row flex-wrap justify-center gap-x-2"><Link className="min-h-11 py-3 text-sm font-medium text-[#111111] underline" href="/(app)/settings/terms">{t("paywall.terms")}</Link><Link className="min-h-11 py-3 text-sm font-medium text-[#111111] underline" href="/(app)/settings/privacy">{t("paywall.privacy")}</Link></View><View className="flex-row items-center justify-center gap-2"><AppIcon color="#737373" name="privacy" size={15} /><Text className="text-xs text-[#737373]">{t("paywallFlow.secureCheckout")}</Text></View></View>
+            <View className="gap-3 rounded-2xl border border-[#E8E8E8] bg-[#FAFAFA] p-4">{/*
+              Without a trial the left half already reads "Full access", so the
+              right half repeated it verbatim — the row rendered "Full access ·
+              Full access". The qualifier only exists to say what the trial turns
+              into, so with no trial there is nothing for it to say.
+            */}
+            <FeatureLine icon="unlock" left={eligible ? t("paywallFlow.daysFree", { count: days ?? 0 }) : t("paywallFlow.fullAccess")} right={eligible ? t("paywallFlow.fullAccess") : undefined} /><FeatureLine icon="privacy" left={t("paywallFlow.cancelAnytimeShort")} right={t("paywallFlow.noCommitments")} /><FeatureLine icon="checkCircle" left={t("paywallFlow.securePrivate")} right={t("paywallFlow.storeProtected")} /></View>
+            <View className="mt-auto gap-3"><PrimaryButton className="min-h-[60px] rounded-2xl" disabled={working || !selectedPackage || active} label={active ? t("paywall.active") : working ? t("paywall.processing") : eligible ? t("paywall.startTrialDays", { count: days ?? 0 }) : t("common.continue")} labelClassName="text-[18px]" onPress={purchasePlan} /><Text className="text-center text-[13px] leading-[18px] text-[#737373]" selectable>{disclosure}</Text>{/*
+              Apple checks that the EULA and privacy policy are reachable from the
+              purchase screen itself, so these open the published documents
+              directly rather than routing through Settings. They fall back to the
+              in-app screens while the URLs are unset in development.
+            */}
+            <View className="flex-row flex-wrap justify-center gap-x-2"><LegalLink fallback="/(app)/settings/terms" label={t("paywall.terms")} url={legalUrls.terms} /><LegalLink fallback="/(app)/settings/privacy" label={t("paywall.privacy")} url={legalUrls.privacy} /></View><View className="flex-row items-center justify-center gap-2"><AppIcon color="#737373" name="privacy" size={15} /><Text className="text-xs text-[#737373]">{t("paywallFlow.secureCheckout")}</Text></View></View>
           </View>
         ) : null}
       </ScrollView>
@@ -228,6 +288,33 @@ export function PaywallScreen() {
   );
 }
 
-function FeatureLine({ icon, left, right }: { icon: AppIconName; left: string; right: string }) {
-  return <View className="flex-row items-center gap-3"><AppIcon name={icon} size={18} /><Text className="min-w-0 flex-1 text-sm text-[#111111]">{left}</Text><Text className="text-right text-xs text-[#737373]">{right}</Text></View>;
+const legalLinkClass = "min-h-11 py-3 text-sm font-medium text-[#111111] underline";
+
+function LegalLink({ fallback, label, url }: { fallback: Href; label: string; url: string | null }) {
+  if (!url) {
+    return (
+      <Link className={legalLinkClass} href={fallback}>
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <Text
+      accessibilityRole="link"
+      className={legalLinkClass}
+      onPress={() => void WebBrowser.openBrowserAsync(url)}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function FeatureLine({ icon, left, right }: { icon: AppIconName; left: string; right?: string }) {
+  return (
+    <View className="flex-row items-center gap-3">
+      <AppIcon name={icon} size={18} />
+      <Text className="min-w-0 flex-1 text-sm text-[#111111]">{left}</Text>
+      {right ? <Text className="text-right text-xs text-[#737373]">{right}</Text> : null}
+    </View>
+  );
 }

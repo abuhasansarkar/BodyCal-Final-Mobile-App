@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Animated, Easing, StyleSheet } from "react-native";
+import { AccessibilityInfo, Animated, Easing, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/app-icon";
@@ -89,6 +89,45 @@ const STEP_KEYS = [
   "scan.stepNutrition",
 ] as const;
 
+/**
+ * How long the screen waits before it stops pretending this is normal.
+ *
+ * A healthy scan resolves well inside `SLOW_AFTER_MS`; the server reaps a truly
+ * stranded one, but not for several minutes. Neither number ends the
+ * subscription — a late result still navigates to the estimate — they only
+ * decide when the user is offered a way out instead of a spinner.
+ */
+const SLOW_AFTER_MS = 45_000;
+const GIVE_UP_AFTER_MS = 150_000;
+
+/**
+ * Whether the operating system is asking for reduced motion, kept current if the
+ * setting is changed while this screen is open.
+ *
+ * This is the longest-running screen in the app and the only one that animates
+ * continuously, so it is the one that most needs to honour the setting — it
+ * previously ran both loops regardless.
+ */
+function useReducedMotion() {
+  const [reduced, setReduced] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((value) => {
+        if (!cancelled) setReduced(value);
+      })
+      .catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduced);
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduced;
+}
+
 export function ScanAnalyzingScreen({ uri, scanId }: { uri?: string; scanId?: string }) {
   const { t } = useTranslation();
 
@@ -97,7 +136,7 @@ export function ScanAnalyzingScreen({ uri, scanId }: { uri?: string; scanId?: st
   }
   if (!uri && !scanId) {
     return (
-      <AppScreen>
+      <AppScreen edges={["top", "left", "right"]}>
         <ErrorState title={t("scan.noEstimateTitle")} description={t("scan.noEstimateDescription")} />
       </AppScreen>
     );
@@ -116,23 +155,32 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
   const [startFailure, setStartFailure] = React.useState<Failure | null>(null);
   const [attempt, setAttempt] = React.useState(0);
   const [activeStepIndex, setActiveStepIndex] = React.useState(0);
+  const [waitedMs, setWaitedMs] = React.useState(0);
   const startedAttempt = React.useRef(-1);
+
+  /*
+    One request id per photo, minted once and reused by every start attempt.
+    `aiDb.begin` is idempotent on (user, requestId), so a re-run after a failed
+    upload rejoins the scan it already created instead of buying a second
+    provider call and burning a second slot of daily quota.
+  */
+  const [requestId] = React.useState(createClientRequestId);
+  const reducedMotion = useReducedMotion();
 
   // Animation values initialized with lazy state to satisfy React 19 compiler
   const [scanLineAnim] = React.useState(() => new Animated.Value(0));
   const [pulseAnim] = React.useState(() => new Animated.Value(1));
 
-  // Step ticker
-  React.useEffect(() => {
-    if (startFailure) return;
-    const timer = setInterval(() => {
-      setActiveStepIndex((prev) => (prev < STEP_KEYS.length - 1 ? prev + 1 : prev));
-    }, 2_400);
-    return () => clearInterval(timer);
-  }, [startFailure]);
-
   // Laser scan line & radar animations
   React.useEffect(() => {
+    // Held at rest rather than started, so the screen is still and legible for
+    // anyone who has asked the system for less movement.
+    if (reducedMotion) {
+      scanLineAnim.setValue(0);
+      pulseAnim.setValue(1);
+      return;
+    }
+
     const scanLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(scanLineAnim, {
@@ -174,7 +222,7 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
       scanLoop.stop();
       pulseLoop.stop();
     };
-  }, [pulseAnim, scanLineAnim]);
+  }, [pulseAnim, reducedMotion, scanLineAnim]);
 
   React.useEffect(() => {
     if (resumedScanId || !uri) return;
@@ -191,7 +239,7 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
         const started = await startScan({
           storageId,
           locale: i18n.resolvedLanguage ?? "en",
-          requestId: createClientRequestId(),
+          requestId,
         });
 
         setScanId(started.scanId);
@@ -211,21 +259,66 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
 
   const scan = useQuery(api.aiDb.getScan, scanId ? { scanId } : "skip");
 
+  /*
+    The photo is still being uploaded until a scan id comes back, and the steps
+    below describe work the model has not been handed yet. The ticker used to
+    start on mount regardless, so a slow upload showed "Estimating portions…"
+    and a full four-of-four checklist for a photo that had not left the device.
+    It now waits for the analysis to actually be queued.
+  */
+  const analysisQueued = scanId !== null;
+  React.useEffect(() => {
+    if (startFailure || !analysisQueued) return;
+    const timer = setInterval(() => {
+      setActiveStepIndex((previous) =>
+        previous < STEP_KEYS.length - 1 ? previous + 1 : previous,
+      );
+    }, 2_400);
+    return () => clearInterval(timer);
+  }, [analysisQueued, startFailure]);
+
+  // What the badge over the photo says: the upload while it is still running,
+  // then the step the checklist is on.
+  const statusLabel = analysisQueued ? t(STEP_KEYS[activeStepIndex]) : t("scan.uploadingTitle");
+
   React.useEffect(() => {
     if (scan?.status === "completed" && scanId) {
       router.replace({ pathname: "/(app)/scan/result", params: { scanId } });
     }
   }, [scan?.status, scanId]);
 
+  /*
+    Waiting clock. It runs from mount rather than from the moment the scan was
+    queued, because an upload that never returns strands the user just as
+    effectively as an analysis that never finishes.
+  */
+  const settled = startFailure !== null || scan?.status === "completed" || scan?.status === "failed";
+  React.useEffect(() => {
+    if (settled) return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => setWaitedMs(Date.now() - startedAt), 1_000);
+    return () => clearInterval(timer);
+  }, [settled]);
+
+  const timedOut = !settled && waitedMs >= GIVE_UP_AFTER_MS;
+  const slow = !settled && waitedMs >= SLOW_AFTER_MS;
+
   const failure =
     startFailure ??
     (scan?.status === "failed"
       ? describeScanFailure(scan.failureCategory, scan.retryable, t)
-      : null);
+      : timedOut
+        ? // Not a server failure — the subscription above stays live, so a late
+          // result still navigates. This only stops the spinner from being the
+          // user's only option.
+          { text: t("scan.errorTimeout"), showUpgrade: false, canRetry: true }
+        : null);
 
   if (failure) {
     return (
-      <AppScreen>
+      // `headerShown` is false for this route, so the error state has to inset
+      // its own top edge rather than sitting under the status bar.
+      <AppScreen edges={["top", "left", "right"]}>
         <ErrorState description={failure.text} title={failure.title ?? t("scan.errorTitle")} />
         <Text className="px-1 text-[13px] leading-4.5 text-app-muted" selectable>
           {t("scan.errorHint")}
@@ -243,8 +336,26 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
             label={t("scan.retryAction")}
             onPress={() => {
               setStartFailure(null);
-              if (scanId) void retryScan({ scanId }).catch(() => setAttempt((v) => v + 1));
-              else setAttempt((value) => value + 1);
+              setWaitedMs(0);
+              /*
+                A scan that exists is re-queued against the image already
+                uploaded. It is never restarted from the photo: that would mint a
+                fresh scan, a second provider call and a second slot of daily
+                quota for a meal the user has already paid to analyse once. Only
+                a failure that happened before the scan existed goes back through
+                upload — and even then it reuses the same request id.
+              */
+              if (scanId) {
+                void retryScan({ scanId }).catch(() =>
+                  setStartFailure({
+                    text: t("scan.errorGeneric"),
+                    showUpgrade: false,
+                    canRetry: false,
+                  }),
+                );
+              } else {
+                setAttempt((value) => value + 1);
+              }
             }}
           />
         ) : null}
@@ -305,42 +416,64 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
               {/* Dark vignette gradient overlay */}
               <View className="absolute inset-0 bg-black/25" />
 
-              {/* Viewfinder Target Markers */}
-              <View className="absolute inset-4 rounded-2xl border border-white/40 pointer-events-none" />
+              {/*
+                Viewfinder frame. Stops short of the bottom so the status badge
+                below is not laid over its own border.
+              */}
+              <View className="absolute inset-4 bottom-14 rounded-2xl border border-white/40 pointer-events-none" />
 
               {/* Animated Laser Scan Line */}
-              <Animated.View
-                style={[
-                  {
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    top: 10,
-                    height: 3,
-                    backgroundColor: "#FFFFFF",
-                    shadowColor: "#FFFFFF",
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.9,
-                    shadowRadius: 10,
-                    elevation: 6,
-                    transform: [{ translateY }],
-                  },
-                ]}
-              />
+              {reducedMotion ? null : (
+                <Animated.View
+                  style={[
+                    {
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      top: 10,
+                      height: 3,
+                      backgroundColor: "#FFFFFF",
+                      shadowColor: "#FFFFFF",
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.9,
+                      shadowRadius: 10,
+                      elevation: 6,
+                      transform: [{ translateY }],
+                    },
+                  ]}
+                />
+              )}
 
-              {/* Floating Pill Status */}
-              <View className="absolute bottom-3 left-3 right-3 flex-row items-center justify-between rounded-xl bg-black/60 px-3.5 py-2 backdrop-blur-md">
-                <View className="flex-row items-center gap-2">
+              {/*
+                Status badge. The fill is opaque rather than `bg-black/60`, and
+                `backdrop-blur-md` is gone — React Native has no backdrop filter,
+                so that class rendered nothing and left white text sitting on
+                whatever the photo happened to be. A meal photo is unpredictable
+                and often bright, which is exactly the case the old translucent
+                fill failed.
+              */}
+              <View
+                className="absolute bottom-3 left-3 right-3 flex-row items-center justify-between gap-3 rounded-xl px-3.5 py-2"
+                style={{ backgroundColor: "rgba(17, 17, 17, 0.92)" }}
+              >
+                <View className="min-w-0 flex-1 flex-row items-center gap-2">
                   <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <View className="h-2.5 w-2.5 rounded-full bg-[#22A06B]" />
+                    <View className="h-2.5 w-2.5 rounded-full bg-[#3DD68C]" />
                   </Animated.View>
-                  <Text className="text-xs font-semibold text-white">
-                    {t(STEP_KEYS[activeStepIndex])}
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    className="min-w-0 flex-1 text-xs font-semibold text-white"
+                    numberOfLines={1}
+                  >
+                    {statusLabel}
                   </Text>
                 </View>
-                <Text className="text-[11px] font-medium text-white/70">
-                  {activeStepIndex + 1}/{STEP_KEYS.length}
-                </Text>
+                {/* The counter describes the checklist, so it appears with it. */}
+                {analysisQueued ? (
+                  <Text className="text-[11px] font-medium text-white/75">
+                    {activeStepIndex + 1}/{STEP_KEYS.length}
+                  </Text>
+                ) : null}
               </View>
             </View>
           ) : (
@@ -427,6 +560,15 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
 
         {/* Footer Actions */}
         <View className="gap-3 pt-4">
+          {slow ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              className="px-1 text-center text-[13px] leading-4.5 text-[#737373]"
+              selectable
+            >
+              {t("scan.slowNotice")}
+            </Text>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             className="min-h-12 items-center justify-center rounded-2xl border border-[#E8E8E8] bg-white px-4 active:bg-[#F7F7F7]"

@@ -67,8 +67,9 @@ function stateFromEvent(eventType: string, periodType: string | undefined): Mirr
     case "UNSUBSCRIBE":
     case "SUBSCRIPTION_PAUSED":
       return "cancelledActive";
-    case "TRANSFER":
-      return "expired";
+    // TRANSFER is deliberately absent: it carries no `app_user_id`, no
+    // `entitlement_ids` and no product, so it cannot be described by this
+    // function at all. `applyTransfer` handles it against `transferred_from`.
     default:
       return trial ? "trial" : "active";
   }
@@ -185,6 +186,86 @@ export const applyWebhook = internalMutation({
     });
 
     return { status: result.reason };
+  },
+});
+
+/**
+ * Applies a RevenueCat `TRANSFER` event by expiring every account the
+ * subscription moved away from.
+ *
+ * Transfers were previously ignored outright: `http.ts` did not list the type,
+ * so the webhook answered 200 and nothing changed, and the account that gave up
+ * the subscription kept an active mirror until its stored `expirationAt` passed
+ * — up to a full year on the annual plan.
+ *
+ * It cannot go through `applyWebhook`. A transfer payload has no `app_user_id`,
+ * no `entitlement_ids` and no product; it names only `transferred_from` and
+ * `transferred_to`. The destination account is left alone here — RevenueCat
+ * sends it its own purchase event, and that event knows the product and the
+ * expiry, which this one does not.
+ */
+export const applyTransfer = internalMutation({
+  args: {
+    eventId: v.string(),
+    eventAt: v.number(),
+    fromCustomerIds: v.array(v.string()),
+  },
+  returns: v.object({ status: v.string(), expired: v.number() }),
+  handler: async (ctx, args) => {
+    const duplicate = await ctx.db
+      .query("subscriptionEvents")
+      .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+      .unique();
+    if (duplicate) return { status: "duplicate", expired: 0 };
+
+    let expired = 0;
+    for (const customerId of args.fromCustomerIds.slice(0, 25)) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", customerId))
+        .unique();
+      if (!user) continue;
+
+      const mirror = await ctx.db
+        .query("subscriptionMirror")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .unique();
+      if (!mirror) continue;
+      // Same out-of-order guard the other write paths use.
+      if (mirror.lastEventAt !== undefined && args.eventAt < mirror.lastEventAt) continue;
+
+      const now = Date.now();
+      await ctx.db.replace(mirror._id, {
+        userId: user._id,
+        revenueCatCustomerId: customerId,
+        state: "expired",
+        // The subscription is no longer this account's, so nothing about the
+        // product it used to hold is still true of it.
+        productId: undefined,
+        periodType: undefined,
+        expirationAt: undefined,
+        willRenew: false,
+        trial: false,
+        lastEventAt: args.eventAt,
+        eventId: args.eventId,
+        verifiedAt: now,
+        updatedAt: now,
+      });
+      expired += 1;
+    }
+
+    await ctx.db.insert("subscriptionEvents", {
+      eventId: args.eventId,
+      // One row per event, so the log keeps the account the entitlement left.
+      customerId: args.fromCustomerIds[0] ?? "",
+      eventType: "TRANSFER",
+      eventAt: args.eventAt,
+      applied: true,
+      payload: {},
+      receivedAt: Date.now(),
+    });
+
+    return { status: "transferred", expired };
   },
 });
 

@@ -337,6 +337,15 @@ export const ko: ScreenTranslations = {
     cancel: "계정 유지",
     cancelled: "삭제를 취소했습니다. 계정이 활성 상태입니다.",
     startError: "삭제를 시작하지 못했습니다. 다시 인증한 뒤 시도해 주세요.",
+    reauthTitle: "본인 확인",
+    reauthPasswordDescription: "이 계정을 삭제하려면 비밀번호를 입력하세요.",
+    reauthPasswordLabel: "비밀번호",
+    reauthCodeDescription: "이메일로 인증 코드를 보냈습니다. 계정 삭제를 확인하려면 코드를 입력하세요.",
+    reauthCodeLabel: "인증 코드",
+    reauthSubmit: "확인 후 삭제",
+    reauthBack: "취소",
+    reauthError: "일치하지 않습니다. 다시 시도하세요.",
+    reauthUnsupported: "이 기기에서는 계정을 확인할 수 없습니다. 다시 로그인한 후 삭제를 시도하세요.",
   },
   foodSearch: {
     title: "음식 추가",
@@ -380,6 +389,11 @@ export const ko: ScreenTranslations = {
     ofDailyGoal: "일일 목표 대비",
     dailyGoalShare: "일일 칼로리 목표의 {{percent}}%",
     macroSummary: "{{label}}: {{grams}}그램, 에너지의 {{percent}}%",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "단백질",
+    carbs: "탄수화물",
+    fat: "지방",
   },
   foodDetail: {
     notFound: "이 음식은 더 이상 제공되지 않습니다.",
@@ -425,6 +439,9 @@ export const ko: ScreenTranslations = {
     lose: "꾸준한 체중 감량을 위한 음식",
     maintain: "체중 유지를 위한 음식",
     gain: "건강한 체중 증가를 위한 음식",
+    loseSupport: "포만감을 유지하면서 꾸준히 체중을 줄이도록 돕는 영양 식단입니다.",
+    maintainSupport: "현재 체중을 유지하도록 돕는 균형 잡힌 영양 식단입니다.",
+    gainSupport: "근육을 키우고 목표에 도달하도록 돕는 고칼로리 영양 식단입니다.",
   },
   foodCategories: {
     all: "전체",
@@ -465,6 +482,7 @@ export const ko: ScreenTranslations = {
     errorUpload: "사진을 업로드하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.",
     errorUnavailable: "식사 분석을 일시적으로 사용할 수 없습니다. 식사를 직접 입력할 수 있습니다.",
     errorTimeout: "분석에 시간이 너무 오래 걸렸습니다.",
+    slowNotice: "평소보다 오래 걸리고 있습니다. 계속 기다리거나 직접 입력할 수 있습니다.",
     errorTooLarge: "이 사진은 업로드하기에 너무 큽니다.",
     errorEntitlement: "AI 식사 분석은 BodyCal Pro 기능입니다.",
     errorQuota: "오늘의 분석 한도에 도달했습니다. 직접 입력은 계속 사용할 수 있습니다.",

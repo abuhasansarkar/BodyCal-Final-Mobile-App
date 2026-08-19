@@ -37,4 +37,46 @@ describe("subscription state", () => {
     } as unknown as CustomerInfo;
     expect(deriveSubscriptionState(info)).toBe("expired");
   });
+  /**
+   * Both lookups used to fall back to the first entitlement in the object, so a
+   * second entitlement on the RevenueCat project — a promo tier, a lifetime SKU,
+   * anything added for a store test — unlocked the app on its own.
+   */
+  it("ignores an active entitlement that is not pro", () => {
+    const info = {
+      entitlements: {
+        active: {
+          legacy_promo: {
+            isActive: true,
+            willRenew: true,
+            periodType: "NORMAL",
+            billingIssueDetectedAt: null,
+            unsubscribeDetectedAt: null,
+          } as unknown as PurchasesEntitlementInfo,
+        },
+        all: {
+          legacy_promo: { isActive: true } as unknown as PurchasesEntitlementInfo,
+        },
+      },
+    } as unknown as CustomerInfo;
+    expect(deriveSubscriptionState(info)).toBe("free");
+  });
+
+  it("still matches a pro entitlement declared with different casing", () => {
+    const info = {
+      entitlements: {
+        active: {
+          Pro: {
+            isActive: true,
+            willRenew: true,
+            periodType: "NORMAL",
+            billingIssueDetectedAt: null,
+            unsubscribeDetectedAt: null,
+          } as unknown as PurchasesEntitlementInfo,
+        },
+        all: {},
+      },
+    } as unknown as CustomerInfo;
+    expect(deriveSubscriptionState(info)).toBe("active");
+  });
 });

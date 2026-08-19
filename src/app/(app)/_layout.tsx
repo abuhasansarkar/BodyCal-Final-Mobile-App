@@ -51,6 +51,15 @@ function AppStack() {
       <Stack.Screen name="review" options={{ headerShown: false }} />
       <Stack.Screen name="thank-you" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="scan/camera" options={{ headerShown: false }} />
+      {/*
+        Analysing draws its own header — a back control and the "BodyCal AI"
+        badge — and its own top safe-area inset. Without this declaration it also
+        received the native one, so the screen showed two back chevrons, a stray
+        divider, and a double top inset. Its siblings (preview, edit, result) use
+        `AppScreen`, which insets only left and right, so they keep the native
+        header and are deliberately left alone.
+      */}
+      <Stack.Screen name="scan/analyzing" options={{ headerShown: false }} />
       <Stack.Screen name="weight/add" options={{ presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.5], headerTitle: t("weight.addTitle") }} />
     </Stack>
   );

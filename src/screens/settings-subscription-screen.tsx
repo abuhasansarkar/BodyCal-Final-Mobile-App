@@ -11,7 +11,8 @@ import { ScreenTitle, SectionCard, SectionHeader } from "@/components/ui/section
 import { InlineNotice, OfflineBanner } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { colors } from "@/config/theme";
-import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
+import { useProAccess } from "@/features/subscription/server-pro-access";
+import { useSubscription } from "@/features/subscription/subscription-provider";
 import { api } from "@/lib/convex-api";
 import { Pressable, Text, View } from "@/tw";
 
@@ -30,7 +31,15 @@ export function SettingsSubscriptionScreen() {
   const [restoring, setRestoring] = React.useState(false);
   const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "error" } | null>(null);
 
-  const isPro = isProState(state);
+  /*
+    Same reasoning as the profile badge: the plan name and the upgrade prompt
+    follow whichever source knows the account is Pro, so a purchase the SDK has
+    not reported yet — or one applied by webhook on another device — cannot leave
+    a paying subscriber looking at "Free plan" and a button to buy it again. The
+    trial and cancellation rows below stay on the client state, which is the only
+    one that carries that detail.
+  */
+  const { isPro } = useProAccess();
   const { i18n } = useTranslation();
   const dateFormatter = new Intl.DateTimeFormat(i18n.resolvedLanguage, { dateStyle: "medium" });
 

@@ -343,6 +343,15 @@ export const it: ScreenTranslations = {
     cancel: "Mantieni il mio account",
     cancelled: "Eliminazione annullata. Il tuo account è attivo.",
     startError: "Non è stato possibile avviare l'eliminazione. Autenticati di nuovo e riprova.",
+    reauthTitle: "Conferma la tua identità",
+    reauthPasswordDescription: "Inserisci la password per confermare che vuoi eliminare questo account.",
+    reauthPasswordLabel: "Password",
+    reauthCodeDescription: "Abbiamo inviato un codice al tuo indirizzo e-mail. Inseriscilo per confermare l'eliminazione dell'account.",
+    reauthCodeLabel: "Codice di verifica",
+    reauthSubmit: "Conferma ed elimina",
+    reauthBack: "Annulla",
+    reauthError: "Non corrisponde. Riprova.",
+    reauthUnsupported: "Questo account non può essere verificato su questo dispositivo. Accedi di nuovo e riprova l'eliminazione.",
   },
   foodSearch: {
     title: "Aggiungi alimento",
@@ -386,6 +395,11 @@ export const it: ScreenTranslations = {
     ofDailyGoal: "dell’obiettivo giornaliero",
     dailyGoalShare: "{{percent}}% del tuo obiettivo calorico giornaliero",
     macroSummary: "{{label}}: {{grams}} grammi, {{percent}}% dell’energia",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "Proteine",
+    carbs: "Carboidrati",
+    fat: "Grassi",
   },
   foodDetail: {
     notFound: "Questo alimento non è più disponibile.",
@@ -431,6 +445,9 @@ export const it: ScreenTranslations = {
     lose: "Alimenti per una perdita di peso costante",
     maintain: "Alimenti per mantenere il tuo peso",
     gain: "Alimenti per aumentare di peso in modo sano",
+    loseSupport: "Pasti sazianti e ricchi di nutrienti per farti sentire soddisfatto mentre perdi peso.",
+    maintainSupport: "Pasti equilibrati e ricchi di nutrienti per aiutarti a mantenere il tuo peso attuale.",
+    gainSupport: "Pasti ricchi di calorie e nutrienti per aiutarti a costruire muscoli e raggiungere i tuoi obiettivi.",
   },
   foodCategories: {
     all: "Tutti",
@@ -471,6 +488,7 @@ export const it: ScreenTranslations = {
     errorUpload: "Non è stato possibile caricare la tua foto. Controlla la connessione e riprova.",
     errorUnavailable: "L’analisi dei pasti non è disponibile al momento. Puoi inserire il pasto manualmente.",
     errorTimeout: "L'analisi ha richiesto troppo tempo.",
+    slowNotice: "Sta richiedendo più tempo del solito. Puoi continuare ad aspettare o inserire il pasto manualmente.",
     errorTooLarge: "Questa foto è troppo grande da caricare.",
     errorEntitlement: "L'analisi dei pasti con IA fa parte di BodyCal Pro.",
     errorQuota: "Hai raggiunto il limite di analisi di oggi. La registrazione manuale funziona ancora.",

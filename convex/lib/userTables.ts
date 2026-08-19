@@ -16,7 +16,6 @@ export const USER_SCOPED_TABLES = [
   "favorites",
   "nutritionGoals",
   "notificationPreferences",
-  "pushDevices",
   "userSettings",
   "userFeedback",
   "subscriptionMirror",

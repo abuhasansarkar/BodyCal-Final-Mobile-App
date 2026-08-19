@@ -337,6 +337,15 @@ export const ja: ScreenTranslations = {
     cancel: "アカウントを残す",
     cancelled: "削除を中止しました。アカウントは有効です。",
     startError: "削除を開始できませんでした。再認証してからお試しください。",
+    reauthTitle: "本人確認",
+    reauthPasswordDescription: "このアカウントを削除するには、パスワードを入力してください。",
+    reauthPasswordLabel: "パスワード",
+    reauthCodeDescription: "メールアドレスに認証コードを送信しました。削除を確定するには、コードを入力してください。",
+    reauthCodeLabel: "認証コード",
+    reauthSubmit: "確認して削除",
+    reauthBack: "キャンセル",
+    reauthError: "一致しませんでした。もう一度お試しください。",
+    reauthUnsupported: "このデバイスではアカウントを確認できません。再度サインインしてから、削除をやり直してください。",
   },
   foodSearch: {
     title: "食品を追加",
@@ -380,6 +389,11 @@ export const ja: ScreenTranslations = {
     ofDailyGoal: "1日の目標に対して",
     dailyGoalShare: "1日のカロリー目標の{{percent}}%",
     macroSummary: "{{label}}：{{grams}} グラム、エネルギーの{{percent}}%",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "たんぱく質",
+    carbs: "炭水化物",
+    fat: "脂質",
   },
   foodDetail: {
     notFound: "この食品は利用できなくなりました。",
@@ -425,6 +439,9 @@ export const ja: ScreenTranslations = {
     lose: "着実に減量するための食事",
     maintain: "体重を維持するための食事",
     gain: "健康的に増量するための食事",
+    loseSupport: "満足感がありながら、着実な減量を支える栄養価の高い食事。",
+    maintainSupport: "現在の体重を無理なく維持するための、バランスのよい栄養価の高い食事。",
+    gainSupport: "筋肉づくりと目標達成を後押しする、高カロリーで栄養価の高い食事。",
   },
   foodCategories: {
     all: "すべて",
@@ -465,6 +482,7 @@ export const ja: ScreenTranslations = {
     errorUpload: "写真をアップロードできませんでした。接続を確認してもう一度お試しください。",
     errorUnavailable: "食事分析は一時的に利用できません。食事は手動で入力できます。",
     errorTimeout: "解析に時間がかかりすぎました。",
+    slowNotice: "いつもより時間がかかっています。このままお待ちいただくか、手動で入力できます。",
     errorTooLarge: "この写真はアップロードするには大きすぎます。",
     errorEntitlement: "AI 食事解析は BodyCal Pro の機能です。",
     errorQuota: "本日の解析上限に達しました。手入力での記録は引き続き利用できます。",

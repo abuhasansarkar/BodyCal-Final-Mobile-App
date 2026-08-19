@@ -31,8 +31,8 @@ This file is the execution roadmap and acceptance checklist. It records both the
 - Manual, curated, favorite, recent, and AI-assisted food logging.
 - Daily calorie and macro summaries grouped by meal.
 - Weight history and progress summaries.
-- Local and push notification preferences.
-- Free and Pro access levels.
+- Local notification reminders and preferences.
+- Free and Pro access levels. Free reads the last 7 days of history on every surface; Pro reads all of it.
 - RevenueCat subscription lifecycle and restore.
 - Eight launch languages and metric/imperial units.
 - Privacy-conscious analytics, crash reporting, export, and account deletion.
@@ -55,7 +55,7 @@ This file is the execution roadmap and acceptance checklist. It records both the
 - Convex for database, reactive queries, mutations, actions, storage, HTTP webhooks, schedules, and cron jobs.
 - RevenueCat for subscription products and authoritative `pro` entitlement state.
 - OpenAI Responses API behind a server-side provider boundary for image analysis.
-- Expo Notifications for local schedules and Expo push integration.
+- Expo Notifications for local reminder schedules. Remote push is post-V1.
 - i18next/react-i18next and Expo Localization.
 - Sentry and consent-gated PostHog analytics.
 - Jest, React Native Testing Library, Convex testing utilities, and Maestro.
@@ -109,7 +109,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Convex tests for authenticated access, unauthenticated rejection, wrong-user rejection, idempotency, query limits, validation bounds, deletion, export, and subscription webhook ordering (48 tests).
 - [x] Offline outbox tests for deduplication, attempt caps, expiry, and account-switch clearing.
 - [x] Translation key-parity test across all eight languages.
-- [ ] Device tests for social auth, purchases, camera, and remote notifications.
+- [ ] Device tests for social auth, purchases, camera, and local reminder delivery.
 
 ### Navigation and screens
 
@@ -195,17 +195,19 @@ design/           Supplied design sources and audit artifacts
 ### Notifications
 
 - [x] Education screen before OS permission request.
-- [x] Android channels, response listener, and deep-link routing.
+- [x] One Android channel per reminder category, with localized names refreshed on every sync.
+- [x] Response listener and allowlisted deep-link routing.
 - [x] Daily local reminders and trial-reminder scheduling helpers.
 - [x] Sign-out and account-switch cleanup of the outbox, scheduled reminders, and RevenueCat identity.
-- [x] Convex preferences and push-device records exist.
-- [x] Expo push token registration, rotation, and permission reconciliation, deduplicated per installation and per token.
-- [ ] Invalid-receipt processing (requires a server sender).
 - [x] Local reminder scheduling with stable identifiers, quiet hours, and cancellation on disable.
 - [x] Reminder preferences persist to Convex.
-- [ ] Server-side reminder sender and multi-device delivery policy.
 - [ ] Timezone/locale change rescheduling.
-- [!] Remote push testing requires Expo credentials and physical Android/iOS devices.
+
+**V1 ships local reminders only.** Remote push is deliberately out of scope: the
+`pushDevices` table, token registration, and the registration provider were
+removed rather than left as a write-only collection of device identifiers with
+no sender behind them. Reintroduce them together with a server-side sender,
+receipt handling, and token invalidation — not before.
 
 ### Localization, accessibility, and privacy
 

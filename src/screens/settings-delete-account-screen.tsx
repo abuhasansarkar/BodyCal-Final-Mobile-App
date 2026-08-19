@@ -1,4 +1,4 @@
-import { useClerk, useReverification } from "@clerk/expo";
+import { useClerk } from "@clerk/expo";
 import { useMutation, useQuery } from "convex/react";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +11,8 @@ import { ScreenTitle, SectionCard, SectionHeader } from "@/components/ui/section
 import { ErrorState, InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { colors } from "@/config/theme";
-import { getInstallationId, leaveUserScope } from "@/features/auth/session-scope";
+import { useReauthentication } from "@/features/auth/reauthentication";
+import { leaveUserScope } from "@/features/auth/session-scope";
 import { releaseRevenueCatIdentity } from "@/features/subscription/subscription-provider";
 import { api } from "@/lib/convex-api";
 import { Pressable, Text, View } from "@/tw";
@@ -34,19 +35,19 @@ function ConfiguredDeleteAccount() {
   const status = useQuery(api.users.getDeletionStatus, {});
   const requestDeletion = useMutation(api.users.requestDeletion);
   const cancelDeletion = useMutation(api.users.cancelDeletion);
-  const unregisterDevice = useMutation(api.notifications.unregisterDevice);
+  const reauth = useReauthentication();
 
   const [confirmation, setConfirmation] = React.useState("");
+  const [credential, setCredential] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "error" } | null>(null);
 
-  const start = useReverification(async () => {
-    const installationId = await getInstallationId();
-    await unregisterDevice({ installationId }).catch(() => undefined);
+  /** Runs only once the session has been re-verified. */
+  const destroy = React.useCallback(async () => {
     await requestDeletion({});
     await Promise.all([leaveUserScope(), releaseRevenueCatIdentity()]);
     await signOut();
-  });
+  }, [requestDeletion, signOut]);
 
   if (status === undefined) {
     return (
@@ -59,14 +60,40 @@ function ConfiguredDeleteAccount() {
   const confirmWord = t("deleteAccount.confirmWord");
   const canDelete = confirmation.trim().toUpperCase() === confirmWord && !busy;
 
+  /*
+    Step one: prove the person holding the phone is the account owner. Deletion
+    is irreversible and the confirmation word alone proves only that somebody
+    can read the screen. A session that is already fresh skips straight through.
+  */
   const run = async () => {
     if (!canDelete) return;
     setBusy(true);
     setNotice(null);
     try {
-      await start();
+      const result = await reauth.begin();
+      if (result.step === "unsupported") {
+        setNotice({ message: t("deleteAccount.reauthUnsupported"), tone: "error" });
+        return;
+      }
+      if (result.verified) await destroy();
     } catch {
       setNotice({ message: t("deleteAccount.startError"), tone: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Step two: the credential itself, then the deletion it authorises. */
+  const confirmCredential = async () => {
+    if (busy || credential.trim().length === 0) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await reauth.submit(credential.trim());
+      setCredential("");
+      await destroy();
+    } catch {
+      setNotice({ message: t("deleteAccount.reauthError"), tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -128,6 +155,67 @@ function ConfiguredDeleteAccount() {
           onPress={() => void cancel()}
         >
           <Text className="text-base font-semibold text-app-text">{t("deleteAccount.cancel")}</Text>
+        </Pressable>
+      </AppScreen>
+    );
+  }
+
+  if (reauth.step === "password" || reauth.step === "code") {
+    const isPassword = reauth.step === "password";
+    return (
+      <AppScreen>
+        <ScreenTitle
+          description={
+            isPassword
+              ? t("deleteAccount.reauthPasswordDescription")
+              : t("deleteAccount.reauthCodeDescription")
+          }
+          title={t("deleteAccount.reauthTitle")}
+        />
+
+        <Field
+          autoCapitalize="none"
+          autoComplete={isPassword ? "current-password" : "one-time-code"}
+          autoCorrect={false}
+          autoFocus
+          keyboardType={isPassword ? "default" : "number-pad"}
+          label={
+            isPassword ? t("deleteAccount.reauthPasswordLabel") : t("deleteAccount.reauthCodeLabel")
+          }
+          onChangeText={setCredential}
+          secureTextEntry={isPassword}
+          textContentType={isPassword ? "password" : "oneTimeCode"}
+          value={credential}
+        />
+
+        {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ busy, disabled: busy || credential.trim().length === 0 }}
+          className="min-h-14 flex-row items-center justify-center gap-2 rounded-2xl bg-app-error px-4 active:opacity-75 disabled:opacity-45"
+          disabled={busy || credential.trim().length === 0}
+          onPress={() => void confirmCredential()}
+        >
+          <AppIcon color={colors.white} name="delete" size={20} weight="semibold" />
+          <Text className="text-base font-semibold text-white">
+            {busy ? t("common.saving") : t("deleteAccount.reauthSubmit")}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          className="min-h-14 items-center justify-center rounded-2xl border border-app-border bg-white px-4 active:bg-app-surface"
+          disabled={busy}
+          onPress={() => {
+            setCredential("");
+            setNotice(null);
+            reauth.reset();
+          }}
+        >
+          <Text className="text-base font-semibold text-app-text">
+            {t("deleteAccount.reauthBack")}
+          </Text>
         </Pressable>
       </AppScreen>
     );

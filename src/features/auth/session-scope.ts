@@ -1,6 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Crypto from "expo-crypto";
-
 import { clearBodyCalNotifications } from "@/features/notifications/scheduler";
 import { bindOutboxToUser, clearOutbox } from "@/features/outbox/outbox";
 
@@ -12,17 +9,6 @@ import { bindOutboxToUser, clearOutbox } from "@/features/outbox/outbox";
  * not enough: a session can end through token revocation or an app switch, and the
  * next account would then inherit the previous user's queued writes and reminders.
  */
-
-const INSTALLATION_KEY = "bodycal.installation-id.v1";
-
-/** Stable per-install identifier used to deduplicate push device registrations. */
-export async function getInstallationId(): Promise<string> {
-  const existing = await AsyncStorage.getItem(INSTALLATION_KEY);
-  if (existing) return existing;
-  const created = Crypto.randomUUID();
-  await AsyncStorage.setItem(INSTALLATION_KEY, created);
-  return created;
-}
 
 /**
  * Called whenever an authenticated user id becomes known. Clears user-scoped

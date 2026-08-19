@@ -17,8 +17,6 @@ export const LIMITS = {
   locale: 35,
   timezone: 64,
   searchQuery: 80,
-  installationId: 128,
-  pushToken: 256,
   feedback: 1_000,
   maxQuantity: 100,
   maxCaloriesPerEntry: 20_000,

@@ -59,8 +59,41 @@ const revenueCatWebhook = httpAction(async (ctx, request) => {
     }
 
     const eventType = event.type.toUpperCase();
-    // Paywall analytics, dashboard tests, transfers, virtual currency, and
-    // other non-subscription events must never create a Pro mirror. A 200 tells
+
+    // Store event ordering. Falls back to receipt time when absent so a missing
+    // timestamp cannot make an event look infinitely old.
+    const eventAt =
+      typeof event.event_timestamp_ms === "number"
+        ? event.event_timestamp_ms
+        : typeof event.purchased_at_ms === "number"
+          ? event.purchased_at_ms
+          : Date.now();
+
+    /*
+      A transfer moves a subscription between App User IDs, and its payload looks
+      nothing like the others: no `app_user_id`, no `entitlement_ids`, no
+      product — only `transferred_from` and `transferred_to`. It therefore needs
+      its own route rather than a place in the set below, which is why it was
+      silently ignored before, leaving the source account entitled.
+    */
+    if (eventType === "TRANSFER") {
+      const from = Array.isArray(event.transferred_from)
+        ? event.transferred_from
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.slice(0, 128))
+        : [];
+      if (from.length === 0) return new Response("ignored", { status: 200 });
+
+      const transfer = await ctx.runMutation(internal.subscriptions.applyTransfer, {
+        eventId: event.id.slice(0, 128),
+        eventAt,
+        fromCustomerIds: from,
+      });
+      return new Response(transfer.status, { status: 200 });
+    }
+
+    // Paywall analytics, dashboard tests, virtual currency, and other
+    // non-subscription events must never create a Pro mirror. A 200 tells
     // RevenueCat they were intentionally ignored instead of causing retries.
     if (!SUBSCRIPTION_EVENT_TYPES.has(eventType)) {
       return new Response("ignored", { status: 200 });
@@ -78,15 +111,6 @@ const revenueCatWebhook = httpAction(async (ctx, request) => {
     if (!entitlementIds.includes(PRO_ENTITLEMENT_ID)) {
       return new Response("ignored", { status: 200 });
     }
-
-    // Store event ordering. Falls back to receipt time when absent so a missing
-    // timestamp cannot make an event look infinitely old.
-    const eventAt =
-      typeof event.event_timestamp_ms === "number"
-        ? event.event_timestamp_ms
-        : typeof event.purchased_at_ms === "number"
-          ? event.purchased_at_ms
-          : Date.now();
 
     const result = await ctx.runMutation(internal.subscriptions.applyWebhook, {
       eventId: event.id.slice(0, 128),

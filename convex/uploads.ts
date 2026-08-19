@@ -13,10 +13,17 @@ export const generateUploadUrl = mutation({
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx);
 
-    // Bound how many unattached uploads one account can accumulate.
+    /*
+      Bound how many *unattached* uploads one account can accumulate. The
+      `attachedAt` equality is what makes this a cap on outstanding work rather
+      than on lifetime usage: an attached blob belongs to a scan or a log and is
+      released by the retention sweep, so counting it here meant a user who had
+      logged 20 meals could never upload again — and the error told them to try
+      again shortly, which would never have helped.
+    */
     const outstanding = await ctx.db
       .query("imageUploads")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user_attached", (q) => q.eq("userId", user._id).eq("attachedAt", undefined))
       .take(UNCLAIMED_UPLOAD_CAP + 1);
     if (outstanding.length > UNCLAIMED_UPLOAD_CAP) {
       throw new ConvexError("Too many pending uploads. Please try again shortly.");

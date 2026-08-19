@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api } from "../_generated/api";
-import { createUser, FOOD_ENTRY, ONBOARDING_INPUT, setupTest} from "./setup";
+import { createUser, FOOD_ENTRY, grantPro, ONBOARDING_INPUT, setupTest } from "./setup";
 
 /**
  * Server-side validation and idempotency.
@@ -253,7 +253,10 @@ describe("idempotency", () => {
 describe("query limits", () => {
   it("clamps a client-supplied history limit", async () => {
     const t = setupTest();
-    const { asUser } = await createUser(t);
+    const { asUser, subject } = await createUser(t);
+    // Pro, so the assertion measures the limit clamp rather than the free-history
+    // clamp — the seeded dates sit outside the free window.
+    await grantPro(t, subject);
 
     for (let index = 0; index < 5; index += 1) {
       await asUser.mutation(api.weights.create, {

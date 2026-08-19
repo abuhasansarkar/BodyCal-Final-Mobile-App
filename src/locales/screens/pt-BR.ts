@@ -341,6 +341,15 @@ export const ptBR: ScreenTranslations = {
     cancel: "Manter minha conta",
     cancelled: "Exclusão cancelada. Sua conta está ativa.",
     startError: "Não foi possível iniciar a exclusão. Autentique-se novamente e tente outra vez.",
+    reauthTitle: "Confirme que é você",
+    reauthPasswordDescription: "Digite sua senha para confirmar que deseja excluir esta conta.",
+    reauthPasswordLabel: "Senha",
+    reauthCodeDescription: "Enviamos um código para seu e-mail. Digite-o para confirmar que deseja excluir esta conta.",
+    reauthCodeLabel: "Código de verificação",
+    reauthSubmit: "Confirmar e excluir",
+    reauthBack: "Cancelar",
+    reauthError: "Não confere. Tente novamente.",
+    reauthUnsupported: "Esta conta não pode ser verificada neste dispositivo. Entre novamente e tente excluir de novo.",
   },
   foodSearch: {
     title: "Adicionar alimento",
@@ -384,6 +393,11 @@ export const ptBR: ScreenTranslations = {
     ofDailyGoal: "da meta diária",
     dailyGoalShare: "{{percent}}% da sua meta diária de calorias",
     macroSummary: "{{label}}: {{grams}} gramas, {{percent}}% da energia",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "Proteínas",
+    carbs: "Carboidratos",
+    fat: "Gorduras",
   },
   foodDetail: {
     notFound: "Este alimento não está mais disponível.",
@@ -429,6 +443,9 @@ export const ptBR: ScreenTranslations = {
     lose: "Alimentos para perder peso de forma constante",
     maintain: "Alimentos para manter seu peso",
     gain: "Alimentos para ganhar peso de forma saudável",
+    loseSupport: "Refeições saciantes e ricas em nutrientes para manter você satisfeito enquanto perde peso.",
+    maintainSupport: "Refeições equilibradas e ricas em nutrientes para ajudar você a manter seu peso atual.",
+    gainSupport: "Refeições calóricas e ricas em nutrientes para ajudar você a ganhar músculo e alcançar suas metas.",
   },
   foodCategories: {
     all: "Tudo",
@@ -469,6 +486,7 @@ export const ptBR: ScreenTranslations = {
     errorUpload: "Não foi possível enviar sua foto. Verifique sua conexão e tente novamente.",
     errorUnavailable: "A análise de refeições está temporariamente indisponível. Você pode inserir a refeição manualmente.",
     errorTimeout: "A análise demorou demais.",
+    slowNotice: "Isto está demorando mais que o normal. Você pode continuar aguardando ou inserir a refeição manualmente.",
     errorTooLarge: "Essa foto é muito grande para enviar.",
     errorEntitlement: "A análise de refeições por IA faz parte do BodyCal Pro.",
     errorQuota: "Você atingiu o limite de análises de hoje. O registro manual continua funcionando.",

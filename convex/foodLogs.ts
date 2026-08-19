@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { attachOwnedUpload, loadOwned, requireCurrentUser, requireOwned } from "./lib/auth";
 import { confidenceValidator, nullableNumber, readStoredEstimate } from "./lib/estimate";
-import { requireHistoryAccess } from "./lib/entitlements";
+import { freeHistoryBoundary, requireHistoryAccess } from "./lib/entitlements";
 import {
   assertBoundedString,
   assertEntryNutrition,
@@ -82,6 +82,23 @@ function normalizeEntry(args: {
   };
 }
 
+/**
+ * The earliest day this account may read, or null when it may read everything.
+ *
+ * Gated reads clamp rather than throw, which keeps a stale client timezone from
+ * crashing a reactive screen — but it also meant a free user tapping a day past
+ * the boundary saw an empty day rather than a locked one, and the app's clearest
+ * upgrade moment passed in silence. The client reads this to tell the two apart.
+ */
+export const getHistoryBoundary = query({
+  args: {},
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx) => {
+    const user = await requireCurrentUser(ctx);
+    return await freeHistoryBoundary(ctx, user._id);
+  },
+});
+
 /** Single day, resolved entirely through the composite index. */
 export const getDay = query({
   args: { localDate: v.string() },
@@ -89,7 +106,7 @@ export const getDay = query({
   handler: async (ctx, { localDate }) => {
     assertLocalDate(localDate, "localDate");
     const user = await requireCurrentUser(ctx);
-    const fromDate = await requireHistoryAccess(ctx, user._id, localDate, localDate, 7);
+    const fromDate = await requireHistoryAccess(ctx, user._id, localDate, localDate);
     if (fromDate !== localDate) return [];
     return await ctx.db
       .query("foodLogs")
@@ -110,7 +127,7 @@ export const getDaySummary = query({
   handler: async (ctx, { localDate }) => {
     assertLocalDate(localDate, "localDate");
     const user = await requireCurrentUser(ctx);
-    const fromDate = await requireHistoryAccess(ctx, user._id, localDate, localDate, 7);
+    const fromDate = await requireHistoryAccess(ctx, user._id, localDate, localDate);
     if (fromDate !== localDate) {
       return { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0, entryCount: 0 };
     }
@@ -225,7 +242,7 @@ export const getHistory = query({
   handler: async (ctx, args) => {
     const { fromDate, toDate } = assertLocalDateRange(args.fromDate, args.toDate);
     const user = await requireCurrentUser(ctx);
-    const accessibleFromDate = await requireHistoryAccess(ctx, user._id, fromDate, toDate, 7);
+    const accessibleFromDate = await requireHistoryAccess(ctx, user._id, fromDate, toDate);
     const limit = boundedLimit(args.limit, 200, 500);
 
     return await ctx.db
@@ -331,6 +348,18 @@ export const remove = mutation({
     const user = await requireCurrentUser(ctx);
     const record = await requireOwned(ctx, id, user._id, "Food log");
 
+    const scan = record.aiScanId ? await loadOwned(ctx, record.aiScanId, user._id) : null;
+    /*
+      A scan-sourced entry stores the *same* storage id the scan holds. Deleting
+      the blob here while leaving `imageDeletedAt` unset on the scan left the scan
+      row advertising an image that no longer existed: `getScan` handed back a URL
+      for a deleted blob, and `retryScan` passed its own guard only to fail later
+      as `image_unavailable`. Whoever deletes the bytes has to say so on the scan.
+    */
+    const sharedWithScan = Boolean(
+      scan && record.imageStorageId && scan.imageStorageId === record.imageStorageId,
+    );
+
     if (record.imageStorageId) {
       await ctx.storage.delete(record.imageStorageId).catch(() => undefined);
       const upload = await ctx.db
@@ -340,15 +369,16 @@ export const remove = mutation({
       if (upload) await ctx.db.delete(upload._id);
     }
 
-    // A scan-sourced photo reverts to the 24-hour abandoned-image window.
-    if (record.aiScanId) {
-      const scan = await loadOwned(ctx, record.aiScanId, user._id);
-      if (scan && !scan.imageDeletedAt) {
-        await ctx.db.patch(scan._id, {
-          retentionUntil: Date.now() + 24 * 60 * 60 * 1_000,
-          updatedAt: Date.now(),
-        });
-      }
+    if (scan && !scan.imageDeletedAt) {
+      const now = Date.now();
+      await ctx.db.patch(
+        scan._id,
+        sharedWithScan
+          ? { imageDeletedAt: now, retentionUntil: now, updatedAt: now }
+          : // The scan kept its own separate image, so it only reverts to the
+            // 24-hour abandoned-image window.
+            { retentionUntil: now + 24 * 60 * 60 * 1_000, updatedAt: now },
+      );
     }
 
     await ctx.db.delete(id);

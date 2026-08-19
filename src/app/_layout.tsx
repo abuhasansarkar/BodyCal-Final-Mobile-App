@@ -16,13 +16,13 @@ SplashScreen.setOptions({
 });
 
 function RootLayout() {
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      void SplashScreen.hideAsync().catch(() => {});
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
-
+  /*
+    The splash used to hide on a fixed 50 ms timer, well before Clerk, Convex and
+    the translation bundle were ready — so the branded splash was replaced by the
+    localization gate's blank fill, and every cold start flashed white. It now
+    hides from `AppProviders` once translations have resolved, which is the first
+    moment there is real content to show.
+  */
   return (
     <FatalErrorBoundary>
       <AppProviders>

@@ -343,6 +343,15 @@ export const fr: ScreenTranslations = {
     cancel: "Conserver mon compte",
     cancelled: "Suppression annulée. Votre compte est actif.",
     startError: "La suppression n'a pas pu démarrer. Authentifiez-vous à nouveau et réessayez.",
+    reauthTitle: "Confirmez votre identité",
+    reauthPasswordDescription: "Saisissez votre mot de passe pour confirmer la suppression de ce compte.",
+    reauthPasswordLabel: "Mot de passe",
+    reauthCodeDescription: "Nous avons envoyé un code à votre adresse e-mail. Saisissez-le pour confirmer la suppression de ce compte.",
+    reauthCodeLabel: "Code de vérification",
+    reauthSubmit: "Confirmer et supprimer",
+    reauthBack: "Annuler",
+    reauthError: "Cela ne correspond pas. Réessayez.",
+    reauthUnsupported: "Ce compte ne peut pas être vérifié sur cet appareil. Reconnectez-vous, puis réessayez la suppression.",
   },
   foodSearch: {
     title: "Ajouter un aliment",
@@ -386,6 +395,11 @@ export const fr: ScreenTranslations = {
     ofDailyGoal: "de l’objectif du jour",
     dailyGoalShare: "{{percent}} % de votre objectif calorique quotidien",
     macroSummary: "{{label}} : {{grams}} grammes, {{percent}} % de l’énergie",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "Protéines",
+    carbs: "Glucides",
+    fat: "Lipides",
   },
   foodDetail: {
     notFound: "Cet aliment n'est plus disponible.",
@@ -431,6 +445,9 @@ export const fr: ScreenTranslations = {
     lose: "Aliments pour une perte de poids régulière",
     maintain: "Aliments pour maintenir votre poids",
     gain: "Aliments pour une prise de poids saine",
+    loseSupport: "Des repas rassasiants et riches en nutriments pour rester satisfait pendant votre perte de poids.",
+    maintainSupport: "Des repas équilibrés et riches en nutriments pour maintenir votre poids actuel.",
+    gainSupport: "Des repas riches en calories et en nutriments pour développer vos muscles et atteindre vos objectifs.",
   },
   foodCategories: {
     all: "Tout",
@@ -471,6 +488,7 @@ export const fr: ScreenTranslations = {
     errorUpload: "Votre photo n’a pas pu être envoyée. Vérifiez votre connexion et réessayez.",
     errorUnavailable: "L’analyse des repas est temporairement indisponible. Vous pouvez saisir le repas manuellement.",
     errorTimeout: "L'analyse a pris trop de temps.",
+    slowNotice: "Cela prend plus de temps que d'habitude. Vous pouvez patienter ou saisir le repas manuellement.",
     errorTooLarge: "Cette photo est trop volumineuse pour être envoyée.",
     errorEntitlement: "L'analyse de repas par IA fait partie de BodyCal Pro.",
     errorQuota: "Vous avez atteint la limite d'analyses du jour. Le suivi manuel fonctionne toujours.",

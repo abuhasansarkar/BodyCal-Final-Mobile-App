@@ -2,10 +2,26 @@ import type { CustomerInfo } from "react-native-purchases";
 
 import type { SubscriptionState } from "@/types/domain";
 
+/**
+ * The single entitlement that grants BodyCal Pro.
+ *
+ * Matched case-insensitively, and never fallen back from. Both lookups below
+ * used to end in `?? entries[0]`, so whichever entitlement RevenueCat listed
+ * first decided access — a promo tier, a lifetime SKU or an entitlement added
+ * for a store test would each have unlocked the app. `convex/http.ts` and
+ * `convex/subscriptionsActions.ts` apply the same rule server-side.
+ */
+const PRO_ENTITLEMENT_ID = "pro";
+
+function findPro<T>(entries: Record<string, T> | undefined) {
+  const match = Object.entries(entries ?? {}).find(
+    ([key]) => key.toLowerCase() === PRO_ENTITLEMENT_ID,
+  );
+  return match ? match[1] : undefined;
+}
+
 export function deriveSubscriptionState(customerInfo: CustomerInfo, now = Date.now()): SubscriptionState {
-  const activeEntries = Object.entries(customerInfo.entitlements.active ?? {});
-  const proEntry = activeEntries.find(([key]) => key.toLowerCase() === "pro") ?? activeEntries[0];
-  const activeEntitlement = proEntry ? proEntry[1] : undefined;
+  const activeEntitlement = findPro(customerInfo.entitlements.active);
 
   if (activeEntitlement?.isActive) {
     // Hard expiry guard: even if marked active in a stale cache, an elapsed expiration date expires access.
@@ -21,11 +37,10 @@ export function deriveSubscriptionState(customerInfo: CustomerInfo, now = Date.n
     return "active";
   }
 
-  // Check if a previously active entitlement has expired
-  const allEntries = Object.entries(customerInfo.entitlements.all ?? {});
-  const allProEntry = allEntries.find(([key]) => key.toLowerCase() === "pro") ?? allEntries[0];
-  const allPro = allProEntry ? allProEntry[1] : undefined;
-  if (allPro && !allPro.isActive) {
+  // A previously held Pro entitlement reads as expired rather than never-subscribed,
+  // which is what lets the paywall offer a resubscribe instead of a first purchase.
+  const historicalPro = findPro(customerInfo.entitlements.all);
+  if (historicalPro && !historicalPro.isActive) {
     return "expired";
   }
 

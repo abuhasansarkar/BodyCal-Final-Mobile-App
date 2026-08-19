@@ -2,11 +2,20 @@ import { v } from "convex/values";
 
 import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
+import { MAX_SCAN_ATTEMPTS } from "./aiDb";
 
 /** Rows handled per transaction. The job reschedules itself while work remains. */
 const BATCH = 100;
 /** Upload claims with nothing attached to them are swept after this long. */
 const UNATTACHED_UPLOAD_TTL_MS = 24 * 60 * 60 * 1_000;
+/**
+ * How long a scan may sit in `processing` before it is treated as abandoned.
+ *
+ * One attempt is an image read plus a provider call capped at 60 seconds, so
+ * anything past five minutes is not slow — it is a run that will never report
+ * back. Retries schedule fresh actions rather than extending this window.
+ */
+const SCAN_STALL_MS = 5 * 60 * 1_000;
 
 /**
  * Deletes AI scan images whose retention window has closed.
@@ -80,6 +89,55 @@ export const sweepUnattachedUploads = internalMutation({
       await ctx.scheduler.runAfter(0, internal.maintenance.sweepUnattachedUploads, {});
     }
     return { deleted: stale.length, rescheduled };
+  },
+});
+
+/**
+ * Recovers scans abandoned mid-analysis.
+ *
+ * `claimForAnalysis` moves a scan to `processing`, and only the action's own
+ * catch block moves it out again. When that action dies outright the row is
+ * stranded: no schedule points at it, no retry is queued, and the scan screen
+ * subscribes to a status that will never change. This is the only thing that
+ * can free it.
+ *
+ * A scan with attempts left is re-queued rather than failed — the user already
+ * spent quota on it, and the fault was ours, not the photo's.
+ */
+export const reapStalledScans = internalMutation({
+  args: {},
+  returns: v.object({ requeued: v.number(), failed: v.number() }),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const stalled = await ctx.db
+      .query("aiScans")
+      .withIndex("by_status_updated", (q) =>
+        q.eq("status", "processing").lt("updatedAt", now - SCAN_STALL_MS),
+      )
+      .take(BATCH);
+
+    let requeued = 0;
+    let failed = 0;
+    for (const scan of stalled) {
+      const canRetry = (scan.attempts ?? 0) < MAX_SCAN_ATTEMPTS && !scan.imageDeletedAt;
+      if (canRetry) {
+        await ctx.db.patch(scan._id, { status: "pending", updatedAt: now });
+        await ctx.scheduler.runAfter(0, internal.ai.runScanAnalysis, { scanId: scan._id });
+        requeued += 1;
+      } else {
+        await ctx.db.patch(scan._id, {
+          status: "failed",
+          failureCategory: "stalled",
+          updatedAt: now,
+        });
+        failed += 1;
+      }
+    }
+
+    if (requeued + failed > 0) {
+      console.warn("[food-analysis] reaped stalled scans", { requeued, failed });
+    }
+    return { requeued, failed };
   },
 });
 

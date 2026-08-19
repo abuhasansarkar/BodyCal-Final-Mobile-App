@@ -4,29 +4,45 @@ import { useTranslation } from "react-i18next";
 
 import { ProgressRing } from "@/components/progress-ring";
 import { calendarStatusColors, colors } from "@/config/theme";
-import { atLocalNoon, dateInWeekForWeekday, formatWeekRange, getDashboardWeeks } from "@/features/dashboard/week-range";
+import { clampSelectableLocalDate, dateInWeekForWeekday, formatWeekRange, getDashboardWeeks, isSelectableLocalDate, localDateToDate } from "@/features/dashboard/week-range";
 import { currentLocalDate } from "@/lib/local-day";
 import { Pressable, ScrollView, Text, View } from "@/tw";
 
 const CURRENT_WEEK_PAGE = 2;
 
 export function DashboardWeekCarousel({
+  earliestLocalDate,
   locale,
   onSelectDate,
   progressByDate,
   selectedDate,
+  todayLocalDate,
 }: {
+  /**
+   * The first day this account can have logged anything — its own sign-up day.
+   *
+   * The strip always renders three weeks, so it reaches back up to twenty days
+   * before an account that was created yesterday. Those days were tappable and
+   * opened an empty diary for a date the user did not have BodyCal on, which
+   * reads as lost data rather than as a day that never existed.
+   */
+  earliestLocalDate?: string;
   locale?: string;
   onSelectDate: (date: Date) => void;
   /** Share of that day's calorie goal that was logged, 0-100, keyed by local `YYYY-MM-DD`. */
   progressByDate?: ReadonlyMap<string, number>;
   selectedDate: Date;
+  /**
+   * Today, as the screen understands it. Passed in rather than read here so the
+   * strip and the range the dashboard queries cannot disagree — and so an app
+   * left open across midnight rebuilds the weeks instead of keeping yesterday's.
+   */
+  todayLocalDate: string;
 }) {
   const { t } = useTranslation();
   const scrollRef = React.useRef<ScrollViewType>(null);
   const [pageWidth, setPageWidth] = React.useState(0);
-  const weeks = React.useMemo(() => getDashboardWeeks(new Date()), []);
-  const todayLocalDate = currentLocalDate();
+  const weeks = React.useMemo(() => getDashboardWeeks(localDateToDate(todayLocalDate)), [todayLocalDate]);
   const selectedLocalDate = selectedDate.toDateString();
   const selectedPage = Math.max(0, weeks.findIndex((week) => week.some((day) => day.toDateString() === selectedLocalDate)));
 
@@ -46,7 +62,9 @@ export function DashboardWeekCarousel({
       has not happened yet. Days ahead of today are not selectable, so settle on
       today instead of a date the user could not have tapped.
     */
-    const nextDate = currentLocalDate(candidate) > todayLocalDate ? atLocalNoon(new Date()) : candidate;
+    const candidateLocalDate = currentLocalDate(candidate);
+    const clamped = clampSelectableLocalDate(candidateLocalDate, { earliestLocalDate, todayLocalDate });
+    const nextDate = clamped === candidateLocalDate ? candidate : localDateToDate(clamped);
     if (nextDate.toDateString() !== selectedLocalDate) onSelectDate(nextDate);
   };
 
@@ -83,25 +101,33 @@ export function DashboardWeekCarousel({
               const dayLocalDate = currentLocalDate(day);
               const selected = day.toDateString() === selectedLocalDate;
               const upcoming = dayLocalDate > todayLocalDate;
-              const progress = upcoming ? 0 : progressByDate?.get(dayLocalDate) ?? 0;
+              const unavailable = !isSelectableLocalDate(dayLocalDate, { earliestLocalDate, todayLocalDate });
+              const beforeSignup = unavailable && !upcoming;
+              const progress = unavailable ? 0 : progressByDate?.get(dayLocalDate) ?? 0;
               const goalMet = progress >= 100;
               const fullDate = new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(day);
               return (
                 <Pressable
                   key={day.toISOString()}
-                  accessibilityHint={upcoming ? t("dashboard.dayUpcoming") : undefined}
+                  accessibilityHint={
+                    upcoming
+                      ? t("dashboard.dayUpcoming")
+                      : beforeSignup
+                        ? t("dashboard.dayBeforeSignup")
+                        : undefined
+                  }
                   accessibilityLabel={
                     progress > 0
                       ? `${fullDate}, ${t("dashboard.dayCalorieProgress", { percent: Math.round(progress) })}`
                       : fullDate
                   }
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: upcoming, selected }}
+                  accessibilityState={{ disabled: unavailable, selected }}
                   className="min-h-16 min-w-11 items-center gap-2"
-                  disabled={upcoming}
+                  disabled={unavailable}
                   onPress={() => onSelectDate(day)}
                 >
-                  <Text className={selected ? "text-xs font-bold text-app-text" : upcoming ? "text-xs font-medium text-app-subtle" : "text-xs font-medium text-app-muted"} selectable>{new Intl.DateTimeFormat(locale, { weekday: "short" }).format(day)}</Text>
+                  <Text className={selected ? "text-xs font-bold text-app-text" : unavailable ? "text-xs font-medium text-app-subtle" : "text-xs font-medium text-app-muted"} selectable>{new Intl.DateTimeFormat(locale, { weekday: "short" }).format(day)}</Text>
                   {/*
                     The ring reports how much of that day's calorie goal was
                     logged: amber while short of it, green once reached. Days
@@ -117,7 +143,7 @@ export function DashboardWeekCarousel({
                     value={progress}
                   >
                     <View className={selected ? "h-9.5 w-9.5 items-center justify-center rounded-full bg-[#111111]" : progress > 0 ? "h-9.5 w-9.5 items-center justify-center rounded-full bg-white" : "h-9.5 w-9.5 items-center justify-center rounded-full border border-dashed border-app-border bg-white"}>
-                      <Text className={selected ? "text-base font-bold text-white" : upcoming ? "text-base font-semibold text-app-subtle" : "text-base font-semibold text-app-text"} selectable style={{ fontVariant: ["tabular-nums"] }}>{day.getDate()}</Text>
+                      <Text className={selected ? "text-base font-bold text-white" : unavailable ? "text-base font-semibold text-app-subtle" : "text-base font-semibold text-app-text"} selectable style={{ fontVariant: ["tabular-nums"] }}>{day.getDate()}</Text>
                     </View>
                   </ProgressRing>
                 </Pressable>

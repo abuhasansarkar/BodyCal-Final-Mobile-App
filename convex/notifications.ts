@@ -2,7 +2,7 @@ import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
 import { requireCurrentUser } from "./lib/auth";
-import { assertBoundedString, assertClockTime, assertLocale, assertTimezone, LIMITS } from "./lib/validation";
+import { assertClockTime, assertTimezone } from "./lib/validation";
 
 /**
  * Reminder categories are a closed set. The previous `v.record` accepted any keys
@@ -111,78 +111,6 @@ export const updatePreferences = mutation({
       .unique();
     if (existing) await ctx.db.replace(existing._id, value);
     else await ctx.db.insert("notificationPreferences", value);
-    return null;
-  },
-});
-
-/**
- * Registers or refreshes this installation's push token.
- *
- * Deduplicates on BOTH the installation and the token: a token that moves to a
- * different account is detached from the old one, so two users on a shared device
- * can never both hold the same token.
- */
-export const registerDevice = mutation({
-  args: {
-    installationId: v.string(),
-    expoPushToken: v.string(),
-    platform: v.union(v.literal("ios"), v.literal("android")),
-    locale: v.string(),
-    timezone: v.string(),
-  },
-  returns: v.id("pushDevices"),
-  handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
-
-    const installationId = assertBoundedString(
-      args.installationId,
-      LIMITS.installationId,
-      "installationId",
-    );
-    const expoPushToken = assertBoundedString(args.expoPushToken, LIMITS.pushToken, "expoPushToken");
-    const value = {
-      userId: user._id,
-      installationId,
-      expoPushToken,
-      platform: args.platform,
-      locale: assertLocale(args.locale),
-      timezone: assertTimezone(args.timezone),
-      lastSeenAt: Date.now(),
-      invalidatedAt: undefined,
-    };
-
-    // Retire any other row holding this token.
-    const sameToken = await ctx.db
-      .query("pushDevices")
-      .withIndex("by_token", (q) => q.eq("expoPushToken", expoPushToken))
-      .collect();
-    for (const row of sameToken) {
-      if (row.installationId !== installationId) await ctx.db.delete(row._id);
-    }
-
-    const existing = await ctx.db
-      .query("pushDevices")
-      .withIndex("by_installation", (q) => q.eq("installationId", installationId))
-      .unique();
-    if (existing) {
-      await ctx.db.replace(existing._id, value);
-      return existing._id;
-    }
-    return await ctx.db.insert("pushDevices", value);
-  },
-});
-
-/** Called on sign-out so a signed-out device stops receiving reminders. */
-export const unregisterDevice = mutation({
-  args: { installationId: v.string() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
-    const existing = await ctx.db
-      .query("pushDevices")
-      .withIndex("by_installation", (q) => q.eq("installationId", args.installationId))
-      .unique();
-    if (existing && existing.userId === user._id) await ctx.db.delete(existing._id);
     return null;
   },
 });

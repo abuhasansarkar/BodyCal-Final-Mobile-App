@@ -213,7 +213,15 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_request", ["userId", "requestId"])
     .index("by_user_created", ["userId", "createdAt"])
-    .index("by_retention", ["retentionUntil"]),
+    .index("by_retention", ["retentionUntil"])
+    /**
+     * Backs the stalled-scan watchdog. A scheduled analysis that dies outright —
+     * a deploy mid-run, an OOM, the action time limit — never reaches its own
+     * error handler, so nothing moves the row out of `processing` and the user
+     * watches a spinner that will never resolve. This lets the sweep find those
+     * rows by status and age instead of scanning the table.
+     */
+    .index("by_status_updated", ["status", "updatedAt"]),
 
   /**
    * Ownership record for every client upload. Written when the client claims the
@@ -230,7 +238,14 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_storage", ["storageId"])
-    .index("by_unattached", ["attachedAt", "createdAt"]),
+    .index("by_unattached", ["attachedAt", "createdAt"])
+    /**
+     * Outstanding claims for one account. `generateUploadUrl` bounds how many
+     * blobs a user may hold unattached; without `attachedAt` in the index it was
+     * counting every upload the account had ever made, which permanently locked
+     * out anyone past 20 logged meals.
+     */
+    .index("by_user_attached", ["userId", "attachedAt"]),
 
   customFoods: defineTable({
     userId: v.id("users"),
@@ -281,19 +296,12 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
-  pushDevices: defineTable({
-    userId: v.id("users"),
-    installationId: v.string(),
-    expoPushToken: v.string(),
-    platform: v.union(v.literal("ios"), v.literal("android")),
-    locale: v.string(),
-    timezone: v.string(),
-    lastSeenAt: v.number(),
-    invalidatedAt: v.optional(v.number()),
-  })
-    .index("by_user", ["userId"])
-    .index("by_token", ["expoPushToken"])
-    .index("by_installation", ["installationId"]),
+  /*
+    There is deliberately no `pushDevices` table. V1 reminders are local
+    `expo-notifications` schedules; nothing server-side sends a push, so storing
+    Expo push tokens would collect a device identifier the product has no use
+    for. Reintroduce it alongside an actual send path, not before it.
+  */
 
   userSettings: defineTable({
     userId: v.id("users"),

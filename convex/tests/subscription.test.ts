@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api, internal } from "../_generated/api";
-import { createUser, setupTest} from "./setup";
+import { claimUpload, createUser, setupTest } from "./setup";
 
 const HOUR = 60 * 60 * 1_000;
 
@@ -220,5 +220,92 @@ describe("AI scan gating", () => {
     const quota = await asUser.query(api.aiDb.getScanQuota, {});
     expect(quota.dailyUsed).toBe(0);
     expect(quota.dailyLimit).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A transfer moves a subscription to a different App User ID. Its payload names
+ * only `transferred_from` and `transferred_to` — no `app_user_id`, no
+ * entitlement, no product — so it travels through `applyTransfer` rather than
+ * `applyWebhook`, and it has to leave the source account unentitled.
+ */
+describe("subscription transfers", () => {
+  it("expires the account a subscription was transferred away from", async () => {
+    const t = setupTest();
+    const { asUser } = await createUser(t, "user_sub");
+    await t.mutation(internal.subscriptions.applyWebhook, event({ eventAt: 1_000, willRenew: true }));
+    expect((await asUser.query(api.subscriptions.getMirror, {}))?.state).toBe("active");
+
+    const result = await t.mutation(internal.subscriptions.applyTransfer, {
+      eventId: "evt-transfer",
+      eventAt: 2_000,
+      fromCustomerIds: ["user_sub"],
+    });
+
+    expect(result).toEqual({ status: "transferred", expired: 1 });
+    const mirror = await asUser.query(api.subscriptions.getMirror, {});
+    expect(mirror?.state).toBe("expired");
+    // Nothing about the product it used to hold is still true of this account.
+    expect(mirror?.expirationAt).toBeUndefined();
+    expect(mirror?.willRenew).toBe(false);
+  });
+
+  it("locks the transferred-away account out of a scan", async () => {
+    const t = setupTest();
+    const { asUser } = await createUser(t, "user_sub");
+    await t.mutation(internal.subscriptions.applyWebhook, event({ eventAt: 1_000 }));
+    await t.mutation(internal.subscriptions.applyTransfer, {
+      eventId: "evt-transfer",
+      eventAt: 2_000,
+      fromCustomerIds: ["user_sub"],
+    });
+
+    const storageId = await claimUpload(t, asUser, "mealScan");
+    await expect(
+      asUser.mutation(internal.aiDb.begin, {
+        storageId,
+        requestId: "after-transfer",
+        locale: "en",
+        provider: "openai",
+        model: "test-model",
+      }),
+    ).rejects.toThrow(/entitlement/i);
+  });
+
+  it("ignores a transfer that is older than the state already applied", async () => {
+    const t = setupTest();
+    const { asUser } = await createUser(t, "user_sub");
+    await t.mutation(internal.subscriptions.applyWebhook, event({ eventAt: 5_000 }));
+
+    const result = await t.mutation(internal.subscriptions.applyTransfer, {
+      eventId: "evt-late-transfer",
+      eventAt: 1_000,
+      fromCustomerIds: ["user_sub"],
+    });
+
+    expect(result.expired).toBe(0);
+    expect((await asUser.query(api.subscriptions.getMirror, {}))?.state).toBe("active");
+  });
+
+  it("applies a transfer exactly once", async () => {
+    const t = setupTest();
+    await createUser(t, "user_sub");
+    await t.mutation(internal.subscriptions.applyWebhook, event({ eventAt: 1_000 }));
+
+    const args = { eventId: "evt-transfer", eventAt: 2_000, fromCustomerIds: ["user_sub"] };
+    await t.mutation(internal.subscriptions.applyTransfer, args);
+    const replay = await t.mutation(internal.subscriptions.applyTransfer, args);
+
+    expect(replay).toEqual({ status: "duplicate", expired: 0 });
+  });
+
+  it("accepts a transfer naming an account this deployment has never seen", async () => {
+    const t = setupTest();
+    const result = await t.mutation(internal.subscriptions.applyTransfer, {
+      eventId: "evt-unknown",
+      eventAt: 1_000,
+      fromCustomerIds: ["nobody_here"],
+    });
+    expect(result).toEqual({ status: "transferred", expired: 0 });
   });
 });

@@ -26,7 +26,15 @@ const appSymbols = {
   fastPace: { ios: "hare.fill", android: "bolt", web: "bolt" },
   fat: { ios: "drop.fill", android: "water_drop", web: "water_drop" },
   feedback: { ios: "bubble.left.and.text.bubble.right.fill", android: "feedback", web: "feedback" },
-  female: { ios: "person.fill", android: "female", web: "female" },
+  /*
+    The calculation-basis pair. Both used to be `person.fill` on iOS, so the two
+    options on that screen rendered the identical glyph and the icon told the
+    user nothing — Android was fine, because Material's `male`/`female` are the
+    distinct Mars and Venus marks. SF Symbols has no Mars/Venus, so iOS uses the
+    standing-figure pair instead; both are SF Symbols 4 (iOS 16), inside the
+    project's deployment target.
+  */
+  female: { ios: "figure.stand.dress", android: "female", web: "female" },
   foods: { ios: "fork.knife", android: "restaurant", web: "restaurant" },
   goal: { ios: "target", android: "track_changes", web: "track_changes" },
   goalGain: { ios: "arrow.up.right", android: "trending_up", web: "trending_up" },
@@ -68,7 +76,7 @@ const appSymbols = {
   lightActivity: { ios: "figure.walk", android: "directions_walk", web: "directions_walk" },
   logout: { ios: "rectangle.portrait.and.arrow.right", android: "logout", web: "logout" },
   macros: { ios: "chart.pie.fill", android: "pie_chart", web: "pie_chart" },
-  male: { ios: "person.fill", android: "male", web: "male" },
+  male: { ios: "figure.stand", android: "male", web: "male" },
   motivation: { ios: "sparkles", android: "auto_awesome", web: "auto_awesome" },
   notification: { ios: "bell.fill", android: "notifications", web: "notifications" },
   nutrition: { ios: "chart.bar.fill", android: "nutrition", web: "nutrition" },

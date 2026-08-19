@@ -1,11 +1,15 @@
 import { describe, expect, it } from "@jest/globals";
 import { api } from "../_generated/api";
-import { createUser, ONBOARDING_INPUT, setupTest } from "./setup";
+import { createUser, grantPro, ONBOARDING_INPUT, setupTest } from "./setup";
 
 describe("progress and dashboard analytics", () => {
   it("handles empty and sparse weight progress records gracefully", async () => {
     const t = setupTest();
-    const { asUser } = await createUser(t, "user_progress_1", "progress1@example.com");
+    const { asUser, subject } = await createUser(t, "user_progress_1", "progress1@example.com");
+    // Pro, so the free-history window does not clamp the seeded dates. Gating has
+    // its own coverage in historyEntitlement.test.ts; this test is about
+    // aggregating sparse records.
+    await grantPro(t, subject);
 
     // 1. Initial state with onboarding complete but no weight logs
     await asUser.mutation(api.onboarding.complete, ONBOARDING_INPUT);
@@ -138,7 +142,9 @@ describe("progress and dashboard analytics", () => {
 
   it("aggregates daily calorie series across multiple entries per day", async () => {
     const t = setupTest();
-    const { asUser } = await createUser(t, "user_series_1", "series1@example.com");
+    const { asUser, subject } = await createUser(t, "user_series_1", "series1@example.com");
+    // Pro: the series under test spans more than the free window.
+    await grantPro(t, subject);
 
     // Two entries on 2026-08-10
     await asUser.mutation(api.foodLogs.create, {

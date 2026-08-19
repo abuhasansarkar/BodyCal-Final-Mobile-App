@@ -1,9 +1,17 @@
 import { ConvexError, v } from "convex/values";
 
 import { internal } from "./_generated/api";
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type QueryCtx,
+} from "./_generated/server";
 import { providerModel, readProviderConfig } from "./lib/aiProvider";
 import { attachOwnedUpload, loadOwned, requireCurrentUser } from "./lib/auth";
+import { localDateInTimezone } from "./lib/entitlements";
 import { readStoredEstimate, storedEstimateValidator } from "./lib/estimate";
 import { consumeRateLimit } from "./lib/rateLimit";
 import { assertLocale } from "./lib/validation";
@@ -12,6 +20,56 @@ const ABANDONED_IMAGE_RETENTION_MS = 24 * 60 * 60 * 1_000;
 const DAILY_SCAN_LIMIT = 10;
 const MONTHLY_SCAN_LIMIT = 150;
 const ENTITLED_STATES = new Set(["trial", "active", "cancelledActive", "billingIssueActive"]);
+
+/**
+ * Counts the scans that have consumed quota, on the user's own calendar day and
+ * in the current month.
+ *
+ * The daily figure used to be a rolling 24-hour window while the UI called it a
+ * daily allowance, so ten scans at dinner left the user still blocked at dinner
+ * the next evening — which reads as a broken counter, not a limit. The profile
+ * timezone is already stored for exactly this kind of question.
+ */
+async function readScanUsage(ctx: QueryCtx, userId: Id<"users">) {
+  const profile = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+
+  let today: string;
+  try {
+    today = localDateInTimezone(profile?.timezone ?? "UTC");
+  } catch {
+    today = localDateInTimezone("UTC");
+  }
+  const startOfLocalDay = Date.parse(`${today}T00:00:00Z`) - 26 * 60 * 60 * 1_000;
+
+  const now = Date.now();
+  const startOfMonth = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
+
+  const scans = await ctx.db
+    .query("aiScans")
+    .withIndex("by_user_created", (q) =>
+      q.eq("userId", userId).gte("createdAt", Math.min(startOfMonth, startOfLocalDay)),
+    )
+    .collect();
+
+  // A failed scan produced nothing, so it never counts against an allowance.
+  const billable = scans.filter((scan) => scan.status !== "failed");
+  const timezone = profile?.timezone ?? "UTC";
+  const onLocalDay = (createdAt: number) => {
+    try {
+      return localDateInTimezone(timezone, createdAt) === today;
+    } catch {
+      return localDateInTimezone("UTC", createdAt) === today;
+    }
+  };
+
+  return {
+    dailyUsed: billable.filter((scan) => onLocalDay(scan.createdAt)).length,
+    monthlyUsed: billable.filter((scan) => scan.createdAt >= startOfMonth).length,
+  };
+}
 
 /**
  * Provider attempts allowed per scan, retries included.
@@ -36,20 +94,11 @@ export const getScanQuota = query({
   }),
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx);
-    const now = Date.now();
-    const startOfMonth = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
-    const since = Math.min(startOfMonth, now - ABANDONED_IMAGE_RETENTION_MS);
-
-    const scans = await ctx.db
-      .query("aiScans")
-      .withIndex("by_user_created", (q) => q.eq("userId", user._id).gte("createdAt", since))
-      .collect();
-
-    const billable = scans.filter((scan) => scan.status !== "failed");
+    const usage = await readScanUsage(ctx, user._id);
     return {
-      dailyUsed: billable.filter((scan) => scan.createdAt >= now - ABANDONED_IMAGE_RETENTION_MS).length,
+      dailyUsed: usage.dailyUsed,
       dailyLimit: DAILY_SCAN_LIMIT,
-      monthlyUsed: billable.filter((scan) => scan.createdAt >= startOfMonth).length,
+      monthlyUsed: usage.monthlyUsed,
       monthlyLimit: MONTHLY_SCAN_LIMIT,
     };
   },
@@ -142,22 +191,12 @@ export const begin = internalMutation({
 
     await consumeRateLimit(ctx, "aiScan", user._id);
 
-    const now = Date.now();
-    const startOfMonth = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
-    const scans = await ctx.db
-      .query("aiScans")
-      .withIndex("by_user_created", (q) =>
-        q.eq("userId", user._id).gte("createdAt", Math.min(startOfMonth, now - ABANDONED_IMAGE_RETENTION_MS)),
-      )
-      .collect();
-    const billable = scans.filter((scan) => scan.status !== "failed");
-    const dailyCount = billable.filter(
-      (scan) => scan.createdAt >= now - ABANDONED_IMAGE_RETENTION_MS,
-    ).length;
-    const monthlyCount = billable.filter((scan) => scan.createdAt >= startOfMonth).length;
-    if (dailyCount >= DAILY_SCAN_LIMIT || monthlyCount >= MONTHLY_SCAN_LIMIT) {
+    const usage = await readScanUsage(ctx, user._id);
+    if (usage.dailyUsed >= DAILY_SCAN_LIMIT || usage.monthlyUsed >= MONTHLY_SCAN_LIMIT) {
       throw new ConvexError("AI scan fair-use limit reached");
     }
+
+    const now = Date.now();
 
     const scanId = await ctx.db.insert("aiScans", {
       userId: user._id,
@@ -379,20 +418,41 @@ export const retryScan = mutation({
 /**
  * Records a user correction on a completed scan so their adjustments can be
  * preserved alongside the original estimate for model review.
+ *
+ * The argument is the *stored* estimate shape rather than `v.any()`. It used to
+ * be the latter, which made this the one public write in the backend that
+ * accepted arbitrary client JSON: no shape, no length bounds, no size limit
+ * beyond Convex's own document ceiling. That was not only unbounded storage —
+ * `getScan` and `foodLogs.getScanDetail` both resolve
+ * `correctedEstimate ?? estimate`, so a correction that did not narrow made a
+ * completed scan render as "no estimate" on both screens.
+ *
+ * Validation happens twice on purpose. The validator proves the shape, and
+ * `readStoredEstimate` then applies the same trimming and caps every read path
+ * uses — 120 characters of meal name, 25 components, 10 warnings, no negative or
+ * non-finite measures — so what is stored is what a reader would have produced
+ * anyway. A correction that carries no usable nutrition is refused rather than
+ * written, because storing it would hide the original estimate behind it.
  */
 export const recordCorrection = mutation({
   args: {
     scanId: v.id("aiScans"),
-    correctedEstimate: v.any(),
+    correctedEstimate: storedEstimateValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
     const scan = await loadOwned(ctx, args.scanId, user._id);
     if (!scan) throw new ConvexError("Scan not found");
+    // Only a finished estimate can be corrected. A pending or processing scan is
+    // still on its way, and `complete` would overwrite the correction anyway.
+    if (scan.status !== "completed") throw new ConvexError("Scan is not complete");
+
+    const normalized = readStoredEstimate(args.correctedEstimate, args.correctedEstimate.confidence);
+    if (!normalized) throw new ConvexError("Correction has no usable nutrition");
 
     await ctx.db.patch(args.scanId, {
-      correctedEstimate: args.correctedEstimate,
+      correctedEstimate: normalized,
       updatedAt: Date.now(),
     });
     return null;

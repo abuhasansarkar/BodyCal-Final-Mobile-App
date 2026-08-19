@@ -11,28 +11,12 @@ import { hasBackendConfiguration } from "@/config/env";
 import { colors, macroColors, shadows } from "@/config/theme";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId, currentLocalDate, currentTimezone } from "@/lib/local-day";
-import { i18n } from "@/locales/i18n";
 import { Image, Pressable, ScrollView, Text, TextInput, View } from "@/tw";
 import type { GoalType, MealType } from "@/types/domain";
 
 const brandLogo = require("@/../assets/images/BodyCal-Black-Logo.png");
 
 type CategoryFilter = "all" | MealType;
-type ViewTab = "all" | "scanned" | "discover";
-
-/** Catalog item as projected by `foods.searchCatalog`. */
-type CatalogItem = {
-  _id: string;
-  title: string;
-  description: string;
-  serving: string;
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
-  fatGrams: number;
-  imageUrl: string | null;
-  mealTypes?: MealType[];
-};
 
 type UserScannedFood = {
   _id: string;
@@ -68,11 +52,9 @@ export function FoodsScreen() {
 
 function ConfiguredFoodsScreen() {
   const { t } = useTranslation();
-  const locale = i18n.resolvedLanguage ?? "en";
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const [category, setCategory] = React.useState<CategoryFilter>("all");
-  const [viewTab, setViewTab] = React.useState<ViewTab>("all");
   const [reloggingId, setReloggingId] = React.useState<string | null>(null);
 
   const profile = useQuery(api.profiles.getCurrent, {});
@@ -82,20 +64,9 @@ function ConfiguredFoodsScreen() {
   const goal: GoalType = profile?.goalType ?? "maintain";
 
   const searching = searchQuery.trim().length > 0;
-  const results = useQuery(
-    api.foods.searchCatalog,
-    searching
-      ? { query: searchQuery, locale, mealType: category === "all" ? undefined : category }
-      : "skip",
-  );
-  const recommended = useQuery(
-    api.foods.getRecommendations,
-    searching || profile === undefined ? "skip" : { goalType: goal, locale },
-  );
 
-  const catalogFoods = searching ? results : recommended;
-
-  // Filter user's scanned & logged foods
+  // Filter the user's own scanned & logged foods. This is the screen's only list:
+  // the goal-suggestion catalog section was removed on request.
   const visibleUserFoods = React.useMemo(() => {
     if (!userScannedFoods) return undefined;
     let list = userScannedFoods;
@@ -109,21 +80,21 @@ function ConfiguredFoodsScreen() {
     return list;
   }, [userScannedFoods, category, searching, searchQuery]);
 
-  // Filter catalog foods
-  const visibleCatalogFoods = React.useMemo(() => {
-    if (!catalogFoods) return undefined;
-    if (category === "all" || searching) return catalogFoods;
-    return catalogFoods.filter((food) => food.mealTypes?.includes(category));
-  }, [category, catalogFoods, searching]);
-
   const headline = t(`foodHeadline.${goal}`);
 
+  /**
+   * One distinct icon per chip. `all` and `lunch` both used `foods`, and `snack`
+   * used the hydration water-drop, so three of the five chips read as the wrong
+   * category at a glance. `design/foods.png` has no Shakes chip equivalent here:
+   * `MealType` is breakfast/lunch/dinner/snack, so a Shakes filter would match
+   * nothing until the meal-type union gains a member.
+   */
   const categories: { icon: AppIconName; key: CategoryFilter; label: string }[] = [
     { key: "all", icon: "foods", label: t("foodCategories.all") },
-    { key: "breakfast", icon: "calories", label: t("foodCategories.breakfast") },
-    { key: "lunch", icon: "foods", label: t("foodCategories.lunch") },
-    { key: "dinner", icon: "nutrition", label: t("foodCategories.dinner") },
-    { key: "snack", icon: "hydration", label: t("foodCategories.snack") },
+    { key: "breakfast", icon: "light", label: t("foodCategories.breakfast") },
+    { key: "lunch", icon: "ingredientMeat", label: t("foodCategories.lunch") },
+    { key: "dinner", icon: "ingredientFish", label: t("foodCategories.dinner") },
+    { key: "snack", icon: "ingredientFruit", label: t("foodCategories.snack") },
   ];
 
   const handleRelog = async (item: UserScannedFood) => {
@@ -154,9 +125,12 @@ function ConfiguredFoodsScreen() {
 
   return (
     <AppScreen edges={["top", "left", "right"]}>
-      {/* Top Header */}
-      <View className="min-h-14 flex-row items-center justify-between">
-        <Image accessibilityLabel="BodyCal" className="h-14 w-14" contentFit="contain" source={brandLogo} />
+      {/* Top Header — logo + wordmark lockup and streak badge, per `design/foods.png`. */}
+      <View className="min-h-14 flex-row items-center justify-between gap-3">
+        <View accessibilityLabel="BodyCal" accessibilityRole="header" className="min-w-0 flex-row items-center gap-2">
+          <Image className="h-12 w-12" contentFit="contain" source={brandLogo} />
+          <Text className="text-2xl font-bold tracking-[-0.4px] text-app-text">BodyCal</Text>
+        </View>
 
         <View
           accessibilityLabel={t("dashboard.streakLabel", { count: streak ?? 0 })}
@@ -164,7 +138,7 @@ function ConfiguredFoodsScreen() {
           style={{ borderCurve: "continuous", boxShadow: shadows.floating }}
         >
           <AppIcon color={macroColors.calories} name="calories" size={18} weight="semibold" />
-          <Text className="text-sm font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
+          <Text className="text-sm font-bold text-app-text" style={{ fontVariant: ["tabular-nums"] }}>
             {streak ?? 0}
           </Text>
         </View>
@@ -198,50 +172,19 @@ function ConfiguredFoodsScreen() {
         ) : null}
       </View>
 
-      {/* View Mode Switcher */}
-      <View className="flex-row rounded-2xl border border-app-border bg-app-surface p-1">
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: viewTab === "all" }}
-          className={`min-h-9 flex-1 items-center justify-center rounded-xl px-2 ${
-            viewTab === "all" ? "bg-white shadow-xs" : ""
-          }`}
-          onPress={() => setViewTab("all")}
-        >
-          <Text className={`text-xs font-bold ${viewTab === "all" ? "text-app-text" : "text-app-muted"}`}>
-            {t("foodSearch.tabAll")}
-          </Text>
-        </Pressable>
+      {/*
+        Category Pills.
 
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: viewTab === "scanned" }}
-          className={`min-h-9 flex-1 items-center justify-center rounded-xl px-2 ${
-            viewTab === "scanned" ? "bg-white shadow-xs" : ""
-          }`}
-          onPress={() => setViewTab("scanned")}
-        >
-          <Text className={`text-xs font-bold ${viewTab === "scanned" ? "text-app-text" : "text-app-muted"}`}>
-            {t("foodSearch.tabScans", { count: userScannedFoods?.length ?? 0 })}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: viewTab === "discover" }}
-          className={`min-h-9 flex-1 items-center justify-center rounded-xl px-2 ${
-            viewTab === "discover" ? "bg-white shadow-xs" : ""
-          }`}
-          onPress={() => setViewTab("discover")}
-        >
-          <Text className={`text-xs font-bold ${viewTab === "discover" ? "text-app-text" : "text-app-muted"}`}>
-            {t("foodSearch.tabDiscover")}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Category Pills */}
-      <ScrollView contentContainerClassName="flex-row gap-2 py-1" horizontal showsHorizontalScrollIndicator={false}>
+        The row bleeds through `AppScreen`'s `px-5` with a matching negative
+        margin so a pill scrolled to either end sits flush with the screen edge
+        instead of being sliced mid-capsule by the parent padding.
+      */}
+      <ScrollView
+        className="-mx-5"
+        contentContainerClassName="flex-row gap-2 px-5 py-1"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
         {categories.map((item) => {
           const active = category === item.key;
           return (
@@ -265,21 +208,40 @@ function ConfiguredFoodsScreen() {
         })}
       </ScrollView>
 
-      {/* Screen Title */}
-      <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.4px] text-app-text">
-        {searching
-          ? t("foodSearch.title")
-          : viewTab === "scanned"
-          ? t("foodSearch.scannedTitle")
-          : headline}
-      </Text>
+      {/* Screen Title and its supporting copy. */}
+      <View className="gap-1.5">
+        <Text accessibilityRole="header" className="text-2xl font-bold tracking-[-0.4px] text-app-text">
+          {searching ? t("foodSearch.title") : headline}
+        </Text>
+        {searching ? null : (
+          <Text className="text-[15px] leading-5.5 text-app-muted">{t(`foodHeadline.${goal}Support`)}</Text>
+        )}
+      </View>
 
-      {/* SECTION 1: User's Real Scanned & Logged Meals */}
-      {(viewTab === "all" || viewTab === "scanned") && visibleUserFoods && visibleUserFoods.length > 0 ? (
+      {/*
+        The user's own scanned & logged meals — now the screen's only list.
+
+        Loading, empty and populated states are all handled here. `undefined`
+        means the query has not resolved yet, which is distinct from a resolved
+        empty list, so the skeleton must not be conflated with the empty state.
+      */}
+      {visibleUserFoods === undefined ? (
+        <ScreenSkeleton lines={3} />
+      ) : visibleUserFoods.length === 0 ? (
+        <EmptyState
+          action={searching ? t("foodSearch.addManually") : t("foodSearch.emptyScannedAction")}
+          description={searching ? t("foodSearch.emptyDescription") : t("foodSearch.emptyScannedDescription")}
+          icon={searching ? "search" : "camera"}
+          onAction={() =>
+            router.push(searching ? "/(app)/food/manual" : "/(app)/(tabs)/scan")
+          }
+          title={searching ? t("foodSearch.emptyTitle") : t("foodSearch.emptyScannedTitle")}
+        />
+      ) : (
         <View className="gap-3">
-          <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center justify-between gap-2">
             <Text accessibilityRole="header" className="text-lg font-bold text-app-text">
-              {viewTab === "all" ? t("foodSearch.scannedSectionAll") : t("foodSearch.scannedSectionTab")}
+              {t("foodSearch.scannedSectionAll")}
             </Text>
             <Text className="text-xs font-semibold text-app-muted">
               {t("foodSearch.mealCount", { count: visibleUserFoods.length })}
@@ -297,48 +259,7 @@ function ConfiguredFoodsScreen() {
             ))}
           </View>
         </View>
-      ) : null}
-
-      {/* SECTION 2: Empty Scanned Meals State */}
-      {viewTab === "scanned" && visibleUserFoods && visibleUserFoods.length === 0 ? (
-        <EmptyState
-          action={t("foodSearch.emptyScannedAction")}
-          description={t("foodSearch.emptyScannedDescription")}
-          icon="camera"
-          onAction={() => router.push("/(app)/(tabs)/scan")}
-          title={t("foodSearch.emptyScannedTitle")}
-        />
-      ) : null}
-
-      {/* SECTION 3: Discover & Catalog Whole Foods */}
-      {(viewTab === "all" || viewTab === "discover") ? (
-        visibleCatalogFoods === undefined ? (
-          <ScreenSkeleton lines={3} />
-        ) : visibleCatalogFoods.length === 0 ? (
-          <EmptyState
-            action={t("foodSearch.addManually")}
-            description={
-              searching ? t("foodSearch.emptyDescription") : t("foodSearch.recommendationsEmptyDescription")
-            }
-            icon={searching ? "search" : "foods"}
-            onAction={() => router.push("/(app)/food/manual")}
-            title={searching ? t("foodSearch.emptyTitle") : t("foodSearch.recommendationsEmptyTitle")}
-          />
-        ) : (
-          <View className="gap-3">
-            {!searching && viewTab === "all" ? (
-              <Text accessibilityRole="header" className="mt-2 text-lg font-bold text-app-text">
-                {t("foodSearch.catalogSection")}
-              </Text>
-            ) : null}
-            <View className="gap-4">
-              {visibleCatalogFoods.map((food) => (
-                <FoodCard food={food} key={food._id} />
-              ))}
-            </View>
-          </View>
-        )
-      ) : null}
+      )}
 
       {/* Footer Add Manually Button */}
       <View className="items-center gap-3 pb-6 pt-3">
@@ -373,13 +294,30 @@ function UserScannedFoodCard({
   const { i18n: instance, t } = useTranslation();
   const number = new Intl.NumberFormat(instance.resolvedLanguage, { maximumFractionDigits: 0 });
 
+  /**
+   * `localDate` is a stored local `YYYY-MM-DD` day key, not an instant. Reading
+   * it through `Intl` keeps the card from printing the raw ISO key, and the
+   * explicit midnight keeps `Date` from parsing the bare date as UTC and drifting
+   * a day backwards for users behind Greenwich.
+   */
+  const loggedOn = new Date(`${item.localDate}T00:00:00`);
+  const loggedLabel = Number.isNaN(loggedOn.getTime())
+    ? item.localDate
+    : new Intl.DateTimeFormat(instance.resolvedLanguage, { day: "numeric", month: "short" }).format(loggedOn);
+
   return (
     <View
       className="overflow-hidden rounded-3xl border border-app-border bg-white"
       style={{ borderCurve: "continuous", boxShadow: shadows.card }}
     >
       <View className="flex-row items-stretch">
-        <FoodThumbnail className="h-38 w-32 bg-app-surface" imageUrl={item.imageUrl} name={item.foodName} />
+        {/*
+          `self-stretch` rather than a fixed height: the row is `items-stretch`,
+          but an explicit `h-38` overrode that and left a white gap beside the
+          macro row whenever the text column grew past 152pt — which a two-line
+          meal name always does.
+        */}
+        <FoodThumbnail className="w-32 self-stretch bg-app-surface" imageUrl={item.imageUrl} name={item.foodName} />
 
         <View className="min-w-0 flex-1 justify-between gap-1.5 p-3.5">
           <View className="gap-1">
@@ -397,10 +335,10 @@ function UserScannedFoodCard({
                   {item.source === "ai" ? t("foodSearch.badgeAi") : t("foodSearch.badgeLogged")}
                 </Text>
               </View>
-              <Text className="text-[11px] font-medium text-app-muted">{item.localDate}</Text>
+              <Text className="text-[11px] font-medium text-app-muted">{loggedLabel}</Text>
             </View>
 
-            <Text accessibilityRole="header" className="text-base font-bold text-app-text" numberOfLines={1} selectable>
+            <Text accessibilityRole="header" className="text-base font-bold text-app-text" numberOfLines={2} selectable>
               {item.foodName}
             </Text>
             <Text className="text-xs text-app-muted" numberOfLines={1}>
@@ -434,11 +372,11 @@ function UserScannedFoodCard({
             <View className="h-px bg-app-border-soft" />
 
             <View className="flex-row items-center">
-              <MacroStat color={macroColors.protein} label={t("nutritionTargets.protein")} value={item.proteinGrams} />
+              <MacroStat color={macroColors.protein} label={t("nutritionBreakdown.protein")} value={item.proteinGrams} />
               <View className="h-6 w-px bg-app-border-soft" />
-              <MacroStat color={macroColors.carbs} label={t("nutritionTargets.carbs")} value={item.carbsGrams} />
+              <MacroStat color={macroColors.carbs} label={t("nutritionBreakdown.carbs")} value={item.carbsGrams} />
               <View className="h-6 w-px bg-app-border-soft" />
-              <MacroStat color={macroColors.fat} label={t("nutritionTargets.fat")} value={item.fatGrams} />
+              <MacroStat color={macroColors.fat} label={t("nutritionBreakdown.fat")} value={item.fatGrams} />
             </View>
           </View>
         </View>
@@ -448,65 +386,19 @@ function UserScannedFoodCard({
 }
 
 /**
- * One recommended or searched catalog food.
+ * Coloured macro value over a muted label.
+ *
+ * The label wraps to a second line rather than truncating: German
+ * "Kohlenhydrate" and Portuguese "Carboidratos" do not fit one third of a card
+ * at this size, and a clipped "Kohlenhydr…" reads worse than two short lines.
  */
-function FoodCard({ food }: { food: CatalogItem }) {
-  const { i18n: instance, t } = useTranslation();
-  const number = new Intl.NumberFormat(instance.resolvedLanguage, { maximumFractionDigits: 0 });
-
-  return (
-    <Pressable
-      accessibilityLabel={food.title}
-      accessibilityRole="button"
-      className="overflow-hidden rounded-3xl border border-app-border bg-white active:bg-app-surface"
-      onPress={() => router.push({ pathname: "/(app)/food/[id]", params: { id: food._id } })}
-      style={{ borderCurve: "continuous", boxShadow: shadows.card }}
-    >
-      <View className="flex-row items-stretch">
-        <FoodThumbnail className="h-44 w-36 bg-app-surface" imageUrl={food.imageUrl} name={food.title} />
-
-        <View className="min-w-0 flex-1 justify-between gap-2 p-4">
-          <View className="gap-1">
-            <Text accessibilityRole="header" className="text-base font-bold text-app-text" numberOfLines={2} selectable>
-              {food.title}
-            </Text>
-            <Text className="text-[13px] leading-4.5 text-app-muted" numberOfLines={2} selectable>
-              {food.description}
-            </Text>
-          </View>
-
-          <View className="gap-2">
-            <View className="flex-row items-center gap-1.5">
-              <AppIcon color={macroColors.calories} name="calories" size={15} weight="semibold" />
-              <Text className="text-sm font-bold text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
-                {t("dashboard.logCalories", { calories: number.format(food.calories) })}
-              </Text>
-            </View>
-
-            <View className="h-px bg-app-border-soft" />
-
-            <View className="flex-row items-center">
-              <MacroStat color={macroColors.protein} label={t("nutritionTargets.protein")} value={food.proteinGrams} />
-              <View className="h-7 w-px bg-app-border-soft" />
-              <MacroStat color={macroColors.carbs} label={t("nutritionTargets.carbs")} value={food.carbsGrams} />
-              <View className="h-7 w-px bg-app-border-soft" />
-              <MacroStat color={macroColors.fat} label={t("nutritionTargets.fat")} value={food.fatGrams} />
-            </View>
-          </View>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-/** Coloured macro value over a muted label. */
 function MacroStat({ color, label, value }: { color: string; label: string; value: number }) {
   return (
-    <View accessibilityLabel={`${label} ${value}g`} className="min-w-0 flex-1 items-center gap-0.5">
+    <View accessibilityLabel={`${label} ${value}g`} className="min-w-0 flex-1 items-center gap-0.5 px-1">
       <Text className="text-[14px] font-bold" selectable style={{ color, fontVariant: ["tabular-nums"] }}>
         {value}g
       </Text>
-      <Text className="text-[11px] font-medium text-app-muted" numberOfLines={1}>
+      <Text className="text-center text-[11px] font-medium text-app-muted" numberOfLines={2}>
         {label}
       </Text>
     </View>

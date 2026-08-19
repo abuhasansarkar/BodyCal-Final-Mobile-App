@@ -10,6 +10,7 @@ import Purchases, {
 } from "react-native-purchases";
 
 import { publicEnv } from "@/config/env";
+import { ProEntitlementMissingError } from "@/features/subscription/entitlement-error";
 import { isNonFatalRevenueCatUiConfigMessage } from "@/features/subscription/revenuecat-logging";
 import { deriveSubscriptionState } from "@/features/subscription/subscription-state";
 import type { SubscriptionState } from "@/types/domain";
@@ -197,9 +198,7 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
       const purchasedState = deriveSubscriptionState(result.customerInfo);
       applyCustomerInfo(result.customerInfo);
       if (!isProState(purchasedState)) {
-        throw new Error(
-          'The store purchase completed, but it is not attached to the RevenueCat entitlement "pro".',
-        );
+        throw new ProEntitlementMissingError();
       }
     },
     [annualPackage, applyCustomerInfo, monthlyPackage],

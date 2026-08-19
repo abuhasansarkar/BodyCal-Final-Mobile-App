@@ -1,7 +1,9 @@
 import { useSSO } from "@clerk/expo";
 import { router } from "expo-router";
+import { SymbolView } from "expo-symbols";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { Platform } from "react-native";
 
 import { getPostSignUpRoute, type AuthDestination } from "@/features/auth/auth-destination";
 import { Image } from "@/tw/image";
@@ -41,17 +43,27 @@ export function SocialAuthButtons({ destination }: { destination: AuthDestinatio
         onPress={() => void complete("apple")}
       >
         {/*
-          The supplied black mark, tinted white for the black button — Apple's
-          required lockup. The previous SF Symbol had no Material equivalent, so
-          the Android button rendered with no logo at all.
+          Apple's own glyph, from the OS.
+
+          This was briefly a bundled PNG, on the reasoning that Material Symbols
+          has no Apple counterpart so the Android button would otherwise carry no
+          logo. The file that shipped was not the Apple mark though — it was a
+          filled rounded square, 97% opaque black — so tinting it white for the
+          black button drew a plain white tile on every platform, which is worse
+          than the gap it was added to close.
+
+          `apple.logo` is the mark itself, shipped by iOS since SF Symbols 1.0
+          and so safely inside the project's deployment target. It is the only
+          copy of the artwork available to the app that is guaranteed correct.
+
+          Android renders the label alone rather than an approximation of a
+          trademark. Restoring the glyph there means downloading the official
+          artwork from Apple's Sign in with Apple design resources and bundling
+          it — an asset/licensing task, not a code one.
         */}
-        <Image
-          accessibilityIgnoresInvertColors
-          className="h-5.5 w-5.5"
-          contentFit="contain"
-          source={require("@/../assets/images/apple-sign-in-logo.png")}
-          tintColor="#FFFFFF"
-        />
+        {Platform.OS === "ios" ? (
+          <SymbolView accessible={false} name="apple.logo" size={19} tintColor="#FFFFFF" />
+        ) : null}
         <Text className="text-base font-semibold text-white">
           {activeProvider === "apple" ? t("auth.signingIn") : t("auth.apple")}
         </Text>

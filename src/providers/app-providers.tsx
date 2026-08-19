@@ -2,6 +2,7 @@ import { ClerkProvider, useAuth, useUser } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient, useAction } from "convex/react";
+import * as SplashScreen from "expo-splash-screen";
 import React, { type PropsWithChildren } from "react";
 import { I18nextProvider } from "react-i18next";
 import { View } from "react-native";
@@ -20,7 +21,6 @@ import { AnalyticsProvider } from "@/providers/analytics-provider";
 import { ConvexUserGate } from "@/providers/convex-user-gate";
 import { NotificationProvider } from "@/providers/notification-provider";
 import { OutboxSyncProvider } from "@/providers/outbox-sync-provider";
-import { PushRegistrationProvider } from "@/providers/push-registration-provider";
 
 const convexClient = publicEnv.convexUrl ? new ConvexReactClient(publicEnv.convexUrl) : null;
 
@@ -41,13 +41,23 @@ function SubscriptionMirrorSync({ userId }: { userId?: string }) {
   return null;
 }
 
-/** Holds the first paint until translations are ready, so no key ever flashes. */
+/**
+ * Holds the first paint until translations are ready, so no key ever flashes.
+ *
+ * It also owns hiding the splash screen. The two are the same moment: the gate's
+ * fallback is a blank fill, so hiding the splash any earlier only swaps a
+ * branded screen for an empty one.
+ */
 function LocalizationGate({ children }: PropsWithChildren) {
   const [isReady, setIsReady] = React.useState(false);
 
   React.useEffect(() => {
     void hydrateAppLanguage().finally(() => setIsReady(true));
   }, []);
+
+  React.useEffect(() => {
+    if (isReady) void SplashScreen.hideAsync().catch(() => undefined);
+  }, [isReady]);
 
   return isReady ? children : <View style={{ flex: 1, backgroundColor: colors.background }} />;
 }
@@ -60,9 +70,7 @@ function AuthenticatedProviders({ children }: PropsWithChildren) {
           one Clerk user can be rendered for the next user. */}
       <SubscriptionProvider key={user?.id ?? "signed-out"} userId={user?.id}>
         <SubscriptionMirrorSync userId={user?.id} />
-        <PushRegistrationProvider>
-          <OutboxSyncProvider>{children}</OutboxSyncProvider>
-        </PushRegistrationProvider>
+        <OutboxSyncProvider>{children}</OutboxSyncProvider>
       </SubscriptionProvider>
     </ConvexUserGate>
   );

@@ -23,6 +23,9 @@ type SubscriberResponse = {
   };
 };
 
+/** The single entitlement that grants BodyCal Pro. Matched case-insensitively. */
+const PRO_ENTITLEMENT_ID = "pro";
+
 export type EntitlementResult = {
   active: boolean;
   trial: boolean;
@@ -51,8 +54,17 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
 
   const payload = (await response.json()) as SubscriberResponse;
   const entitlements = payload.subscriber?.entitlements ?? {};
-  const entitlementKey =
-    Object.keys(entitlements).find((k) => k.toLowerCase() === "pro") ?? Object.keys(entitlements)[0];
+  /*
+    Only the `pro` entitlement grants access, and its absence is not-entitled.
+
+    This used to fall back to `Object.keys(entitlements)[0]`, so the first
+    entitlement RevenueCat happened to return — a promo tier, a lifetime SKU, an
+    entitlement added for a test — verified as Pro and wrote an active mirror
+    that gates AI scanning. The webhook path in `http.ts` has always required
+    `entitlement_ids` to contain `pro`; this is the same rule, applied to the
+    path that actually writes the server gate.
+  */
+  const entitlementKey = Object.keys(entitlements).find((key) => key.toLowerCase() === PRO_ENTITLEMENT_ID);
   const entitlement = entitlementKey ? entitlements[entitlementKey] : undefined;
   const expiresRaw = entitlement?.expires_date;
   const expirationAt = expiresRaw ? Date.parse(expiresRaw) : undefined;

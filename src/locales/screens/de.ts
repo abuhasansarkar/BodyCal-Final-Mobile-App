@@ -343,6 +343,15 @@ export const de: ScreenTranslations = {
     cancel: "Konto behalten",
     cancelled: "Löschung abgebrochen. Dein Konto ist aktiv.",
     startError: "Die Löschung konnte nicht gestartet werden. Melde dich erneut an und versuche es nochmal.",
+    reauthTitle: "Bestätige, dass du es bist",
+    reauthPasswordDescription: "Gib dein Passwort ein, um zu bestätigen, dass du dieses Konto löschen möchtest.",
+    reauthPasswordLabel: "Passwort",
+    reauthCodeDescription: "Wir haben einen Code an deine E-Mail-Adresse gesendet. Gib ihn ein, um die Löschung zu bestätigen.",
+    reauthCodeLabel: "Bestätigungscode",
+    reauthSubmit: "Bestätigen und löschen",
+    reauthBack: "Abbrechen",
+    reauthError: "Das hat nicht gepasst. Versuche es erneut.",
+    reauthUnsupported: "Dieses Konto kann auf diesem Gerät nicht bestätigt werden. Melde dich erneut an und versuche es dann noch einmal.",
   },
   foodSearch: {
     title: "Lebensmittel hinzufügen",
@@ -386,6 +395,11 @@ export const de: ScreenTranslations = {
     ofDailyGoal: "des Tagesziels",
     dailyGoalShare: "{{percent}} % deines täglichen Kalorienziels",
     macroSummary: "{{label}}: {{grams}} Gramm, {{percent}} % der Energie",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "Protein",
+    carbs: "Kohlenhydrate",
+    fat: "Fett",
   },
   foodDetail: {
     notFound: "Dieses Lebensmittel ist nicht mehr verfügbar.",
@@ -431,6 +445,9 @@ export const de: ScreenTranslations = {
     lose: "Lebensmittel für gleichmäßiges Abnehmen",
     maintain: "Lebensmittel zum Halten deines Gewichts",
     gain: "Lebensmittel für gesundes Zunehmen",
+    loseSupport: "Sättigende, nährstoffdichte Mahlzeiten, damit du satt bleibst, während du gleichmäßig abnimmst.",
+    maintainSupport: "Ausgewogene, nährstoffdichte Mahlzeiten, damit du dein aktuelles Gewicht konstant hältst.",
+    gainSupport: "Kalorienreiche, nährstoffdichte Mahlzeiten, damit du Muskeln aufbaust und deine Ziele erreichst.",
   },
   foodCategories: {
     all: "Alle",
@@ -471,6 +488,7 @@ export const de: ScreenTranslations = {
     errorUpload: "Dein Foto konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut.",
     errorUnavailable: "Die Mahlzeitenanalyse ist vorübergehend nicht verfügbar. Du kannst die Mahlzeit manuell eingeben.",
     errorTimeout: "Die Analyse hat zu lange gedauert.",
+    slowNotice: "Das dauert länger als sonst. Du kannst weiter warten oder die Mahlzeit manuell eingeben.",
     errorTooLarge: "Dieses Foto ist zu groß für den Upload.",
     errorEntitlement: "Die KI-Mahlzeitenanalyse ist Teil von BodyCal Pro.",
     errorQuota: "Du hast das heutige Analyse-Limit erreicht. Manuelles Erfassen funktioniert weiterhin.",

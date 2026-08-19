@@ -341,6 +341,15 @@ export const en = {
     cancel: "Keep my account",
     cancelled: "Deletion cancelled. Your account is active.",
     startError: "Deletion could not be started. Reauthenticate and try again.",
+    reauthTitle: "Confirm it's you",
+    reauthPasswordDescription: "Enter your password to confirm you want to delete this account.",
+    reauthPasswordLabel: "Password",
+    reauthCodeDescription: "We sent a code to your email address. Enter it to confirm you want to delete this account.",
+    reauthCodeLabel: "Verification code",
+    reauthSubmit: "Confirm and delete",
+    reauthBack: "Cancel",
+    reauthError: "That did not match. Try again.",
+    reauthUnsupported: "This account cannot be verified on this device. Sign in again, then retry the deletion.",
   },
   foodSearch: {
     title: "Add food",
@@ -385,6 +394,11 @@ export const en = {
     ofDailyGoal: "of daily goal",
     dailyGoalShare: "{{percent}}% of your daily calorie goal",
     macroSummary: "{{label}}: {{grams}} grams, {{percent}}% of the energy",
+    // Compact column labels for macro rows. The unit belongs to the value
+    // ("54g"), so these must never repeat it the way the settings-form labels do.
+    protein: "Protein",
+    carbs: "Carbs",
+    fat: "Fat",
   },
   foodDetail: {
     notFound: "This food is no longer available.",
@@ -430,6 +444,9 @@ export const en = {
     lose: "Foods for steady weight loss",
     maintain: "Foods for maintaining your weight",
     gain: "Foods for healthy weight gain",
+    loseSupport: "Filling, nutrient-dense meals to keep you satisfied while you lose weight steadily.",
+    maintainSupport: "Balanced, nutrient-dense meals to help you stay consistent at your current weight.",
+    gainSupport: "High-calorie, nutrient-dense meals to help you build muscle and reach your goals.",
   },
   foodCategories: {
     all: "All",
@@ -469,6 +486,7 @@ export const en = {
     errorUpload: "Your photo could not be uploaded. Check your connection and try again.",
     errorUnavailable: "Meal analysis is temporarily unavailable. You can still enter this meal manually.",
     errorTimeout: "The analysis took too long.",
+    slowNotice: "This is taking longer than usual. You can keep waiting, or enter the meal manually.",
     errorTooLarge: "That photo is too large to upload.",
     errorEntitlement: "AI meal scanning is part of BodyCal Pro.",
     errorQuota: "You have reached today's scan limit. Manual logging still works.",

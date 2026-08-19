@@ -10,10 +10,29 @@ import { Platform } from "react-native";
  * actually shown.
  */
 
-export const MEAL_CHANNEL = "meal-reminders";
-export const PRO_CHANNEL = "subscription-reminders";
-
 export type ReminderKey = "daily" | "meal" | "hydration" | "progress" | "motivation";
+
+/**
+ * One Android channel per reminder category.
+ *
+ * Every reminder used to be posted to `meal-reminders`, so silencing hydration
+ * nudges in Android settings silenced the daily summary too, and all five sat
+ * under a label that only described one of them. Channels are the only control
+ * Android gives a user over notification categories, so they have to match the
+ * categories the app actually offers.
+ *
+ * `meal` keeps its original id: it is the `defaultChannel` declared in
+ * `app.json`, and a channel id is permanent once created on a device.
+ */
+export const REMINDER_CHANNELS: Record<ReminderKey, string> = {
+  daily: "daily-reminders",
+  meal: "meal-reminders",
+  hydration: "hydration-reminders",
+  progress: "progress-reminders",
+  motivation: "motivation-reminders",
+};
+
+export const PRO_CHANNEL = "subscription-reminders";
 
 /** Stable identifiers keep scheduling idempotent across saves. */
 const REMINDER_IDS: Record<ReminderKey, string[]> = {
@@ -28,18 +47,26 @@ const TRIAL_NOTIFICATION_ID = "bodycal.trial-reminder";
 
 export type PermissionStatus = "granted" | "denied" | "undetermined" | "not_requested";
 
-export async function configureNotificationChannels() {
+/**
+ * Creates or renames every channel, using the user's current language.
+ *
+ * Android updates the name and description of an existing channel id, so calling
+ * this on each sync keeps the labels in the language the app is running in
+ * rather than whichever one happened to be active at first launch. Channel
+ * names were previously hard-coded English — the only user-visible strings in
+ * the app that bypassed i18next.
+ */
+async function configureReminderChannels(copy: ReminderCopy) {
   if (Platform.OS !== "android") return;
-  await Promise.all([
-    Notifications.setNotificationChannelAsync(MEAL_CHANNEL, {
-      name: "Meal reminders",
-      importance: Notifications.AndroidImportance.DEFAULT,
-    }),
-    Notifications.setNotificationChannelAsync(PRO_CHANNEL, {
-      name: "Subscription reminders",
-      importance: Notifications.AndroidImportance.DEFAULT,
-    }),
-  ]);
+  await Promise.all(
+    (Object.keys(REMINDER_CHANNELS) as ReminderKey[]).map((key) =>
+      Notifications.setNotificationChannelAsync(REMINDER_CHANNELS[key], {
+        name: copy[key].title,
+        description: copy[key].body,
+        importance: Notifications.AndroidImportance.DEFAULT,
+      }),
+    ),
+  );
 }
 
 export async function getPermissionStatus(): Promise<PermissionStatus> {
@@ -134,6 +161,11 @@ export async function syncReminders(
   const allIds = Object.values(REMINDER_IDS).flat();
   await cancel(allIds);
 
+  // Channels must exist before anything is scheduled against them, and this is
+  // the only place reminders are scheduled — so it is also the right place to
+  // keep their localized names current.
+  await configureReminderChannels(copy);
+
   const scheduled: string[] = [];
   for (const key of Object.keys(REMINDER_IDS) as ReminderKey[]) {
     if (!plan.categories[key]) continue;
@@ -159,7 +191,7 @@ export async function syncReminders(
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour: time.hour,
           minute: time.minute,
-          channelId: MEAL_CHANNEL,
+          channelId: REMINDER_CHANNELS[key],
         },
       });
       scheduled.push(identifier);
@@ -178,6 +210,15 @@ export async function syncTrialReminder(
 
   const triggerAt = expiresAt - 24 * 60 * 60 * 1_000;
   if (triggerAt <= Date.now()) return false;
+
+  // Its own channel, named from the same localized copy as the notification, so
+  // a trial reminder can be silenced without silencing meal reminders.
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync(PRO_CHANNEL, {
+      name: copy.title,
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
 
   await Notifications.scheduleNotificationAsync({
     identifier: TRIAL_NOTIFICATION_ID,

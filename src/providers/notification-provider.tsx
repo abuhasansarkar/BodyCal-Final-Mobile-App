@@ -4,7 +4,6 @@ import type { PropsWithChildren } from "react";
 import React from "react";
 
 import { resolveNotificationDestination } from "@/features/notifications/destinations";
-import { configureNotificationChannels } from "@/features/notifications/scheduler";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -28,7 +27,8 @@ function navigateFromResponse(response: Notifications.NotificationResponse) {
 
 export function NotificationProvider({ children }: PropsWithChildren) {
   React.useEffect(() => {
-    void configureNotificationChannels();
+    // Channels are created by `syncReminders`, which has the localized copy their
+    // names come from and runs before anything is scheduled against them.
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) navigateFromResponse(response);
     });

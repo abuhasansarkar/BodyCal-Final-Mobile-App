@@ -7,6 +7,8 @@ export default function CalculationBasisRoute() {
   const { t } = useTranslation();
   return <ChoiceScreen
     description={t("onboarding.basis.description")}
+    // Two one-word labels, so they sit side by side rather than as full-width rows.
+    layout="row"
     nextHref="/(onboarding)/age"
     onChange={(calculationBasis) => update({ calculationBasis })}
     options={[

@@ -1,5 +1,5 @@
 import { useClerk, useUser } from "@clerk/expo";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { Link } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -7,8 +7,10 @@ import { useTranslation } from "react-i18next";
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
 import { hasBackendConfiguration } from "@/config/env";
-import { getInstallationId, leaveUserScope } from "@/features/auth/session-scope";
+import { leaveUserScope } from "@/features/auth/session-scope";
+import { useProAccess } from "@/features/subscription/server-pro-access";
 import {
+  isProState,
   releaseRevenueCatIdentity,
   useSubscription,
 } from "@/features/subscription/subscription-provider";
@@ -41,6 +43,8 @@ const accountSettings: Setting[] = [
 ];
 
 function ConfiguredProfile() {
+  // Either RevenueCat or the Convex mirror saying Pro is enough for the badge.
+  const { isPro } = useProAccess();
   const { user } = useUser();
   const profile = useQuery(api.profiles.getCurrent, {});
   const recentDate = new Date();
@@ -52,7 +56,7 @@ function ConfiguredProfile() {
   });
 
   if (profile === undefined || latestWeights === undefined) return <ProfileLoading />;
-  return <ProfileContent identity={{ email: user?.primaryEmailAddress?.emailAddress ?? null, imageUrl: user?.imageUrl ?? null, name: user?.fullName || user?.firstName || null }} latestWeightKg={latestWeights[0]?.normalizedKg ?? null} profile={profile} />;
+  return <ProfileContent isPremium={isPro} identity={{ email: user?.primaryEmailAddress?.emailAddress ?? null, imageUrl: user?.imageUrl ?? null, name: user?.fullName || user?.firstName || null }} latestWeightKg={latestWeights[0]?.normalizedKg ?? null} profile={profile} />;
 }
 
 function ProfileLoading() {
@@ -72,10 +76,18 @@ type ProfileData = {
   weightUnit: "kg" | "lb";
 } | null;
 
-function ProfileContent({ identity, latestWeightKg, profile }: { identity: { email: string | null; imageUrl: string | null; name: string | null }; latestWeightKg: number | null; profile: ProfileData }) {
+function ProfileContent({ identity, isPremium: isPremiumProp, latestWeightKg, profile }: { identity: { email: string | null; imageUrl: string | null; name: string | null }; isPremium?: boolean; latestWeightKg: number | null; profile: ProfileData }) {
   const { t, i18n } = useTranslation();
   const { state } = useSubscription();
-  const isPremium = state === "active" || state === "trial" || state === "cancelledActive" || state === "billingIssueActive";
+  /*
+    The badge used to read the RevenueCat SDK state alone, and re-derive "is this
+    Pro" from an inline copy of the state list. A purchase the SDK had not
+    reported yet — or one applied by webhook on another device — therefore showed
+    "Free plan" to somebody who had already paid. The configured screen resolves
+    it from both sources; the unconfigured dev fallback has no Convex to ask, so
+    it keeps the client-only reading through `isProState`.
+  */
+  const isPremium = isPremiumProp ?? isProState(state);
   const name = identity.name || t("profile.bodyCalMember");
   const currentKg = latestWeightKg ?? profile?.currentWeightKg ?? null;
   const weightUnit = profile?.weightUnit ?? "kg";
@@ -190,7 +202,6 @@ function SettingsSection({ items, title }: { items: Setting[]; title?: string })
 
 function SignOutRow() {
   const { signOut } = useClerk();
-  const unregisterDevice = useMutation(api.notifications.unregisterDevice);
   const { t } = useTranslation();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(false);
@@ -199,8 +210,6 @@ function SignOutRow() {
     setBusy(true);
     setError(false);
     try {
-      const installationId = await getInstallationId();
-      await unregisterDevice({ installationId }).catch(() => undefined);
       await Promise.all([leaveUserScope(), releaseRevenueCatIdentity()]);
       await signOut();
     } catch {

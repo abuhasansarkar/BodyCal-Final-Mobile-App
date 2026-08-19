@@ -68,7 +68,7 @@ export const getHistory = query({
     const fromDate = args.fromDate ?? shiftLocalDate(toDate, -29);
     assertLocalDate(fromDate, "fromDate");
     assertLocalDate(toDate, "toDate");
-    const accessibleFromDate = await requireHistoryAccess(ctx, user._id, fromDate, toDate, 30);
+    const accessibleFromDate = await requireHistoryAccess(ctx, user._id, fromDate, toDate);
     return await ctx.db
       .query("weightLogs")
       .withIndex("by_user_date", (q) =>
@@ -102,7 +102,7 @@ export const getProgress = query({
   }),
   handler: async (ctx) => {
     const user = await requireCurrentUser(ctx);
-    const freeBoundary = await freeHistoryBoundary(ctx, user._id, 30);
+    const freeBoundary = await freeHistoryBoundary(ctx, user._id);
     const profile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user", (q) => q.eq("userId", user._id))

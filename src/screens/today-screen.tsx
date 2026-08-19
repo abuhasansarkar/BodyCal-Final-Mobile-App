@@ -3,6 +3,7 @@ import { useConvexConnectionState, useQuery } from "convex/react";
 import { router } from "expo-router";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { AppState } from "react-native";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
@@ -11,7 +12,7 @@ import { DashboardWeekCarousel } from "@/components/dashboard-week-carousel";
 import { FoodThumbnail } from "@/components/food-thumbnail";
 import { ProgressRing } from "@/components/progress-ring";
 import { hasBackendConfiguration } from "@/config/env";
-import { atLocalNoon, getDashboardWeeks } from "@/features/dashboard/week-range";
+import { atLocalNoon, getDashboardWeeks, localDateToDate } from "@/features/dashboard/week-range";
 import { api } from "@/lib/convex-api";
 import { currentLocalDate } from "@/lib/local-day";
 import { Image, Link, Pressable, Text, View } from "@/tw";
@@ -29,21 +30,55 @@ type FoodLog = Nutrition & { _id: string; foodName: string; mealType: MealType }
 const emptyNutrition: Nutrition = { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
 const mealTypes = ["breakfast", "lunch", "dinner", "snack"] as const;
 
+/**
+ * Today's local date, re-read whenever the app comes back to the foreground.
+ *
+ * The dashboard used to compute its three-week window once on mount, so an app
+ * left open across midnight kept yesterday highlighted as today — and every
+ * "is this today?" comparison on the screen stayed a day behind with it.
+ */
+function useTodayLocalDate() {
+  const [today, setToday] = React.useState(currentLocalDate);
+
+  React.useEffect(() => {
+    const refresh = () => setToday((previous) => {
+      const next = currentLocalDate();
+      return next === previous ? previous : next;
+    });
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    // Also covers an app left in the foreground overnight.
+    const timer = setInterval(refresh, 60_000);
+    return () => {
+      subscription.remove();
+      clearInterval(timer);
+    };
+  }, []);
+
+  return today;
+}
+
 function ConfiguredToday() {
   const [selectedDate, setSelectedDate] = React.useState(() => atLocalNoon(new Date()));
   const localDate = currentLocalDate(selectedDate);
+  const todayLocalDate = useTodayLocalDate();
   // The week strip spans the same three weeks the carousel renders, so one
   // range read covers every day it can show.
-  const weeks = React.useMemo(() => getDashboardWeeks(new Date()), []);
+  const weeks = React.useMemo(() => getDashboardWeeks(localDateToDate(todayLocalDate)), [todayLocalDate]);
   const fromDate = currentLocalDate(weeks[0][0]);
   const toDate = currentLocalDate(weeks[weeks.length - 1][6]);
   const logs = useQuery(api.foodLogs.getDay, { localDate });
   const summary = useQuery(api.foodLogs.getDaySummary, { localDate });
+  // Gated reads clamp to the boundary and come back empty, so the screen has to
+  // ask where the boundary is to tell "nothing logged" from "not yours to read".
+  const historyBoundary = useQuery(api.foodLogs.getHistoryBoundary, {});
   const goal = useQuery(api.nutritionGoals.getActive, { localDate });
   const recentUploads = useQuery(api.dashboard.getRecentUploads, { limit: 3 });
-  const loggingStreak = useQuery(api.dashboard.getLoggingStreak, { todayLocalDate: currentLocalDate() });
+  const loggingStreak = useQuery(api.dashboard.getLoggingStreak, { todayLocalDate });
   const calorieSeries = useQuery(api.dashboard.getDailyCalorieSeries, { fromDate, toDate });
   const goalHistory = useQuery(api.nutritionGoals.getHistory, {});
+  const currentUser = useQuery(api.users.getCurrent, {});
   const connection = useConvexConnectionState();
 
   /*
@@ -70,14 +105,23 @@ function ConfiguredToday() {
     recentUploads === undefined ||
     loggingStreak === undefined ||
     calorieSeries === undefined ||
-    goalHistory === undefined
+    goalHistory === undefined ||
+    historyBoundary === undefined ||
+    currentUser === undefined
   ) {
     return <DashboardLoading />;
   }
 
   return (
     <TodayContent
+      /*
+        No day before the account existed can hold a log, so the strip stops
+        there. Derived from the account's own creation time on the device, which
+        is the same clock the local dates are written against.
+      */
+      earliestLocalDate={currentUser ? currentLocalDate(new Date(currentUser._creationTime)) : undefined}
       goal={goal}
+      isLocked={historyBoundary !== null && localDate < historyBoundary}
       isOffline={connection.hasEverConnected && !connection.isWebSocketConnected}
       loggingStreak={loggingStreak}
       logs={logs}
@@ -86,6 +130,7 @@ function ConfiguredToday() {
       recentUploads={recentUploads}
       selectedDate={selectedDate}
       summary={summary}
+      todayLocalDate={todayLocalDate}
     />
   );
 }
@@ -175,6 +220,8 @@ function GreetingHeader() {
 
 
 function TodayContent({
+  earliestLocalDate,
+  isLocked = false,
   isOffline = false,
   loggingStreak = 0,
   logs = [],
@@ -183,8 +230,12 @@ function TodayContent({
   recentUploads = [],
   selectedDate,
   summary = emptyNutrition,
+  todayLocalDate,
   goal = null,
 }: {
+  /** The account's sign-up day. Days before it are not selectable. */
+  earliestLocalDate?: string;
+  isLocked?: boolean;
   isOffline?: boolean;
   loggingStreak?: number;
   logs?: FoodLog[];
@@ -193,6 +244,7 @@ function TodayContent({
   recentUploads?: RecentUpload[];
   selectedDate: Date;
   summary?: Nutrition;
+  todayLocalDate: string;
   goal?: Nutrition | null;
 }) {
   const { t, i18n } = useTranslation();
@@ -221,7 +273,7 @@ function TodayContent({
         </View>
       ) : null}
 
-      <DashboardWeekCarousel locale={locale} onSelectDate={onSelectDate} progressByDate={progressByDate} selectedDate={selectedDate} />
+      <DashboardWeekCarousel earliestLocalDate={earliestLocalDate} locale={locale} onSelectDate={onSelectDate} progressByDate={progressByDate} selectedDate={selectedDate} todayLocalDate={todayLocalDate} />
       <CalorieCard goal={goal?.calories ?? 0} progress={calorieProgress} remaining={remaining} summary={summary.calories} />
 
       <View className="flex-row gap-3">
@@ -243,7 +295,7 @@ function TodayContent({
       <View className="gap-3">
         <View className="flex-row items-center justify-between gap-3">
           <Text accessibilityRole="header" className="min-w-0 flex-1 text-xl font-bold text-app-text" selectable>
-            {currentLocalDate(selectedDate) === currentLocalDate()
+            {currentLocalDate(selectedDate) === todayLocalDate
               ? t("dashboard.todaysMeals")
               : t("dashboard.selectedMeals", { date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(selectedDate) })}
           </Text>
@@ -251,17 +303,57 @@ function TodayContent({
             {t("dashboard.viewAll")}
           </Link>
         </View>
-        {mealTypes.map((meal) => (
-          <MealSection
-            canAdd={currentLocalDate(selectedDate) === currentLocalDate()}
-            key={meal}
-            logs={logs.filter((item) => item.mealType === meal)}
-            meal={meal}
-            recentUploads={recentUploads}
-          />
-        ))}
+        {isLocked ? (
+          <LockedDay />
+        ) : (
+          mealTypes.map((meal) => (
+            <MealSection
+              canAdd={currentLocalDate(selectedDate) === todayLocalDate}
+              key={meal}
+              logs={logs.filter((item) => item.mealType === meal)}
+              meal={meal}
+              recentUploads={recentUploads}
+            />
+          ))
+        )}
       </View>
     </AppScreen>
+  );
+}
+
+/**
+ * Shown for a day the account cannot read.
+ *
+ * The server clamps a gated range and returns nothing, which is indistinguishable
+ * from a day with no meals — so without this, the moment a free user reaches for
+ * their own older data reads as an empty diary instead of the one place an
+ * upgrade is obviously worth something.
+ */
+function LockedDay() {
+  const { t } = useTranslation();
+  return (
+    <View
+      className="items-center gap-3 rounded-3xl border border-app-border bg-white p-6"
+      style={{ borderCurve: "continuous" }}
+    >
+      <View className="h-14 w-14 items-center justify-center rounded-full bg-app-surface">
+        <AppIcon color="#737373" name="subscription" size={26} />
+      </View>
+      <Text accessibilityRole="header" className="text-center text-lg font-bold text-app-text" selectable>
+        {t("dashboard.lockedDayTitle")}
+      </Text>
+      <Text className="text-center text-sm leading-5 text-app-muted" selectable>
+        {t("dashboard.lockedDayDescription")}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        className="min-h-12 flex-row items-center gap-2 rounded-2xl bg-[#111111] px-6 active:opacity-80"
+        onPress={() => router.push("/(app)/paywall")}
+      >
+        <AppIcon color="#FFFFFF" name="unlock" size={19} />
+        <Text className="font-semibold text-white">{t("dashboard.lockedDayAction")}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -460,5 +552,6 @@ export function TodayScreen() {
 
 function UnconfiguredToday() {
   const [selectedDate, setSelectedDate] = React.useState(() => atLocalNoon(new Date()));
-  return <TodayContent goal={{ calories: 2_000, proteinGrams: 150, carbsGrams: 225, fatGrams: 60 }} onSelectDate={setSelectedDate} selectedDate={selectedDate} />;
+  const todayLocalDate = useTodayLocalDate();
+  return <TodayContent goal={{ calories: 2_000, proteinGrams: 150, carbsGrams: 225, fatGrams: 60 }} onSelectDate={setSelectedDate} selectedDate={selectedDate} todayLocalDate={todayLocalDate} />;
 }

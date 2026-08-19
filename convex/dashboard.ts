@@ -74,9 +74,12 @@ export const getRecentUploads = query({
 /**
  * Consecutive days with at least one food log, ending today or yesterday.
  *
- * Reads the recent window once and walks it in memory. The previous version
- * issued one indexed query per day — up to 366 sequential round trips on every
- * dashboard render.
+ * Walks backwards from today and stops at the first missing day, reading one
+ * page of the date index at a time. The streak is by definition an unbroken run
+ * ending now, so everything before the first gap is irrelevant — the previous
+ * version collected up to a year of logs to answer a question that usually needs
+ * the last few days, on a reactive home-screen query that re-runs on every write.
+ * A 300-day streak still costs a few pages; a typical one costs a single page.
  */
 export const getLoggingStreak = query({
   args: { todayLocalDate: v.string() },
@@ -85,28 +88,33 @@ export const getLoggingStreak = query({
     const user = await requireCurrentUser(ctx);
     assertLocalDate(todayLocalDate, "todayLocalDate");
 
-    const earliest = shiftLocalDate(todayLocalDate, -MAX_STREAK_DAYS);
-    const logs = await ctx.db
-      .query("foodLogs")
-      .withIndex("by_user_date", (q) =>
-        q.eq("userId", user._id).gte("localDate", earliest).lte("localDate", todayLocalDate),
-      )
-      .collect();
-
-    const loggedDates = new Set(logs.map((log) => log.localDate));
-    if (loggedDates.size === 0) return 0;
-
-    // A streak may end today or yesterday; missing today does not break it yet.
-    let cursor = loggedDates.has(todayLocalDate)
-      ? todayLocalDate
-      : shiftLocalDate(todayLocalDate, -1);
-    if (!loggedDates.has(cursor)) return 0;
-
+    /*
+      Read a month at a time and stop at the first gap. A user with a three-day
+      streak — the overwhelming majority — costs exactly one bounded range read;
+      only someone approaching a full year pays for more than a couple.
+    */
+    const CHUNK_DAYS = 30;
     let streak = 0;
-    while (streak < MAX_STREAK_DAYS && loggedDates.has(cursor)) {
-      streak += 1;
-      cursor = shiftLocalDate(cursor, -1);
+    let cursor = todayLocalDate;
+
+    for (let day = 0; day < MAX_STREAK_DAYS; ) {
+      const chunkFrom = shiftLocalDate(cursor, -(CHUNK_DAYS - 1));
+      const rows = await ctx.db
+        .query("foodLogs")
+        .withIndex("by_user_date", (q) =>
+          q.eq("userId", user._id).gte("localDate", chunkFrom).lte("localDate", cursor),
+        )
+        .collect();
+      const logged = new Set(rows.map((log) => log.localDate));
+
+      for (let step = 0; step < CHUNK_DAYS && day < MAX_STREAK_DAYS; step += 1, day += 1) {
+        if (logged.has(cursor)) streak += 1;
+        // Today not being logged yet does not break a streak; any earlier gap does.
+        else if (cursor !== todayLocalDate) return streak;
+        cursor = shiftLocalDate(cursor, -1);
+      }
     }
+
     return streak;
   },
 });
@@ -119,13 +127,7 @@ export const getDailyCalorieSeries = query({
     const user = await requireCurrentUser(ctx);
     assertLocalDate(args.fromDate, "fromDate");
     assertLocalDate(args.toDate, "toDate");
-    const fromDate = await requireHistoryAccess(
-      ctx,
-      user._id,
-      args.fromDate,
-      args.toDate,
-      30,
-    );
+    const fromDate = await requireHistoryAccess(ctx, user._id, args.fromDate, args.toDate);
 
     const logs = await ctx.db
       .query("foodLogs")

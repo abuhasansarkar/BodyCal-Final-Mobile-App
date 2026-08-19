@@ -5,6 +5,16 @@ import type { QueryCtx } from "../_generated/server";
 
 const PRO_STATES = new Set(["trial", "active", "cancelledActive", "billingIssueActive"]);
 
+/**
+ * How much history a free account can read, in days, counting today.
+ *
+ * One number for every surface. It used to be passed per call site, and the
+ * call sites disagreed — 7 for food logs, 30 for the calorie chart and weight
+ * history — so a free user saw a month of calorie bars above a week of the meals
+ * that produced them. Change this and every gated read moves together.
+ */
+export const FREE_HISTORY_DAYS = 7;
+
 export function localDateInTimezone(timezone: string, timestamp = Date.now()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -25,7 +35,7 @@ export function shiftLocalDate(localDate: string, days: number) {
 export async function freeHistoryBoundary(
   ctx: QueryCtx,
   userId: Id<"users">,
-  freeDays: number,
+  freeDays: number = FREE_HISTORY_DAYS,
 ): Promise<string | null> {
   const mirror = await ctx.db
     .query("subscriptionMirror")
@@ -54,7 +64,7 @@ export async function requireHistoryAccess(
   userId: Id<"users">,
   requestedFromDate: string,
   requestedToDate: string,
-  freeDays: number,
+  freeDays: number = FREE_HISTORY_DAYS,
 ): Promise<string> {
   if (requestedFromDate < shiftLocalDate(requestedToDate, -3_659)) {
     throw new ConvexError("History ranges are limited to ten years.");
