@@ -264,6 +264,19 @@ export const cameraTranslations = {
   ko: { aiScan: "AI 스캔", heroLabel: "건강한 식사 위로 휴대폰을 들고 있는 사람", bestScan: "더 정확하게 스캔하는 방법", holdStill: "휴대폰을 움직이지 마세요", useLight: "밝은 곳에서 촬영하세요", showIngredients: "모든 재료가 보이게 하세요", gotIt: "알겠어요", openSettings: "설정 열기", settingsDescription: "카메라 접근이 꺼져 있습니다. 기기 설정에서 허용해 주세요.", close: "카메라 닫기", takePhoto: "사진 촬영", choosePhoto: "사진 선택", frameMeal: "식사 전체가 화면에 들어오게 하세요", starting: "카메라를 시작하는 중…", torchOn: "조명 켜기", torchOff: "조명 끄기", captureError: "사진을 촬영하지 못했습니다. 다시 시도해 주세요.", pickError: "사진을 열지 못했습니다. 다시 시도해 주세요.", unavailableTitle: "카메라를 사용할 수 없음", unavailableDescription: "카메라를 시작하지 못했습니다. 다른 앱이 사용 중일 수 있습니다. 대신 라이브러리에서 사진을 선택할 수 있습니다." , scansLeftOne: "오늘 남은 AI 스캔은 1회입니다.", scansLeftMany: "오늘 남은 AI 스캔은 {{count}}회입니다.", scansNoneLeft: "오늘 남은 AI 스캔이 없습니다. 직접 입력은 계속 사용할 수 있습니다." },
 } as const;
 
+/**
+ * Superseded by `screenTranslations[lang].progress`.
+ *
+ * `buildBundle` assigns `progress: screens.progress`, replacing this namespace
+ * outright rather than merging it, so nothing below reaches a screen. It is kept
+ * only because `resources` is a typed literal that other namespaces spread from.
+ *
+ * Two live copies of one namespace is how `pctOfGoal` shipped broken: this copy
+ * interpolates `{{pct}}`, the one that actually renders interpolates
+ * `{{percent}}`, and `progress-screen.tsx` passed `pct` — so the progress card
+ * rendered the literal text "{{percent}}% of goal". Do not add keys here; add
+ * them to `src/locales/screens/*.ts`.
+ */
 export const progressTranslations = {
   en: { title: "Your progress", subtitle: "Track your journey. See the results.", startWeight: "Start weight", currentWeight: "Current weight", goalWeight: "Goal weight", totalGain: "Total gain", totalLoss: "Total loss", pctOfGoal: "{{pct}}% of your goal", ofGoalShort: "of goal", weightOverTime: "Weight over time", rangeWeek: "Week", rangeMonth: "Month", range3M: "3M", rangeAll: "All", noChartData: "Log your weight to see your progress chart here.", currentStreak: "Current streak", streakDays: "{{count}} days", keepItUp: "Keep it up!", startLogging: "Start logging today", weightEntries: "Weight logs", totalLogged: "Total logged", goalProgress: "Goal progress", towardGoal: "Toward goal", avgCalories: "Avg. calories", comingSoon: "Coming soon", addWeight: "Add weight", history: "History" },
   es: { title: "Tu progreso", subtitle: "Sigue tu camino. Ve los resultados.", startWeight: "Peso inicial", currentWeight: "Peso actual", goalWeight: "Peso objetivo", totalGain: "Ganancia total", totalLoss: "Pérdida total", pctOfGoal: "{{pct}}% de tu objetivo", ofGoalShort: "del objetivo", weightOverTime: "Peso a lo largo del tiempo", rangeWeek: "Sem", rangeMonth: "Mes", range3M: "3M", rangeAll: "Todo", noChartData: "Registra tu peso para ver el gráfico de progreso.", currentStreak: "Racha actual", streakDays: "{{count}} días", keepItUp: "¡Sigue así!", startLogging: "Empieza a registrar hoy", weightEntries: "Registros de peso", totalLogged: "Total registrado", goalProgress: "Progreso", towardGoal: "Hacia el objetivo", avgCalories: "Cal. promedio", comingSoon: "Próximamente", addWeight: "Añadir peso", history: "Historial" },

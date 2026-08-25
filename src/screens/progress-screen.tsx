@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { ScreenErrorBoundary } from "@/components/screen-error-boundary";
 import { PrimaryButton } from "@/components/primary-button";
 import { ProgressRing } from "@/components/progress-ring";
 import { hasBackendConfiguration } from "@/config/env";
@@ -44,7 +45,12 @@ type ProgressData = {
 type RangeOption = "week" | "month" | "3m" | "all";
 
 export function ProgressScreen() {
-  return hasBackendConfiguration ? <ConfiguredProgress /> : <UnconfiguredProgress />;
+  if (!hasBackendConfiguration) return <UnconfiguredProgress />;
+  return (
+    <ScreenErrorBoundary scope="progress">
+      <ConfiguredProgress />
+    </ScreenErrorBoundary>
+  );
 }
 
 function dateDaysAgo(days: number) {
@@ -265,7 +271,7 @@ function ProgressContent({
             <Text className="text-3xl font-bold tracking-[-0.5px] text-app-text" selectable style={{ fontVariant: ["tabular-nums"] }}>
               {diffFormatted}{diffKg !== null ? <Text className="text-sm font-normal text-app-muted"> {unit}</Text> : null}
             </Text>
-            <Text className="text-sm font-medium text-app-muted">{t("progress.pctOfGoal", { pct: pctGoal })}</Text>
+            <Text className="text-sm font-medium text-app-muted">{t("progress.pctOfGoal", { percent: pctGoal })}</Text>
             <View className="h-2.5 overflow-hidden rounded-full bg-[#E8E8E8]">
               <View className="h-full rounded-full bg-[#111111]" style={{ width: `${pctGoal}%` }} />
             </View>
@@ -273,7 +279,7 @@ function ProgressContent({
 
           {/* Circular Ring */}
           <View
-            accessibilityLabel={t("progress.pctOfGoal", { pct: pctGoal })}
+            accessibilityLabel={t("progress.pctOfGoal", { percent: pctGoal })}
             accessibilityRole="progressbar"
             accessibilityValue={{ min: 0, max: 100, now: pctGoal }}
             className="items-center justify-center"

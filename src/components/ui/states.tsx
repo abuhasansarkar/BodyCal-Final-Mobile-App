@@ -32,12 +32,20 @@ export function ScreenSkeleton({ lines = 4 }: { lines?: number }) {
 /** Empty state with an optional primary action. */
 export function EmptyState({
   action,
+  actionIcon = "add",
   description,
   icon = "foods",
   onAction,
   title,
 }: {
   action?: string;
+  /**
+   * Glyph on the action button. Defaults to `add` because most empty states
+   * offer "create the first one" — but not all do: an empty meal-type filter
+   * offers "show every meal", where a plus sign promises a new entry the button
+   * does not make.
+   */
+  actionIcon?: AppIconName;
   description: string;
   icon?: AppIconName;
   onAction?: () => void;
@@ -58,7 +66,7 @@ export function EmptyState({
         {description}
       </Text>
       {action && onAction ? (
-        <PrimaryButton className="mt-1 w-full" icon="add" label={action} onPress={onAction} />
+        <PrimaryButton className="mt-1 w-full" icon={actionIcon} label={action} onPress={onAction} />
       ) : null}
     </View>
   );

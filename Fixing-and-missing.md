@@ -306,6 +306,136 @@ caller's own settings or nothing at all.
 
 Covered by three regressions in `convex/tests/reviewRegressions.test.ts`.
 
-## 8.
+## 8. Progress card rendered `{{percent}}% of goal` — fixed
+
+Reported from a screenshot of the Progress tab.
+
+### The literal placeholder
+
+`progress.pctOfGoal` is defined **twice**. `resources.ts` says `"{{pct}}% of your
+goal"`; `screens/*.ts` says `"{{percent}}% of goal"`. `buildBundle` assigns
+`progress: screens.progress`, replacing the namespace outright rather than
+merging it, so the screens copy is the one that renders and the `resources` copy
+is unreachable. `progress-screen.tsx` passed `{ pct }`.
+
+i18next leaves an unmatched placeholder in place rather than throwing — correct
+at runtime, and the reason this reached a device in all eight languages with
+every test passing. `parity.test.ts` compares which keys *exist*; the key existed
+everywhere and every language agreed. The mismatch was between the call site and
+the bundle, which nothing looked at.
+
+Fixed by passing `percent`, and the dead `progressTranslations` copy now carries
+a comment saying it is superseded and must not be added to.
+
+### The guard
+
+`src/locales/interpolation.test.ts` parses every `t("key", { … })` call in `src/`
+— balanced-brace scan, so nested objects and ternaries are read whole, and
+shorthand `{ percent }` counts — resolves each key against the bundle that
+actually renders, and fails when the string names a placeholder the call site
+does not supply. Verified against the real defect: reintroducing `pct` fails the
+suite in all eight languages with the file and both names.
+
+### Screens that could take down the app
+
+The dashboard had an error boundary written inline. Progress, Profile and Foods
+had none, so a Convex `useQuery` observing a server error threw past them to
+`FatalErrorBoundary` — which replaces the *whole* app with "Something went wrong"
+and offers a restart. One failed profile query should not read as a crash, nor
+cost the user their place in the app.
+
+`components/screen-error-boundary.tsx` generalizes it: a retryable card in place
+of the screen, reporting to Sentry with a `screen` tag rather than swallowing the
+error, and reusing the existing `ErrorState` and `errors.loadFailed`. Applied to
+Progress, Profile and Foods; the dashboard's hand-rolled copy now uses it too and
+keeps its own wording.
+
+### Checked and correct — no change
+
+- All twelve Profile settings routes resolve to real files.
+- `weights.getHistory` orders `desc`, so Profile's `limit: 1` really is the
+  latest entry, not the oldest.
+- The floating gear in the screenshot is the `expo-dev-client` launcher button,
+  not app UI.
+- Content passing under the translucent tab bar is iOS behaviour;
+  `contentInsetAdjustmentBehavior="automatic"` gives the scroll view its inset.
+
+## 9. Foods tab review, 25 Aug 2026 — fixed
+
+A full pass over the Foods tab and the two screens it should lead to. The tab
+rendered a list and nothing else: no route out of it, a search box that searched
+almost nothing, and a "Log Again" button that failed in silence.
+
+### The list led nowhere
+
+`UserScannedFoodCard` was a plain `View`. `/(app)/food/log/[id]` — the screen
+that views, corrects and deletes a logged meal — existed and was reachable from
+Today and from History, but not from the tab dedicated to the user's meals. From
+here a logged meal could not be opened at all. The card is now the press target,
+with a composed accessibility label and a hint.
+
+### The search box only searched what was already on screen
+
+It substring-matched the 40 rows the screen had already loaded. `foods.searchCatalog`,
+its search index, `foodCatalog` and every localized title in it had no caller, so
+`/(app)/food/[id]` — the catalog detail screen — was unreachable in the running
+app, and a search for a food the user had never logged returned "No matches" for
+a catalog that contained it.
+
+Searching now consults three sources under one query: the user's own logged
+meals, their saved custom foods, and the catalog through its search index.
+Matching is accent-insensitive, because "musli" must find "Müsli" in a German
+build. The catalog section appears only while a query is present, so the
+goal-suggestion section that was removed on request stays removed.
+
+### Re-logging failed silently
+
+`catch {}` with a comment saying the user could retry — nothing on screen said
+the write had failed, and there was no offline path, so a re-log made with no
+connection was simply lost. `features/food/use-relog-meal.ts` now carries that
+flow for both screens: an offline attempt is queued for `OutboxSyncProvider`,
+every outcome produces a notice, and one in-flight re-log disables all of them so
+a double tap cannot produce two entries. It stays on the screen afterwards rather
+than jumping to Today — "log again" is an action people repeat.
+
+The photograph is deliberately not copied to the new entry. An image's lifetime
+is bound to the scan that produced it and `foodLogs.remove` reclaims the blob
+with the entry that owns it, so a second entry pointing at the same storage id
+would lose its picture the moment the original was deleted.
+
+### Other defects fixed on the same screens
+
+- **A meal-type filter that matched nothing** showed "No scanned meals found" and
+  offered a camera. The user had meals; the chip did not. It now says so and
+  offers to clear the chip.
+- **`MacroStat` had an `accessibilityLabel` on a `View` with no `accessible`,**
+  so the label was dropped and VoiceOver read the value and the label as two
+  separate elements. Same defect on the streak badge.
+- **Every card name carried `accessibilityRole="header"`,** so screen-reader
+  header navigation walked through forty list items.
+- **The list stopped at 60 entries in silence.** It pages in blocks of 30 to a
+  stated ceiling of 150, names what is on screen, and points at the full history.
+- **`/(app)/food/[id]` and `/(app)/food/log/[id]` had no error boundary,** so a
+  failed read replaced the whole app with a restart prompt.
+- **The catalog detail screen filed every food as lunch** unless the user noticed
+  the meal control. It now defaults from the local hour.
+- **Deleting an entry called `router.back()` unconditionally,** which is a no-op
+  when the screen was opened by deep link and left the user on a deleted entry.
+- **The delete confirmation offered "Yes" and "No",** which forces the reader
+  back to the title to work out which one deletes. Now "Cancel" and "Delete".
+- **The logged-meal screen had no primary action.** Correcting and deleting were
+  in the hero; eating the same thing again meant going back to the tab.
+
+### Still open — product decisions, not defects
+
+- `/(app)/food/search` remains reachable only from the new "Browse the food
+  library" link in the Foods footer. Its favourites, recents and library sections
+  are now largely duplicated by the tab's own search; removing it is a product
+  call, so it is linked rather than deleted.
+- `foods.getRecommendations` still has no caller, for the reason recorded in §6.
+- The design's fifth "Shakes" chip has no equivalent: `MealType` is
+  breakfast/lunch/dinner/snack, so the chip would match nothing.
+
+## 10.
 
 <!-- Add the next issue here. -->

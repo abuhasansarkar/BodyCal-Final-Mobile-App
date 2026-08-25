@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Stack } from "expo-router/stack";
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { ActivityIndicator, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/app-icon";
@@ -12,15 +13,24 @@ import { FoodThumbnail } from "@/components/food-thumbnail";
 import { IngredientChip } from "@/components/ingredient-chip";
 import { NutritionBreakdownCard } from "@/components/nutrition-breakdown-card";
 import { PrimaryButton } from "@/components/primary-button";
+import { ScreenErrorBoundary } from "@/components/screen-error-boundary";
 import { Field, FieldGroup, SegmentedControl } from "@/components/ui/form";
 import { InlineNotice } from "@/components/ui/states";
 import { hasBackendConfiguration } from "@/config/env";
 import { colors } from "@/config/theme";
+import { useRelogMeal } from "@/features/food/use-relog-meal";
 import { api } from "@/lib/convex-api";
 import { Pressable, ScrollView, Text, View } from "@/tw";
 import type { MealType } from "@/types/domain";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
+
+/**
+ * Heavier than `shadows.floating`. These controls sit on a meal photograph,
+ * where a white circle needs the extra separation to stay legible against
+ * whatever the picture happens to be.
+ */
+const HERO_CONTROL_SHADOW = "0 4px 14px rgba(0, 0, 0, 0.18)";
 
 export function FoodLogEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +45,16 @@ export function FoodLogEditScreen() {
   }
 
   if (hasBackendConfiguration) {
-    return <ConfiguredFoodLogEdit id={id as Id<"foodLogs">} />;
+    /*
+      A Convex `useQuery` throws on the render that observes a server error. With
+      no boundary here that reached `FatalErrorBoundary` and replaced the whole
+      app with a restart prompt — for one entry that failed to load.
+    */
+    return (
+      <ScreenErrorBoundary scope="foodLog">
+        <ConfiguredFoodLogEdit id={id as Id<"foodLogs">} />
+      </ScreenErrorBoundary>
+    );
   }
 
   return (
@@ -251,6 +270,18 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  /*
+    Separate from `error`: a re-log confirmation is not a failure, and the two
+    must not overwrite one another. `InlineNotice` announces politely either way.
+  */
+  const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "success" } | null>(null);
+  const { pendingId, relog } = useRelogMeal();
+  /*
+    Editing happens in a sheet rather than inline. The screen's job is to show
+    what was logged; the form is a deliberate second step, which also stops a
+    stray tap on a number field from silently altering a saved entry.
+  */
+  const [editing, setEditing] = React.useState(false);
 
   const loggedAt = new Intl.DateTimeFormat(i18n.resolvedLanguage, {
     day: "numeric",
@@ -275,7 +306,10 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
         fatGrams: Math.max(0, Number(fatGrams) || 0),
         mealType,
       });
-      router.back();
+      // Close the sheet rather than the screen. The correction is what the user
+      // came to check, so returning them to the entry — now showing the saved
+      // numbers — is the answer to "did that work?".
+      setEditing(false);
     } catch {
       setError(t("foodLogEdit.updateError"));
     } finally {
@@ -283,12 +317,87 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
     }
   };
 
+  /**
+   * Closes the sheet and puts every field back the way it was saved.
+   *
+   * The summary card behind the sheet reads the same state the fields write, so
+   * it updates as you type — which is the point, you see the correction before
+   * committing it. Dismissing without saving therefore has to restore the stored
+   * values, or the entry would go on displaying numbers that were never written.
+   */
+  const handleCancelEdit = () => {
+    if (saving) return;
+    setFoodName(log.foodName);
+    setServing(log.serving);
+    setQuantity(String(log.quantity));
+    setCalories(String(log.calories));
+    setProteinGrams(String(log.proteinGrams));
+    setCarbsGrams(String(log.carbsGrams));
+    setFatGrams(String(log.fatGrams));
+    setMealType(log.mealType as MealType);
+    setError(null);
+    setEditing(false);
+  };
+
+  /**
+   * Logs this meal against today again, without leaving the entry.
+   *
+   * Shares `useRelogMeal` with the Foods tab, so the offline queue, the
+   * double-tap guard and the fields copied are the same in both places rather
+   * than two implementations that drift.
+   */
+  const handleRelog = async () => {
+    setError(null);
+    setNotice(null);
+    const outcome = await relog(log._id, {
+      calories: toNumber(calories),
+      carbsGrams: toNumber(carbsGrams),
+      fatGrams: toNumber(fatGrams),
+      foodName: foodName.trim() || log.foodName,
+      mealType,
+      proteinGrams: toNumber(proteinGrams),
+      quantity: Math.max(0.1, Number(quantity) || 1),
+      serving: serving.trim() || log.serving,
+      servingUnit: log.servingUnit,
+      source: log.source,
+    });
+    if (outcome === "logged") setNotice({ message: t("foodSearch.relogged"), tone: "success" });
+    else if (outcome === "queued") setNotice({ message: t("foodSearch.reloggedOffline"), tone: "info" });
+    else setError(t("foodSearch.relogError"));
+  };
+
+  /**
+   * Confirms before deleting, because the entry cannot be recovered.
+   *
+   * A native alert rather than a bespoke dialog: it is the platform's own
+   * destructive confirmation, so it inherits VoiceOver, Dynamic Type and the
+   * iOS destructive styling, and it invents no dialog design of its own. The
+   * cancel option is the default, so an accidental tap resolves to "no".
+   */
+  const confirmDelete = () => {
+    if (deleting || saving) return;
+    Alert.alert(
+      t("foodLogEdit.deleteConfirmTitle"),
+      t("foodLogEdit.deleteConfirmBody"),
+      [
+        // Named for what they do. "Yes"/"No" forces the reader back to the title
+        // to work out which one deletes; the destructive button says "Delete".
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => void handleDelete() },
+      ],
+      { cancelable: true },
+    );
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     setError(null);
     try {
       await removeLog({ id });
-      router.back();
+      // Deep links and notification taps can land here with nothing behind them,
+      // where `back()` is a no-op and leaves the user on a deleted entry.
+      if (router.canGoBack()) router.back();
+      else router.replace("/(app)/(tabs)/today");
     } catch {
       setError(t("foodLogEdit.deleteError"));
       setDeleting(false);
@@ -306,17 +415,53 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
           {/* The entry's own photo when it has one; a generic meal still otherwise. */}
           <FoodThumbnail className="h-72 w-full bg-app-surface" imageUrl={log.imageUrl} name={foodName} />
           <SafeAreaView edges={["top"]} style={{ position: "absolute", left: 0, right: 0, top: 0 }}>
-            <Pressable
-              accessibilityLabel={t("common.back")}
-              accessibilityRole="button"
-              className="m-4 h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
-              onPress={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)/today"))}
-              // Heavier than `shadows.floating`: this sits on a photograph,
-              // where a white circle needs the extra separation to read.
-              style={{ boxShadow: "0 4px 14px rgba(0, 0, 0, 0.18)" }}
-            >
-              <AppIcon name="back" size={22} weight="semibold" />
-            </Pressable>
+            {/*
+              Back on the left, edit and delete opposite it. All three sit on the
+              photograph, so each carries the heavier shadow a white circle needs
+              to read against an unpredictable image, and each is a 44pt target.
+            */}
+            <View className="m-4 flex-row items-center justify-between">
+              <Pressable
+                accessibilityLabel={t("common.back")}
+                accessibilityRole="button"
+                className="h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
+                onPress={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)/today"))}
+                style={{ boxShadow: HERO_CONTROL_SHADOW }}
+              >
+                <AppIcon name="back" size={22} weight="semibold" />
+              </Pressable>
+
+              <View className="flex-row items-center gap-2.5">
+                <Pressable
+                  accessibilityLabel={t("foodLogEdit.title")}
+                  accessibilityRole="button"
+                  className="h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
+                  disabled={deleting}
+                  onPress={() => setEditing(true)}
+                  style={{ boxShadow: HERO_CONTROL_SHADOW }}
+                >
+                  <AppIcon name="edit" size={20} weight="semibold" />
+                </Pressable>
+
+                <Pressable
+                  accessibilityLabel={t("foodLogEdit.deleteMealLog")}
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: deleting, disabled: deleting }}
+                  className="h-11 w-11 items-center justify-center rounded-full bg-white active:opacity-80"
+                  disabled={deleting}
+                  onPress={confirmDelete}
+                  style={{ boxShadow: HERO_CONTROL_SHADOW }}
+                >
+                  {/* The row leaves the screen on success, so the only feedback
+                      that matters is that the tap registered. */}
+                  {deleting ? (
+                    <ActivityIndicator color={colors.danger} size="small" />
+                  ) : (
+                    <AppIcon color={colors.danger} name="delete" size={20} weight="semibold" />
+                  )}
+                </Pressable>
+              </View>
+            </View>
           </SafeAreaView>
         </View>
 
@@ -362,105 +507,205 @@ function FoodLogEditForm({ id, log }: { id: Id<"foodLogs">; log: FoodLogRecord }
 
           {scan ? <ScanDetail scan={scan} /> : null}
 
-          <View className="gap-4">
-            <Text accessibilityRole="header" className="text-xl font-bold text-app-text" selectable>
-              {t("foodLogEdit.title")}
-            </Text>
-            <Text className="-mt-2 text-[13px] leading-4.5 text-app-muted" selectable>
-              {t("foodLogEdit.subtitle")}
-            </Text>
+          {/* Errors from a delete or a re-log surface here; the sheet shows its own. */}
+          {error && !editing ? <InlineNotice message={error} tone="error" /> : null}
+          {notice ? <InlineNotice message={notice.message} tone={notice.tone} /> : null}
+        </View>
+      </ScrollView>
 
-            <View className="gap-4 rounded-3xl border border-app-border bg-white p-4" style={{ borderCurve: "continuous" }}>
-              <Field label={t("foodLogEdit.foodName")} onChangeText={setFoodName} value={foodName} />
+      {/*
+        The screen's primary action. It had none: the entry could be corrected or
+        deleted from the hero, but eating the same thing again — the single most
+        repeated thing a food log is asked to do — meant going back to the tab.
+      */}
+      <View className="border-t border-app-border-soft bg-white px-5 pb-2 pt-3">
+        <PrimaryButton
+          className="min-h-14 rounded-2xl"
+          disabled={pendingId !== null || deleting}
+          icon="add"
+          label={pendingId !== null ? t("foodSearch.loggingAgain") : t("foodSearch.logAgainLabel")}
+          labelClassName="text-[17px]"
+          onPress={() => void handleRelog()}
+        />
+      </View>
 
-              <FieldGroup label={t("foodLogEdit.mealCategory")}>
-                <SegmentedControl
-                  accessibilityLabel={t("foodLogEdit.mealCategory")}
-                  onChange={setMealType}
-                  options={mealTypes.map((meal) => ({ value: meal, label: t(`dashboard.meals.${meal}`) }))}
-                  value={mealType}
-                />
-              </FieldGroup>
+      <EditEntrySheet
+        calories={calories}
+        carbsGrams={carbsGrams}
+        error={editing ? error : null}
+        fatGrams={fatGrams}
+        foodName={foodName}
+        mealType={mealType}
+        onChangeCalories={setCalories}
+        onChangeCarbs={setCarbsGrams}
+        onChangeFat={setFatGrams}
+        onChangeFoodName={setFoodName}
+        onChangeMealType={setMealType}
+        onChangeProtein={setProteinGrams}
+        onChangeQuantity={setQuantity}
+        onChangeServing={setServing}
+        onClose={handleCancelEdit}
+        onSave={() => void handleSave()}
+        proteinGrams={proteinGrams}
+        quantity={quantity}
+        saving={saving}
+        serving={serving}
+        visible={editing}
+      />
+    </SafeAreaView>
+  );
+}
 
-              <View className="flex-row gap-3">
-                <View className="min-w-0 flex-1">
-                  <Field label={t("foodLogEdit.servingDescription")} onChangeText={setServing} value={serving} />
-                </View>
-                <View className="w-24">
-                  <Field
-                    keyboardType="decimal-pad"
-                    label={t("foodLogEdit.quantity")}
-                    onChangeText={setQuantity}
-                    value={quantity}
-                  />
-                </View>
-              </View>
-            </View>
+type EditSheetProps = {
+  calories: string;
+  carbsGrams: string;
+  error: string | null;
+  fatGrams: string;
+  foodName: string;
+  mealType: MealType;
+  onChangeCalories: (value: string) => void;
+  onChangeCarbs: (value: string) => void;
+  onChangeFat: (value: string) => void;
+  onChangeFoodName: (value: string) => void;
+  onChangeMealType: (value: MealType) => void;
+  onChangeProtein: (value: string) => void;
+  onChangeQuantity: (value: string) => void;
+  onChangeServing: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+  proteinGrams: string;
+  quantity: string;
+  saving: boolean;
+  serving: string;
+  visible: boolean;
+};
 
-            <View className="gap-4 rounded-3xl border border-app-border bg-white p-4" style={{ borderCurve: "continuous" }}>
-              <Text className="px-1 text-base font-bold text-app-text">{t("foodLogEdit.nutritionSnapshot")}</Text>
-              <Field
-                keyboardType="number-pad"
-                label={t("foodLogEdit.caloriesKcal")}
-                onChangeText={setCalories}
-                value={calories}
+/**
+ * The correction form, as a sheet over the entry.
+ *
+ * `pageSheet` gives the platform's own presentation — the iOS card with its
+ * swipe-to-dismiss, a full-screen modal on Android — rather than a dialog drawn
+ * by hand. `onRequestClose` covers the Android back button and the iOS swipe, so
+ * every route out of the sheet lands in the same place as Cancel.
+ */
+function EditEntrySheet(props: EditSheetProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Modal
+      animationType="slide"
+      onRequestClose={props.onClose}
+      presentationStyle="pageSheet"
+      transparent={false}
+      visible={props.visible}
+    >
+      <SafeAreaView edges={["bottom", "left", "right", "top"]} style={{ flex: 1, backgroundColor: colors.background }}>
+        <View className="flex-row items-center justify-between gap-3 border-b border-app-border-soft px-5 pb-3 pt-1">
+          <Text accessibilityRole="header" className="min-w-0 flex-1 text-xl font-bold text-app-text" selectable>
+            {t("foodLogEdit.title")}
+          </Text>
+          <Pressable
+            accessibilityLabel={t("common.close")}
+            accessibilityRole="button"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-app-surface"
+            disabled={props.saving}
+            onPress={props.onClose}
+          >
+            <AppIcon name="close" size={21} weight="semibold" />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          className="flex-1 bg-white"
+          contentContainerClassName="gap-5 px-5 pb-6 pt-5"
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text className="text-[13px] leading-4.5 text-app-muted" selectable>
+            {t("foodLogEdit.subtitle")}
+          </Text>
+
+          <View className="gap-4 rounded-3xl border border-app-border bg-white p-4" style={{ borderCurve: "continuous" }}>
+            <Field label={t("foodLogEdit.foodName")} onChangeText={props.onChangeFoodName} value={props.foodName} />
+
+            <FieldGroup label={t("foodLogEdit.mealCategory")}>
+              <SegmentedControl
+                accessibilityLabel={t("foodLogEdit.mealCategory")}
+                onChange={props.onChangeMealType}
+                options={mealTypes.map((meal) => ({ value: meal, label: t(`dashboard.meals.${meal}`) }))}
+                value={props.mealType}
               />
-              <View className="flex-row gap-3">
-                <View className="min-w-0 flex-1">
-                  <Field
-                    keyboardType="number-pad"
-                    label={t("foodLogEdit.proteinG")}
-                    onChangeText={setProteinGrams}
-                    value={proteinGrams}
-                  />
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Field
-                    keyboardType="number-pad"
-                    label={t("foodLogEdit.carbsG")}
-                    onChangeText={setCarbsGrams}
-                    value={carbsGrams}
-                  />
-                </View>
-                <View className="min-w-0 flex-1">
-                  <Field
-                    keyboardType="number-pad"
-                    label={t("foodLogEdit.fatG")}
-                    onChangeText={setFatGrams}
-                    value={fatGrams}
-                  />
-                </View>
+            </FieldGroup>
+
+            <View className="flex-row gap-3">
+              <View className="min-w-0 flex-1">
+                <Field
+                  label={t("foodLogEdit.servingDescription")}
+                  onChangeText={props.onChangeServing}
+                  value={props.serving}
+                />
+              </View>
+              <View className="w-24">
+                <Field
+                  keyboardType="decimal-pad"
+                  label={t("foodLogEdit.quantity")}
+                  onChangeText={props.onChangeQuantity}
+                  value={props.quantity}
+                />
               </View>
             </View>
           </View>
 
-          {error ? <InlineNotice message={error} tone="error" /> : null}
+          <View className="gap-4 rounded-3xl border border-app-border bg-white p-4" style={{ borderCurve: "continuous" }}>
+            <Text className="px-1 text-base font-bold text-app-text">{t("foodLogEdit.nutritionSnapshot")}</Text>
+            <Field
+              keyboardType="number-pad"
+              label={t("foodLogEdit.caloriesKcal")}
+              onChangeText={props.onChangeCalories}
+              value={props.calories}
+            />
+            <View className="flex-row gap-3">
+              <View className="min-w-0 flex-1">
+                <Field
+                  keyboardType="number-pad"
+                  label={t("foodLogEdit.proteinG")}
+                  onChangeText={props.onChangeProtein}
+                  value={props.proteinGrams}
+                />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Field
+                  keyboardType="number-pad"
+                  label={t("foodLogEdit.carbsG")}
+                  onChangeText={props.onChangeCarbs}
+                  value={props.carbsGrams}
+                />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Field
+                  keyboardType="number-pad"
+                  label={t("foodLogEdit.fatG")}
+                  onChangeText={props.onChangeFat}
+                  value={props.fatGrams}
+                />
+              </View>
+            </View>
+          </View>
 
-          <Pressable
-            accessibilityRole="button"
-            className="min-h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-app-border bg-app-error-surface px-4 active:opacity-80"
-            disabled={deleting || saving}
-            onPress={() => void handleDelete()}
-          >
-            <AppIcon color={colors.danger} name="delete" size={20} />
-            <Text className="text-base font-semibold text-app-error">
-              {deleting ? t("foodLogEdit.deleting") : t("foodLogEdit.deleteMealLog")}
-            </Text>
-          </Pressable>
+          {props.error ? <InlineNotice message={props.error} tone="error" /> : null}
+        </ScrollView>
+
+        {/* Pinned so saving never means scrolling past the fields. */}
+        <View className="border-t border-app-border-soft bg-white px-5 pb-2 pt-3">
+          <PrimaryButton
+            className="min-h-14 rounded-2xl"
+            disabled={props.saving}
+            icon="check"
+            label={props.saving ? t("foodLogEdit.saving") : t("foodLogEdit.saveChanges")}
+            labelClassName="text-[17px]"
+            onPress={props.onSave}
+          />
         </View>
-      </ScrollView>
-
-      {/* Pinned so saving a correction never means scrolling past the fields. */}
-      <View className="border-t border-app-border-soft bg-white px-5 pb-2 pt-3">
-        <PrimaryButton
-          className="min-h-14 rounded-2xl"
-          disabled={saving || deleting}
-          icon="check"
-          label={saving ? t("foodLogEdit.saving") : t("foodLogEdit.saveChanges")}
-          labelClassName="text-[17px]"
-          onPress={() => void handleSave()}
-        />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </Modal>
   );
 }

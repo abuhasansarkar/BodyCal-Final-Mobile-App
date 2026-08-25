@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { ScreenErrorBoundary } from "@/components/screen-error-boundary";
 import { hasBackendConfiguration } from "@/config/env";
 import { leaveUserScope } from "@/features/auth/session-scope";
 import { useProAccess } from "@/features/subscription/server-pro-access";
@@ -233,5 +234,18 @@ function initials(name: string) {
 }
 
 export function ProfileScreen() {
-  return hasBackendConfiguration ? <ConfiguredProfile /> : <ProfileContent identity={{ email: null, imageUrl: null, name: null }} latestWeightKg={null} profile={{ goalType: "maintain", currentWeightKg: 70, goalWeightKg: 70, weightUnit: "kg" }} />;
+  if (!hasBackendConfiguration) {
+    return (
+      <ProfileContent
+        identity={{ email: null, imageUrl: null, name: null }}
+        latestWeightKg={null}
+        profile={{ goalType: "maintain", currentWeightKg: 70, goalWeightKg: 70, weightUnit: "kg" }}
+      />
+    );
+  }
+  return (
+    <ScreenErrorBoundary scope="profile">
+      <ConfiguredProfile />
+    </ScreenErrorBoundary>
+  );
 }

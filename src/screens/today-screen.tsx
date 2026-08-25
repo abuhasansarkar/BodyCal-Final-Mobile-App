@@ -7,6 +7,7 @@ import { AppState } from "react-native";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { AppScreen } from "@/components/app-screen";
+import { ScreenErrorBoundary } from "@/components/screen-error-boundary";
 import { DashboardRecentUploads, type RecentUpload } from "@/components/dashboard-recent-uploads";
 import { DashboardWeekCarousel } from "@/components/dashboard-week-carousel";
 import { FoodThumbnail } from "@/components/food-thumbnail";
@@ -152,43 +153,15 @@ function DashboardLoading() {
   );
 }
 
-class DashboardErrorBoundary extends React.Component<
-  React.PropsWithChildren<{ fallback: (retry: () => void) => React.ReactNode }>,
-  { failed: boolean }
-> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  retry = () => this.setState({ failed: false });
-  render() {
-    return this.state.failed ? this.props.fallback(this.retry) : this.props.children;
-  }
-}
-
 function ConfiguredDashboard() {
   const { t } = useTranslation();
+  // Keeps the dashboard's own wording; the boundary itself is now shared, so
+  // Progress, Profile and Foods get the same containment instead of failing all
+  // the way up to `FatalErrorBoundary`.
   return (
-    <DashboardErrorBoundary
-      fallback={(retry) => (
-        <AppScreen>
-          <View accessibilityRole="alert" className="items-center gap-4 rounded-3xl border border-app-border bg-white p-6">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-app-surface">
-              <AppIcon color="#737373" name="warning" size={26} />
-            </View>
-            <Text className="text-center text-base text-app-muted" selectable>
-              {t("dashboard.loadError")}
-            </Text>
-            <Pressable accessibilityRole="button" className="min-h-12 flex-row items-center gap-2 rounded-2xl bg-[#111111] px-6" onPress={retry}>
-              <AppIcon color="#FFFFFF" name="refresh" size={19} />
-              <Text className="font-semibold text-white">{t("common.retry")}</Text>
-            </Pressable>
-          </View>
-        </AppScreen>
-      )}
-    >
+    <ScreenErrorBoundary scope="dashboard" title={t("dashboard.loadError")}>
       <ConfiguredToday />
-    </DashboardErrorBoundary>
+    </ScreenErrorBoundary>
   );
 }
 

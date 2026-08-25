@@ -457,7 +457,15 @@ export const getMyScannedAndLoggedFoods = query({
   returns: v.array(userFoodItem),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
-    const limit = boundedLimit(args.limit, 30, 60);
+    /*
+      The Foods tab pages this in blocks of 30 and stops at 150. The ceiling was
+      60, which the screen reached in two taps and then stopped silently — the
+      list simply ended, with nothing to say that older meals existed. It is
+      still a ceiling rather than a cursor because each row resolves a storage
+      URL, so an unbounded read is a real cost; the screen names the ceiling and
+      points at the full history rather than pretending to be complete.
+    */
+    const limit = boundedLimit(args.limit, 30, 150);
 
     const logs = await ctx.db
       .query("foodLogs")
