@@ -221,7 +221,16 @@ export default defineSchema({
      * watches a spinner that will never resolve. This lets the sweep find those
      * rows by status and age instead of scanning the table.
      */
-    .index("by_status_updated", ["status", "updatedAt"]),
+    .index("by_status_updated", ["status", "updatedAt"])
+    /**
+     * Backs the fair-use counters. Usage counts only scans that produced
+     * something, so reading every scan the account made this month and
+     * discarding the failures meant the read grew with failures — which nothing
+     * bounds, because a failed scan consumes no quota and the per-minute limiter
+     * still allows thousands a day. Leading with `status` lets each billable
+     * status be read as its own range, each bounded by the monthly limit.
+     */
+    .index("by_user_status_created", ["userId", "status", "createdAt"]),
 
   /**
    * Ownership record for every client upload. Written when the client claims the
@@ -369,7 +378,17 @@ export default defineSchema({
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    /**
+     * Backs the export-retention sweep. It previously read the head of the table
+     * and filtered `expiresAt` in JavaScript, so once the first rows were
+     * unexpired nothing behind them was ever reached and the archives — which
+     * hold a full copy of an account's data — outlived their download window.
+     * `status` leads the index so pending jobs, which have no expiry yet, are
+     * outside the range rather than sorted in front of everything.
+     */
+    .index("by_status_expires", ["status", "expiresAt"]),
 
   deletionJobs: defineTable({
     userId: v.id("users"),
@@ -403,5 +422,8 @@ export default defineSchema({
     key: v.string(),
     windowStart: v.number(),
     count: v.number(),
-  }).index("by_key", ["key"]),
+  })
+    .index("by_key", ["key"])
+    /** Backs the counter sweep, for the same reason `exportJobs` needs one. */
+    .index("by_window", ["windowStart"]),
 });

@@ -164,9 +164,25 @@ export function assertBodyMetrics(input: {
  */
 export function assertAdultDateOfBirth(dateOfBirth: string, now = new Date()): string {
   assertLocalDate(dateOfBirth, "dateOfBirth");
-  const birthYear = Number(dateOfBirth.slice(0, 4));
-  const age = now.getUTCFullYear() - birthYear;
-  if (age < NUTRITION_LIMITS.minAge - 1 || age > NUTRITION_LIMITS.maxAge + 1) {
+
+  /*
+    Age from the whole date, not the year alone.
+
+    This subtracted birth years and then allowed a year of slack either side, so
+    the 18–80 window it advertised actually admitted 17 and 81. The slack was
+    covering for the year-only arithmetic: onboarding stores a derived
+    `YYYY-01-01` for a user who only told us their age, and comparing that
+    against a mid-year birthday is off by one for half the calendar. Deriving 1
+    January is exactly what makes the exact comparison safe — see
+    `deriveDateOfBirth` — so the slack is no longer paying for anything.
+  */
+  const [birthYear, birthMonth, birthDay] = dateOfBirth.split("-").map(Number);
+  let age = now.getUTCFullYear() - birthYear;
+  const monthsBefore = now.getUTCMonth() + 1 < birthMonth;
+  const sameMonthDaysBefore = now.getUTCMonth() + 1 === birthMonth && now.getUTCDate() < birthDay;
+  if (monthsBefore || sameMonthDaysBefore) age -= 1;
+
+  if (age < NUTRITION_LIMITS.minAge || age > NUTRITION_LIMITS.maxAge) {
     fail(`BodyCal supports adults ages ${NUTRITION_LIMITS.minAge} to ${NUTRITION_LIMITS.maxAge}`);
   }
   return dateOfBirth;

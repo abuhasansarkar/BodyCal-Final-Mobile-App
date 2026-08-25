@@ -486,6 +486,8 @@ export const ko: ScreenTranslations = {
     errorTooLarge: "이 사진은 업로드하기에 너무 큽니다.",
     errorEntitlement: "AI 식사 분석은 BodyCal Pro 기능입니다.",
     errorQuota: "오늘의 분석 한도에 도달했습니다. 직접 입력은 계속 사용할 수 있습니다.",
+    errorRateLimited: "분석 요청이 너무 빠릅니다. 잠시 후 다시 시도해 주세요.",
+    errorRateLimitedSeconds: "분석 요청이 너무 빠릅니다. {{seconds}}초 후에 다시 시도해 주세요.",
     errorOffline: "오프라인 상태입니다. 직접 입력은 계속 사용할 수 있습니다.",
     resultTitle: "추정된 식사",
     estimatedLabel: "추정",

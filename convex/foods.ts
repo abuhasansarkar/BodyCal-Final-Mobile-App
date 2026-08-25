@@ -100,24 +100,53 @@ export const searchCatalog = query({
       .collect();
     const favoriteIds = new Set(favorites.map((item) => item.referenceId));
 
+    /*
+      `mealTypes` is an array, so it cannot be a search `filterField` — those
+      compare a whole value for equality, and there is no array-contains. The
+      predicate therefore has to run after the read, which means the read must
+      not already have truncated to `limit`: taking 30 rows and *then* dropping
+      the ones that are not breakfast returned a handful of results and made the
+      rest of the catalog look absent, which is the same defect this function's
+      docstring says was fixed once already, one layer further in.
+
+      The pool is bounded rather than unbounded — a catalog search must not turn
+      into a table scan — so a meal-typed search is exact up to CANDIDATE_POOL
+      ranked matches and truncates beyond it. With a curated catalog that is
+      every match; the ceiling exists so growth degrades gracefully instead of
+      by timeout.
+    */
+    const CANDIDATE_POOL = 200;
+    const readLimit = args.mealType ? Math.min(limit * 8, CANDIDATE_POOL) : limit;
+
     const foods = term
       ? await ctx.db
           .query("foodCatalog")
           .withSearchIndex("search_title", (q) => q.search("searchText", term).eq("active", true))
-          .take(limit)
+          .take(readLimit)
       : await ctx.db
           .query("foodCatalog")
           .withIndex("by_active", (q) => q.eq("active", true))
-          .take(limit);
+          .take(readLimit);
 
-    const filtered = args.mealType
-      ? foods.filter((food) => food.mealTypes.includes(args.mealType!))
+    const mealType = args.mealType;
+    const filtered = mealType
+      ? foods.filter((food) => food.mealTypes.includes(mealType)).slice(0, limit)
       : foods;
 
     return await Promise.all(filtered.map((food) => present(ctx, food, locale, favoriteIds)));
   },
 });
 
+/**
+ * Goal-based catalog suggestions.
+ *
+ * Deliberately without a caller. `foods-screen.tsx` used to render this as a
+ * goal-suggestion section and it was removed on request, so the screen now shows
+ * only the user's own scanned and logged foods. Kept because the catalog, its
+ * localized copy and `foodHeadline.*` are all still in place and re-adding the
+ * section is a product decision rather than a rewrite — this note exists so the
+ * absent caller reads as that decision rather than as an oversight.
+ */
 export const getRecommendations = query({
   args: { goalType: goalTypeValidator, locale: v.string(), limit: v.optional(v.number()) },
   returns: v.array(catalogItem),

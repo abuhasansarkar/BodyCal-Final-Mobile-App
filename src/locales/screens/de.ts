@@ -492,6 +492,8 @@ export const de: ScreenTranslations = {
     errorTooLarge: "Dieses Foto ist zu groß für den Upload.",
     errorEntitlement: "Die KI-Mahlzeitenanalyse ist Teil von BodyCal Pro.",
     errorQuota: "Du hast das heutige Analyse-Limit erreicht. Manuelles Erfassen funktioniert weiterhin.",
+    errorRateLimited: "Du scannst etwas zu schnell. Bitte versuche es gleich noch einmal.",
+    errorRateLimitedSeconds: "Du scannst etwas zu schnell. Bitte versuche es in {{seconds}} Sekunden erneut.",
     errorOffline: "Du bist offline. Manuelles Erfassen funktioniert weiterhin.",
     resultTitle: "Geschätzte Mahlzeit",
     estimatedLabel: "Schätzung",

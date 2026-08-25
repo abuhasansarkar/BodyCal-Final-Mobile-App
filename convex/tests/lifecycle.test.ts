@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api, internal } from "../_generated/api";
+import { EXPORT_TABLE_COUNT } from "../usersDb";
 import { claimUpload, createUser, FOOD_ENTRY, ONBOARDING_INPUT, settle, setupTest } from "./setup";
 
 /**
@@ -26,14 +27,28 @@ describe("data export", () => {
       clientRequestId: "w-1",
     });
 
-    const raw = await t.query(internal.usersDb.collectExport, { userId });
-    const data = raw ? (JSON.parse(raw) as Record<string, unknown[]>) : null;
+    const header = await t.query(internal.usersDb.collectExportHeader, { userId });
+    expect(header).not.toBeNull();
 
-    expect(data).not.toBeNull();
-    expect(data?.foodLogs).toHaveLength(1);
-    expect(data?.weightLogs).toHaveLength(1);
-    expect(data?.nutritionGoals).toHaveLength(1);
-    expect(data?.userProfiles).toHaveLength(1);
+    // Walk the export the way `usersActions.buildExport` does, so the assertion
+    // covers the pagination rather than a single collect that no longer exists.
+    const data: Record<string, unknown[]> = {};
+    for (let tableIndex = 0; tableIndex < EXPORT_TABLE_COUNT; tableIndex += 1) {
+      let cursor: string | null = null;
+      const rows: unknown[] = [];
+      do {
+        const page: { table: string; rows: unknown[]; continueCursor: string | null } =
+          await t.query(internal.usersDb.collectExportPage, { userId, tableIndex, cursor });
+        rows.push(...page.rows);
+        data[page.table] = rows;
+        cursor = page.continueCursor;
+      } while (cursor !== null);
+    }
+
+    expect(data.foodLogs).toHaveLength(1);
+    expect(data.weightLogs).toHaveLength(1);
+    expect(data.nutritionGoals).toHaveLength(1);
+    expect(data.userProfiles).toHaveLength(1);
   });
 
   it("reuses a pending export instead of stacking duplicates", async () => {

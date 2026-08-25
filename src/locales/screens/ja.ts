@@ -486,6 +486,8 @@ export const ja: ScreenTranslations = {
     errorTooLarge: "この写真はアップロードするには大きすぎます。",
     errorEntitlement: "AI 食事解析は BodyCal Pro の機能です。",
     errorQuota: "本日の解析上限に達しました。手入力での記録は引き続き利用できます。",
+    errorRateLimited: "解析の間隔が短すぎます。少し時間をおいてからもう一度お試しください。",
+    errorRateLimitedSeconds: "解析の間隔が短すぎます。{{seconds}}秒後にもう一度お試しください。",
     errorOffline: "オフラインです。手入力での記録は引き続き利用できます。",
     resultTitle: "推定された食事",
     estimatedLabel: "推定",

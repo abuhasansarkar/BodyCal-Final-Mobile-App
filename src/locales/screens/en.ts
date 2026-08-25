@@ -490,6 +490,8 @@ export const en = {
     errorTooLarge: "That photo is too large to upload.",
     errorEntitlement: "AI meal scanning is part of BodyCal Pro.",
     errorQuota: "You have reached today's scan limit. Manual logging still works.",
+    errorRateLimited: "You are scanning a little too quickly. Please try again in a moment.",
+    errorRateLimitedSeconds: "You are scanning a little too quickly. Please try again in {{seconds}} seconds.",
     errorOffline: "You are offline. Manual logging still works.",
     resultTitle: "Estimated meal",
     estimatedLabel: "Estimate",

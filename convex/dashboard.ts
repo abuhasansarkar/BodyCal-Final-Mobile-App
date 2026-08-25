@@ -129,12 +129,28 @@ export const getDailyCalorieSeries = query({
     assertLocalDate(args.toDate, "toDate");
     const fromDate = await requireHistoryAccess(ctx, user._id, args.fromDate, args.toDate);
 
+    /*
+      Bounded, and read newest-first.
+
+      This used to `.collect()` the whole range. The range is only capped at ten
+      years by `requireHistoryAccess`, and the progress screen offers an "All"
+      option, so a long-standing account could ask for more documents than a
+      Convex query may read — and the chart would fail outright rather than draw
+      what it had.
+
+      Descending order is what makes the bound safe to hit: truncation then drops
+      the *oldest* days, which a chart shortens gracefully, rather than the most
+      recent ones, which would silently draw a flat line across the days the user
+      is actually looking at.
+    */
+    const MAX_ROWS = 20_000;
     const logs = await ctx.db
       .query("foodLogs")
       .withIndex("by_user_date", (q) =>
         q.eq("userId", user._id).gte("localDate", fromDate).lte("localDate", args.toDate),
       )
-      .collect();
+      .order("desc")
+      .take(MAX_ROWS);
 
     const byDate = new Map<string, { calories: number; entryCount: number }>();
     for (const log of logs) {
@@ -144,8 +160,12 @@ export const getDailyCalorieSeries = query({
       byDate.set(log.localDate, bucket);
     }
 
-    return [...byDate.entries()]
+    const series = [...byDate.entries()]
       .map(([localDate, value]) => ({ localDate, ...value }))
       .sort((a, b) => a.localDate.localeCompare(b.localDate));
+
+    // The oldest day in a truncated read is the one the cut fell inside, so its
+    // total is partial. A wrong number on a chart is worse than a shorter chart.
+    return logs.length === MAX_ROWS ? series.slice(1) : series;
   },
 });

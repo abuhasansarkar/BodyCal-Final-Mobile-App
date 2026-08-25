@@ -155,6 +155,19 @@ void i18n.use(initReactI18next).init({
   returnNull: false,
 });
 
+/**
+ * The manual language choice stored on this device, or null when there is none.
+ *
+ * Exposed so the account-level mirror can tell "this device has no preference,
+ * adopt the account's" from "this device has one, leave it alone" — without
+ * which adopting a server value would silently overrule a choice the user made
+ * on this phone.
+ */
+export async function readStoredLanguage(): Promise<SupportedLanguage | null> {
+  const persisted = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+  return isSupportedLanguage(persisted) ? persisted : null;
+}
+
 export async function hydrateAppLanguage() {
   const persisted = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
   if (isSupportedLanguage(persisted) && i18n.resolvedLanguage !== persisted) {

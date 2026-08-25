@@ -1,3 +1,4 @@
+import { useConvexAuth, useQuery } from "convex/react";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -7,6 +8,8 @@ import { ActivityIndicator, Linking, StyleSheet } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppIcon, type AppIconName } from "@/components/app-icon";
+import { hasBackendConfiguration } from "@/config/env";
+import { api } from "@/lib/convex-api";
 import { PrimaryButton } from "@/components/primary-button";
 // `Image` comes from the tw wrapper, not expo-image directly: only the wrapper
 // pipes `className` through to a style. Imported bare, the hero's sizing classes
@@ -39,6 +42,42 @@ export function CameraScreen() {
   // resolves before the push commits, so a second tap in that window pushed the
   // preview twice and left a duplicate screen behind the first.
   const [busy, setBusy] = React.useState(false);
+
+  /*
+    Remaining AI scans, so the allowance is something the user can see before
+    they frame a meal rather than something they discover by having a photo
+    refused. `aiDb.getScanQuota` existed for exactly this and had no caller
+    anywhere in the app, which left the daily and monthly limits enforced but
+    invisible.
+
+    Only surfaced when it is close to running out: a count shown at ten of ten
+    is noise, and the camera is not the place to advertise a limit nobody is
+    near. Nothing is disabled on the strength of it — the server remains the
+    gate, and `scan/analyzing` already explains a refusal.
+  */
+  // Gated on Convex auth as well as configuration: the query requires an
+  // identity, and a screen still mounted through a sign-out would otherwise
+  // re-issue it without one.
+  const { isAuthenticated } = useConvexAuth();
+  const quota = useQuery(
+    api.aiDb.getScanQuota,
+    hasBackendConfiguration && isAuthenticated ? {} : "skip",
+  );
+  const remainingScans =
+    quota === undefined
+      ? null
+      : Math.max(
+          0,
+          Math.min(quota.dailyLimit - quota.dailyUsed, quota.monthlyLimit - quota.monthlyUsed),
+        );
+  const quotaNotice =
+    remainingScans === null || remainingScans > 3
+      ? null
+      : remainingScans === 0
+        ? t("camera.scansNoneLeft")
+        : remainingScans === 1
+          ? t("camera.scansLeftOne")
+          : t("camera.scansLeftMany", { count: remainingScans });
 
   const continueWith = React.useCallback(
     (asset: { uri: string; width?: number; height?: number }) =>
@@ -201,6 +240,16 @@ export function CameraScreen() {
                 selectable
               >
                 {error}
+              </Text>
+            ) : null}
+
+            {quotaNotice ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                className="self-center rounded-2xl bg-black/70 px-4 py-2.5 text-center text-sm font-medium text-white"
+                selectable
+              >
+                {quotaNotice}
               </Text>
             ) : null}
 

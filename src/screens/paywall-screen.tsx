@@ -9,7 +9,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppIcon, type AppIconName } from "@/components/app-icon";
 import { PrimaryButton } from "@/components/primary-button";
 import { legalUrls } from "@/config/env";
-import { isProEntitlementMissing } from "@/features/subscription/entitlement-error";
+import { grantedEntitlementsOf, isProEntitlementMissing } from "@/features/subscription/entitlement-error";
+import { isPurchaseCancellation } from "@/features/subscription/purchase-cancellation";
 import { isProState, useSubscription } from "@/features/subscription/subscription-provider";
 import { freeTrialDays } from "@/features/subscription/trial-length";
 import { Link, Pressable, ScrollView, Text, View } from "@/tw";
@@ -162,24 +163,6 @@ export function PaywallScreen() {
     setNotice(null);
     setPlan(next);
   };
-  const isCancellation = (err: unknown) => {
-    if (!err) return false;
-    if (typeof err === "object") {
-      const errorObj = err as Record<string, unknown>;
-      if (errorObj.userCancelled === true) return true;
-      if (errorObj.code === 1 || errorObj.code === "1" || errorObj.code === "PURCHASE_CANCELLED_ERROR") return true;
-      if (typeof errorObj.message === "string") {
-        const msg = errorObj.message.toLowerCase();
-        if (msg.includes("cancel") || msg.includes("dismiss") || msg.includes("closed")) return true;
-      }
-    }
-    if (err instanceof Error) {
-      const msg = err.message.toLowerCase();
-      if (msg.includes("cancel") || msg.includes("dismiss") || msg.includes("closed")) return true;
-    }
-    return false;
-  };
-
   const run = async (operation: () => Promise<void>, success?: () => void) => {
     if (working) return;
     setWorking(true);
@@ -188,7 +171,7 @@ export function PaywallScreen() {
       await operation();
       success?.();
     } catch (err: unknown) {
-      if (!isCancellation(err)) {
+      if (!isPurchaseCancellation(err)) {
         /*
           One sentence is the right thing to show a user, and the wrong thing to
           leave in a log. This catch used to discard the cause entirely, so a
@@ -210,6 +193,14 @@ export function PaywallScreen() {
           userCancelled: rcError?.userCancelled ?? null,
           // Names the one failure that is ours to fix rather than the store's.
           entitlementMissing,
+          /*
+            What the dashboard granted instead. An empty list means no product
+            is attached to any entitlement; a non-empty one that does not contain
+            `pro` means the entitlement is identified differently than the three
+            places this app pins it. Identifiers only — configuration, never
+            subscriber data.
+          */
+          grantedEntitlements: entitlementMissing ? grantedEntitlementsOf(err) : undefined,
         });
         /*
           "Please try again" is the wrong advice when the store already took the

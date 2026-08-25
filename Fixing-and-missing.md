@@ -171,6 +171,141 @@ again" was actively wrong advice — the next attempt buys nothing and the previ
 one is unaccounted for — so that case now points at Restore instead, in all eight
 languages.
 
-## 6.
+## 6. Full-codebase and process review, 24 Aug 2026 — all findings fixed
+
+A read of the whole tree plus the four gate commands. The gate itself was the
+first finding: `npm test` and `npx expo-doctor` were both failing on `main`, so
+CI was red while `PLAN.md` and this file read green.
+
+### The gate
+
+- **Test fixtures had rotted.** `FREE_HISTORY_DAYS` is a window that moves with
+  the calendar, and `FOOD_ENTRY.localDate` was the literal `2026-08-13`. Eleven
+  days later the fixture sat outside the free window, every gated read clamped it
+  away, and three tests failed reporting an empty array — which reads as a broken
+  query, not an expired fixture. Fixture dates now hang off `localDateOffset()`
+  in `convex/tests/setup.ts`. Tests that deliberately probe *outside* the free
+  window keep their literals and their `grantPro`, because those only ever drift
+  further out.
+- **Thirteen packages behind their SDK 57 patch versions.** `npx expo install
+  --fix`; doctor is 21/21.
+
+### Security and correctness
+
+- **Unmetered RevenueCat calls through `ai.startScan`.** The `aiScan` rate limit
+  lives inside `aiDb.begin`, which runs *after* the entitlement check, and
+  `isEntitlementFresh` returns false for every account with no mirror row — which
+  is every free user. So each `startScan` spent an outbound request to
+  `api.revenuecat.com` before any limiter could refuse it, and the call that
+  eventually threw "Pro entitlement required" had already spent it.
+  `verifyForCurrentUser` now consumes the same per-identity budget as the
+  client-callable `verifyEntitlement`.
+- **A malformed store date granted open-ended Pro.** An unparseable
+  `expires_date` made `active` true and normalized `expirationAt` to `undefined`,
+  which every gate reads as "no expiry". `expires_date: null` legitimately means
+  a non-expiring entitlement and still grants; a date we cannot read is now
+  refused and logged.
+- **The 18–80 age window admitted 17 and 81.** `assertAdultDateOfBirth`
+  subtracted birth years and then allowed a year of slack either side. The slack
+  was covering for year-only arithmetic that `deriveDateOfBirth`'s 1 January
+  convention already makes unnecessary. Now an exact comparison.
+
+### Scale — every item from §3's "open, recorded but not fixed" list
+
+- **`usersDb.collectExport`** `.collect()`ed every row of every user table in one
+  query. Past Convex's read limit that threw, `buildExport` caught it and wrote
+  `export_failed`, and the account with the most data was the one that could
+  never get it out. Now `collectExportHeader` + a cursor-paginated
+  `collectExportPage`, driven by the action.
+- **`maintenance.deleteExpiredExports` and `pruneRateLimits`** read the head of
+  an unindexed table and filtered in JavaScript, so once the head held unexpired
+  rows nothing behind it was ever reached — both reported success and collected
+  nothing. Now indexed (`by_status_expires`, `by_window`) and self-rescheduling,
+  like the two sweeps beside them. `failExport` stamps an expiry so failed jobs
+  are collected too.
+- **`aiDb.readScanUsage`** read every scan of the month and discarded the
+  failures. Failures consume no quota, so nothing bounds how many an account can
+  accumulate — and this runs on the path that starts every scan, so a phone with
+  a bad camera could eventually make its own scanning impossible. Now three
+  bounded reads over `by_user_status_created`, one per billable status.
+- **`foods.searchCatalog`** took `limit` rows and *then* dropped the ones that did
+  not match the meal type, so a filtered search returned whatever fraction of the
+  first page happened to match. `mealTypes` is an array and cannot be a search
+  `filterField`, so the read now over-fetches into a bounded candidate pool
+  before filtering.
+- **`dashboard.getDailyCalorieSeries`** `.collect()`ed a range capped only at ten
+  years, while the progress screen offers "All". Now bounded and read
+  newest-first, so if the bound is ever reached the chart loses its oldest days
+  rather than flat-lining the ones the user is looking at; the partial day the
+  cut falls inside is dropped rather than charted wrong.
+
+### Product
+
+- **`settings.get` had no caller.** The table had a writer and no reader, so its
+  own docstring — that these preferences follow the account across devices —
+  described something that did not happen. Language was worse: nothing ever
+  *wrote* it, so `languageMode`/`language` only held insert defaults. New
+  `providers/settings-sync-provider.tsx` pulls once on sign-in, filling in only
+  what this device has no answer for, then pushes this device's choices back.
+  A device with its own stored language keeps it; an analytics question already
+  answered here is never overwritten by the account's copy.
+- **Rate limits reached the user as "the analysis did not finish".**
+  `describeStartFailure` read `cause.data` only when it was a string, and
+  `consumeRateLimit` is the one error that throws object data — so the object
+  fell through to `cause.message`, matched no branch, and `retryAfterMs` was
+  discarded. Extracted to `features/scan/start-failure.ts` (testable, returns a
+  key rather than translated text), with new copy in all eight languages that
+  says how long to wait.
+- **`aiDb.getScanQuota` had no caller,** so the 10/day and 150/month limits were
+  enforced but invisible and discoverable only by failing. The camera screen now
+  shows the remaining count once it is down to three, reusing the existing notice
+  treatment rather than inventing one.
+
+### Not defects — no change, now documented in place
+
+- `foods.getRecommendations` has no caller because the goal-suggestion section
+  was removed from the foods screen on request. Re-adding it is a product
+  decision, not a repair.
+- `aiDb.getProviderStatus` has no caller because it is an operator tool read from
+  the Convex dashboard. Giving it a screen would put deployment configuration in
+  front of users.
+- `settings.update({ units })` is a redundant mirror: display units live on
+  `userProfiles`, which `profiles.getCurrent` already reads back.
+
+### Process
+
+`PLAN.md` and this file were both green while the gate was red. Status markers
+should not move until the gate has been run in the worktree — the rule AGENTS.md
+already states for checks applies to the markers that report them.
+
+## 7. `settings.get` threw `Unauthenticated` on the welcome screen — fixed
+
+Introduced by §6's own settings-sync work, reported from the device log the same
+evening.
+
+`SettingsSyncProvider` subscribed to `api.settings.get` unconditionally. It sits
+inside `ConvexUserGate`, and that gate returns its children *unwrapped* when
+nobody is signed in — the auth and public routes live under the same provider
+tree — so the query ran with no identity on the very first screen of the app and
+`requireCurrentUser` threw.
+
+`OutboxSyncProvider`, its sibling, already guarded every flush with
+`useConvexAuth().isAuthenticated`. The new provider was the outlier and now
+follows the same pattern: the subscription is `"skip"` until Convex has an
+identity, both effects return early without one, and the pull flag resets on
+sign-out so the next account adopts its own settings rather than inheriting the
+previous one's.
+
+`settings.get` is also tolerant now, matching `users.getCurrent`: no identity, or
+an identity whose `syncFromClerk` has not landed, answers null rather than
+throwing. A client subscribes to this across sign-in and sign-out, and those
+moments are not errors. Nothing is leaked by the distinction — the answer is the
+caller's own settings or nothing at all.
+
+`aiDb.getScanQuota` on the camera screen took the same guard, for the same reason.
+
+Covered by three regressions in `convex/tests/reviewRegressions.test.ts`.
+
+## 8.
 
 <!-- Add the next issue here. -->

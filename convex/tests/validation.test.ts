@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api } from "../_generated/api";
-import { createUser, FOOD_ENTRY, grantPro, ONBOARDING_INPUT, setupTest } from "./setup";
+import {
+  createUser,
+  FOOD_ENTRY,
+  grantPro,
+  localDateOffset,
+  ONBOARDING_INPUT,
+  setupTest,
+  TODAY,
+} from "./setup";
 
 /**
  * Server-side validation and idempotency.
@@ -93,7 +101,7 @@ describe("server validation", () => {
         proteinGrams: 5_000,
         carbsGrams: 200,
         fatGrams: 60,
-        effectiveFrom: "2026-08-13",
+        effectiveFrom: TODAY,
         isManualOverride: true,
       }),
     ).rejects.toThrow(/proteinGrams/);
@@ -109,7 +117,7 @@ describe("server validation", () => {
       proteinGrams: 150,
       carbsGrams: 210,
       fatGrams: 70,
-      effectiveFrom: "2026-08-13",
+      effectiveFrom: TODAY,
       isManualOverride: true,
     };
     const first = await asUser.mutation(api.nutritionGoals.createGoal, args);
@@ -119,7 +127,7 @@ describe("server validation", () => {
     });
 
     expect(second).toBe(first);
-    const active = await asUser.query(api.nutritionGoals.getActive, { localDate: "2026-08-13" });
+    const active = await asUser.query(api.nutritionGoals.getActive, { localDate: TODAY });
     expect(active?.calories).toBe(2_200);
   });
 
@@ -133,15 +141,21 @@ describe("server validation", () => {
       proteinGrams: 160,
       carbsGrams: 250,
       fatGrams: 80,
-      effectiveFrom: "2026-09-01",
+      effectiveFrom: localDateOffset(8),
       isManualOverride: true,
     });
 
-    const august = await asUser.query(api.nutritionGoals.getActive, { localDate: "2026-08-20" });
-    const september = await asUser.query(api.nutritionGoals.getActive, { localDate: "2026-09-05" });
+    // Either side of the new goal's effective date: the onboarding goal still
+    // answers for days before it, and is never rewritten by the later one.
+    const before = await asUser.query(api.nutritionGoals.getActive, {
+      localDate: localDateOffset(1),
+    });
+    const after = await asUser.query(api.nutritionGoals.getActive, {
+      localDate: localDateOffset(12),
+    });
 
-    expect(august?.effectiveFrom).toBe(ONBOARDING_INPUT.effectiveFrom);
-    expect(september?.calories).toBe(2_500);
+    expect(before?.effectiveFrom).toBe(ONBOARDING_INPUT.effectiveFrom);
+    expect(after?.calories).toBe(2_500);
   });
 
   it("rejects invalid nutrition on a food entry", async () => {
@@ -168,7 +182,7 @@ describe("server validation", () => {
         normalizedKg: 70,
         displayValue: 70,
         displayUnit: "kg",
-        localDate: "2026-08-13",
+        localDate: TODAY,
         timezone: "Europe/Berlin",
         note: "n".repeat(2_000),
         clientRequestId: "w-long",
@@ -227,7 +241,7 @@ describe("idempotency", () => {
       normalizedKg: 70,
       displayValue: 70,
       displayUnit: "kg" as const,
-      localDate: "2026-08-13",
+      localDate: TODAY,
       timezone: "Europe/Berlin",
       clientRequestId: "w-same",
     };

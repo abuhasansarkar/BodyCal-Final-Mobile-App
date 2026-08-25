@@ -22,6 +22,16 @@ type AnalyticsContextValue = {
   consent: ConsentState;
   setConsent: (granted: boolean) => Promise<void>;
   isAvailable: boolean;
+  /**
+   * Whether the stored choice has been read yet.
+   *
+   * `consent` starts at "unknown" and stays there when nothing is stored, so on
+   * its own it cannot tell "this device has never been asked" from "we have not
+   * finished looking". Anything that would *write* a default — adopting the
+   * account's server-side choice, say — has to wait for this, or it races the
+   * read and overwrites a decision the user already made here.
+   */
+  isLoaded: boolean;
 };
 
 const AnalyticsContext = React.createContext<AnalyticsContextValue | null>(null);
@@ -35,11 +45,14 @@ export async function readAnalyticsConsent(): Promise<ConsentState> {
 
 export function AnalyticsProvider({ children }: PropsWithChildren) {
   const [consent, setConsentState] = React.useState<ConsentState>("unknown");
+  const [isLoaded, setIsLoaded] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
     void readAnalyticsConsent().then((value) => {
-      if (!cancelled) setConsentState(value);
+      if (cancelled) return;
+      setConsentState(value);
+      setIsLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -54,8 +67,8 @@ export function AnalyticsProvider({ children }: PropsWithChildren) {
 
   const isAvailable = Boolean(publicEnv.analyticsKey);
   const value = React.useMemo(
-    () => ({ consent, setConsent, isAvailable }),
-    [consent, setConsent, isAvailable],
+    () => ({ consent, setConsent, isAvailable, isLoaded }),
+    [consent, setConsent, isAvailable, isLoaded],
   );
 
   const content =

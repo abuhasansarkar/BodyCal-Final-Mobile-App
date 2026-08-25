@@ -141,38 +141,72 @@ export const reapStalledScans = internalMutation({
   },
 });
 
-/** Drops export archives whose download window has closed. */
+/**
+ * Drops export archives whose download window has closed.
+ *
+ * Indexed and self-rescheduling, like the two sweeps above. It used to read the
+ * head of `exportJobs` and test `expiresAt` in JavaScript, so as soon as the
+ * first hundred rows were unexpired it deleted nothing at all — and the rows it
+ * could not reach are archives holding a complete copy of an account's data,
+ * long past the retention window they were promised.
+ *
+ * `failed` is swept alongside `complete` because `failExport` now stamps an
+ * expiry too: a failed job holds no archive, but it does hold a user id, and
+ * nothing else would ever remove it.
+ */
 export const deleteExpiredExports = internalMutation({
   args: {},
-  returns: v.object({ deleted: v.number() }),
+  returns: v.object({ deleted: v.number(), rescheduled: v.boolean() }),
   handler: async (ctx) => {
     const now = Date.now();
-    const jobs = await ctx.db.query("exportJobs").take(BATCH);
 
     let deleted = 0;
-    for (const job of jobs) {
-      if (job.expiresAt === undefined || job.expiresAt > now) continue;
-      if (job.storageId) await ctx.storage.delete(job.storageId).catch(() => undefined);
-      await ctx.db.delete(job._id);
-      deleted += 1;
+    let sawFullBatch = false;
+    for (const status of ["complete", "failed"] as const) {
+      const jobs = await ctx.db
+        .query("exportJobs")
+        .withIndex("by_status_expires", (q) => q.eq("status", status).lt("expiresAt", now))
+        .take(BATCH);
+
+      for (const job of jobs) {
+        if (job.storageId) await ctx.storage.delete(job.storageId).catch(() => undefined);
+        await ctx.db.delete(job._id);
+        deleted += 1;
+      }
+      if (jobs.length === BATCH) sawFullBatch = true;
     }
-    return { deleted };
+
+    if (sawFullBatch) {
+      await ctx.scheduler.runAfter(0, internal.maintenance.deleteExpiredExports, {});
+    }
+    return { deleted, rescheduled: sawFullBatch };
   },
 });
 
-/** Clears rate-limit counters whose window has long passed. */
+/**
+ * Clears rate-limit counters whose window has long passed.
+ *
+ * One row exists per (limit, identity), so this table grows with the user base
+ * and never shrinks on its own. Reading the head of it and filtering in
+ * JavaScript meant that once the first five hundred rows were current — which is
+ * to say, almost immediately — no counter was ever collected again.
+ */
 export const pruneRateLimits = internalMutation({
   args: {},
-  returns: v.object({ deleted: v.number() }),
+  returns: v.object({ deleted: v.number(), rescheduled: v.boolean() }),
   handler: async (ctx) => {
     const cutoff = Date.now() - 48 * 60 * 60 * 1_000;
-    const rows = await ctx.db.query("rateLimits").take(BATCH * 5);
-    let deleted = 0;
-    for (const row of rows) {
-      if (row.windowStart >= cutoff) continue;
-      await ctx.db.delete(row._id);
-      deleted += 1;
+    const rows = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_window", (q) => q.lt("windowStart", cutoff))
+      .take(BATCH * 5);
+
+    for (const row of rows) await ctx.db.delete(row._id);
+
+    const rescheduled = rows.length === BATCH * 5;
+    if (rescheduled) {
+      await ctx.scheduler.runAfter(0, internal.maintenance.pruneRateLimits, {});
     }
-    return { deleted };
+    return { deleted: rows.length, rescheduled };
   },
 });

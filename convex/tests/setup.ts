@@ -44,10 +44,24 @@ const modulePaths = [
 ];
 
 const moduleCache = new Map<string, any>();
+
+/**
+ * convex-test reads `module.default`, so function modules — which export no
+ * default — are given the namespace as their own default.
+ *
+ * A module that *does* have a default export has to keep it. `http.ts` exports
+ * the router that way, and overwriting it with the namespace left convex-test
+ * calling `router.lookup` on a plain module object: every `t.fetch` threw
+ * `router.lookup is not a function`, so no HTTP route — the RevenueCat webhook
+ * included — could be tested at all.
+ */
+function withDefault(m: any) {
+  return { ...m, default: m?.default ?? m };
+}
+
 for (const p of modulePaths) {
   try {
-    const m = require(p);
-    moduleCache.set(p, { ...m, default: m });
+    moduleCache.set(p, withDefault(require(p)));
   } catch {
     // ignore
   }
@@ -55,8 +69,7 @@ for (const p of modulePaths) {
 
 function loadModule(relPath: string) {
   if (!moduleCache.has(relPath)) {
-    const m = require(relPath);
-    moduleCache.set(relPath, { ...m, default: m });
+    moduleCache.set(relPath, withDefault(require(relPath)));
   }
   return Promise.resolve(moduleCache.get(relPath));
 }
@@ -220,6 +233,32 @@ export async function claimUpload(
   return storageId;
 }
 
+/**
+ * A `YYYY-MM-DD` date offset from the day the suite runs.
+ *
+ * Fixture dates must never be literals. `FREE_HISTORY_DAYS` is a window that
+ * moves with the calendar, so a date pinned to a literal eventually falls
+ * outside it and every gated read silently clamps the fixture away — the query
+ * returns an empty array and the failure reads as a broken query rather than an
+ * expired fixture. That is exactly how `FOOD_ENTRY` and the weight fixtures
+ * below rotted eleven days after they were written.
+ *
+ * Tests that deliberately probe the *outside* of the free window still use
+ * literals, and pair them with `grantPro`; those are stable precisely because
+ * they only drift further into the past.
+ */
+export function localDateOffset(days: number, from: Date = new Date()): string {
+  const date = new Date(
+    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + days),
+  );
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${month}-${day}`;
+}
+
+/** The day the suite is running, in UTC. Every non-literal fixture hangs off this. */
+export const TODAY = localDateOffset(0);
+
 export const ONBOARDING_INPUT = {
   dateOfBirth: "1994-07-01",
   dateOfBirthPrecision: "year" as const,
@@ -234,11 +273,11 @@ export const ONBOARDING_INPUT = {
   goalPace: "recommended" as const,
   locale: "en",
   timezone: "Europe/Berlin",
-  effectiveFrom: "2026-08-13",
+  effectiveFrom: TODAY,
 };
 
 export const FOOD_ENTRY = {
-  localDate: "2026-08-13",
+  localDate: TODAY,
   timezone: "Europe/Berlin",
   mealType: "lunch" as const,
   source: "manual" as const,

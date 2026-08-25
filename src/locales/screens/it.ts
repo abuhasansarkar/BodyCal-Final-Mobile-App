@@ -492,6 +492,8 @@ export const it: ScreenTranslations = {
     errorTooLarge: "Questa foto è troppo grande da caricare.",
     errorEntitlement: "L'analisi dei pasti con IA fa parte di BodyCal Pro.",
     errorQuota: "Hai raggiunto il limite di analisi di oggi. La registrazione manuale funziona ancora.",
+    errorRateLimited: "Stai analizzando troppo in fretta. Riprova tra un momento.",
+    errorRateLimitedSeconds: "Stai analizzando troppo in fretta. Riprova tra {{seconds}} secondi.",
     errorOffline: "Sei offline. La registrazione manuale funziona ancora.",
     resultTitle: "Pasto stimato",
     estimatedLabel: "Stima",
