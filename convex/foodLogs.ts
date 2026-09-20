@@ -245,6 +245,8 @@ export const getHistory = query({
     const accessibleFromDate = await requireHistoryAccess(ctx, user._id, fromDate, toDate);
     const limit = boundedLimit(args.limit, 200, 500);
 
+    // The date index orders (localDate DESC, createdAt DESC), so ties on the
+    // same day finish newest-first.
     return await ctx.db
       .query("foodLogs")
       .withIndex("by_user_date", (q) =>

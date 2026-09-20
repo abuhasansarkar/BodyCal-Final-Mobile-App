@@ -1,0 +1,337 @@
+
+> bodycal@1.0.0 test
+> jest --runInBand --forceExit
+
+PASS app src/providers/analytics.test.ts
+PASS convex convex/tests/validation.test.ts
+PASS app src/features/notifications/scheduler.test.ts
+  ● Console
+
+    console.warn
+      expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/.
+
+    [0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m [33m*[39m [36mas[39m [33mNotifications[39m [36mfrom[39m [32m"expo-notifications"[39m[33m;[39m
+     [90m   |[39m [31m[1m^[22m[39m
+     [90m 2 |[39m [36mimport[39m { [33mPlatform[39m } [36mfrom[39m [32m"react-native"[39m[33m;[39m
+     [90m 3 |[39m
+     [90m 4 |[39m [90m/**[39m[0m
+
+      at warn (node_modules/expo-notifications/src/warnOfExpoGoPushUsage.ts:14:15)
+      at addPushTokenListener (node_modules/expo-notifications/src/TokenEmitter.ts:44:24)
+      at Object.<anonymous> (node_modules/expo-notifications/src/DevicePushTokenAutoRegistration.fx.ts:104:23)
+      at Object.require (node_modules/expo-notifications/src/getExpoPushTokenAsync.ts:5:1)
+      at Object.require (node_modules/expo-notifications/src/index.ts:16:1)
+      at Object.require (src/features/notifications/scheduler.ts:1:1)
+      at Object.require (src/features/notifications/scheduler.test.ts:3:1)
+
+PASS convex convex/tests/scanLifecycle.test.ts
+  ● Console
+
+    console.error
+      [ai.runScanAnalysis] no AI provider key found. Set one of AI_API_KEY or OPENAI_API_KEY on the Convex deployment with `npx convex env set <NAME> <value>`; a local .env file is not read by deployed functions.
+
+    [0m [90m 71 |[39m [36mexport[39m [36mfunction[39m logProviderMisconfiguration(scope[33m:[39m string) {
+     [90m 72 |[39m   [36mconst[39m provider [33m=[39m process[33m.[39menv[33m.[39m[33mAI_PROVIDER[39m[33m?[39m[33m.[39mtrim()[33m.[39mtoLowerCase()[33m;[39m
+    [31m[1m>[22m[39m[90m 73 |[39m   console[33m.[39merror(
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 74 |[39m     [32m`[${scope}] no AI provider key found. Set one of ${KEY_VARIABLES.join(" or ")} on the Convex `[39m [33m+[39m
+     [90m 75 |[39m       [32m`deployment with \`npx convex env set <NAME> <value>\`; a local .env file is not read by `[39m [33m+[39m
+     [90m 76 |[39m       [32m`deployed functions.`[39m [33m+[39m[0m
+
+      at error (convex/lib/aiProvider.ts:73:11)
+      at convex/ai.ts:326:34
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (convex/ai.ts:323:10)
+      at handler (node_modules/convex-test/dist/index.js:1735:24)
+      at func (node_modules/convex/src/server/impl/registration_impl.ts:90:36)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:83:23)
+      at invokeFunction (node_modules/convex/src/server/impl/registration_impl.ts:513:24)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:500:16)
+      at Function.invokeAction (node_modules/convex/src/server/impl/registration_impl.ts:601:5)
+      at invokeAction (node_modules/convex-test/dist/index.js:1749:79)
+      at run (node_modules/convex-test/dist/index.js:1749:53)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at run (node_modules/convex-test/dist/index.js:1746:46)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex-test/dist/index.js:1725:31)
+      at Object.runActionWithHandler (node_modules/convex-test/dist/index.js:1828:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      [ai.runScanAnalysis] no AI provider key found. Set one of AI_API_KEY or OPENAI_API_KEY on the Convex deployment with `npx convex env set <NAME> <value>`; a local .env file is not read by deployed functions.
+
+    [0m [90m 71 |[39m [36mexport[39m [36mfunction[39m logProviderMisconfiguration(scope[33m:[39m string) {
+     [90m 72 |[39m   [36mconst[39m provider [33m=[39m process[33m.[39menv[33m.[39m[33mAI_PROVIDER[39m[33m?[39m[33m.[39mtrim()[33m.[39mtoLowerCase()[33m;[39m
+    [31m[1m>[22m[39m[90m 73 |[39m   console[33m.[39merror(
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 74 |[39m     [32m`[${scope}] no AI provider key found. Set one of ${KEY_VARIABLES.join(" or ")} on the Convex `[39m [33m+[39m
+     [90m 75 |[39m       [32m`deployment with \`npx convex env set <NAME> <value>\`; a local .env file is not read by `[39m [33m+[39m
+     [90m 76 |[39m       [32m`deployed functions.`[39m [33m+[39m[0m
+
+      at error (convex/lib/aiProvider.ts:73:11)
+      at convex/ai.ts:326:34
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (convex/ai.ts:323:10)
+      at handler (node_modules/convex-test/dist/index.js:1735:24)
+      at func (node_modules/convex/src/server/impl/registration_impl.ts:90:36)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:83:23)
+      at invokeFunction (node_modules/convex/src/server/impl/registration_impl.ts:513:24)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:500:16)
+      at Function.invokeAction (node_modules/convex/src/server/impl/registration_impl.ts:601:5)
+      at invokeAction (node_modules/convex-test/dist/index.js:1749:79)
+      at run (node_modules/convex-test/dist/index.js:1749:53)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at run (node_modules/convex-test/dist/index.js:1746:46)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex-test/dist/index.js:1725:31)
+      at Object.runActionWithHandler (node_modules/convex-test/dist/index.js:1828:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      [ai.runScanAnalysis] no AI provider key found. Set one of AI_API_KEY or OPENAI_API_KEY on the Convex deployment with `npx convex env set <NAME> <value>`; a local .env file is not read by deployed functions.
+
+    [0m [90m 71 |[39m [36mexport[39m [36mfunction[39m logProviderMisconfiguration(scope[33m:[39m string) {
+     [90m 72 |[39m   [36mconst[39m provider [33m=[39m process[33m.[39menv[33m.[39m[33mAI_PROVIDER[39m[33m?[39m[33m.[39mtrim()[33m.[39mtoLowerCase()[33m;[39m
+    [31m[1m>[22m[39m[90m 73 |[39m   console[33m.[39merror(
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 74 |[39m     [32m`[${scope}] no AI provider key found. Set one of ${KEY_VARIABLES.join(" or ")} on the Convex `[39m [33m+[39m
+     [90m 75 |[39m       [32m`deployment with \`npx convex env set <NAME> <value>\`; a local .env file is not read by `[39m [33m+[39m
+     [90m 76 |[39m       [32m`deployed functions.`[39m [33m+[39m[0m
+
+      at error (convex/lib/aiProvider.ts:73:11)
+      at convex/ai.ts:326:34
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (convex/ai.ts:323:10)
+      at handler (node_modules/convex-test/dist/index.js:1735:24)
+      at func (node_modules/convex/src/server/impl/registration_impl.ts:90:36)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:83:23)
+      at invokeFunction (node_modules/convex/src/server/impl/registration_impl.ts:513:24)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:500:16)
+      at Function.invokeAction (node_modules/convex/src/server/impl/registration_impl.ts:601:5)
+      at invokeAction (node_modules/convex-test/dist/index.js:1749:79)
+      at run (node_modules/convex-test/dist/index.js:1749:53)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at run (node_modules/convex-test/dist/index.js:1746:46)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex-test/dist/index.js:1725:31)
+      at Object.runActionWithHandler (node_modules/convex-test/dist/index.js:1828:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      [ai.runScanAnalysis] no AI provider key found. Set one of AI_API_KEY or OPENAI_API_KEY on the Convex deployment with `npx convex env set <NAME> <value>`; a local .env file is not read by deployed functions.
+
+    [0m [90m 71 |[39m [36mexport[39m [36mfunction[39m logProviderMisconfiguration(scope[33m:[39m string) {
+     [90m 72 |[39m   [36mconst[39m provider [33m=[39m process[33m.[39menv[33m.[39m[33mAI_PROVIDER[39m[33m?[39m[33m.[39mtrim()[33m.[39mtoLowerCase()[33m;[39m
+    [31m[1m>[22m[39m[90m 73 |[39m   console[33m.[39merror(
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 74 |[39m     [32m`[${scope}] no AI provider key found. Set one of ${KEY_VARIABLES.join(" or ")} on the Convex `[39m [33m+[39m
+     [90m 75 |[39m       [32m`deployment with \`npx convex env set <NAME> <value>\`; a local .env file is not read by `[39m [33m+[39m
+     [90m 76 |[39m       [32m`deployed functions.`[39m [33m+[39m[0m
+
+      at error (convex/lib/aiProvider.ts:73:11)
+      at convex/ai.ts:326:34
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (convex/ai.ts:323:10)
+      at handler (node_modules/convex-test/dist/index.js:1735:24)
+      at func (node_modules/convex/src/server/impl/registration_impl.ts:90:36)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:83:23)
+      at invokeFunction (node_modules/convex/src/server/impl/registration_impl.ts:513:24)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:500:16)
+      at Function.invokeAction (node_modules/convex/src/server/impl/registration_impl.ts:601:5)
+      at invokeAction (node_modules/convex-test/dist/index.js:1749:79)
+      at run (node_modules/convex-test/dist/index.js:1749:53)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at run (node_modules/convex-test/dist/index.js:1746:46)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex-test/dist/index.js:1725:31)
+      at Object.runActionWithHandler (node_modules/convex-test/dist/index.js:1828:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS convex convex/tests/subscription.test.ts
+PASS convex convex/tests/auditRegressions.test.ts
+  ● Console
+
+    console.warn
+      [food-analysis] reaped stalled scans { requeued: 1, failed: 0 }
+
+    [0m [90m 136 |[39m
+     [90m 137 |[39m     [36mif[39m (requeued [33m+[39m failed [33m>[39m [35m0[39m) {
+    [31m[1m>[22m[39m[90m 138 |[39m       console[33m.[39mwarn([32m"[food-analysis] reaped stalled scans"[39m[33m,[39m { requeued[33m,[39m failed })[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 139 |[39m     }
+     [90m 140 |[39m     [36mreturn[39m { requeued[33m,[39m failed }[33m;[39m
+     [90m 141 |[39m   }[33m,[39m[0m
+
+      at warn (convex/maintenance.ts:138:15)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      [ai.runScanAnalysis] no AI provider key found. Set one of AI_API_KEY or OPENAI_API_KEY on the Convex deployment with `npx convex env set <NAME> <value>`; a local .env file is not read by deployed functions.
+
+    [0m [90m 71 |[39m [36mexport[39m [36mfunction[39m logProviderMisconfiguration(scope[33m:[39m string) {
+     [90m 72 |[39m   [36mconst[39m provider [33m=[39m process[33m.[39menv[33m.[39m[33mAI_PROVIDER[39m[33m?[39m[33m.[39mtrim()[33m.[39mtoLowerCase()[33m;[39m
+    [31m[1m>[22m[39m[90m 73 |[39m   console[33m.[39merror(
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 74 |[39m     [32m`[${scope}] no AI provider key found. Set one of ${KEY_VARIABLES.join(" or ")} on the Convex `[39m [33m+[39m
+     [90m 75 |[39m       [32m`deployment with \`npx convex env set <NAME> <value>\`; a local .env file is not read by `[39m [33m+[39m
+     [90m 76 |[39m       [32m`deployed functions.`[39m [33m+[39m[0m
+
+      at error (convex/lib/aiProvider.ts:73:11)
+      at convex/ai.ts:326:34
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (convex/ai.ts:323:10)
+      at handler (node_modules/convex-test/dist/index.js:1735:24)
+      at func (node_modules/convex/src/server/impl/registration_impl.ts:90:36)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:83:23)
+      at invokeFunction (node_modules/convex/src/server/impl/registration_impl.ts:513:24)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex/src/server/impl/registration_impl.ts:500:16)
+      at Function.invokeAction (node_modules/convex/src/server/impl/registration_impl.ts:601:5)
+      at invokeAction (node_modules/convex-test/dist/index.js:1749:79)
+      at run (node_modules/convex-test/dist/index.js:1749:53)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at run (node_modules/convex-test/dist/index.js:1746:46)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (node_modules/convex-test/dist/index.js:1725:31)
+      at Object.runActionWithHandler (node_modules/convex-test/dist/index.js:1828:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.warn
+      [food-analysis] reaped stalled scans { requeued: 0, failed: 1 }
+
+    [0m [90m 136 |[39m
+     [90m 137 |[39m     [36mif[39m (requeued [33m+[39m failed [33m>[39m [35m0[39m) {
+    [31m[1m>[22m[39m[90m 138 |[39m       console[33m.[39mwarn([32m"[food-analysis] reaped stalled scans"[39m[33m,[39m { requeued[33m,[39m failed })[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 139 |[39m     }
+     [90m 140 |[39m     [36mreturn[39m { requeued[33m,[39m failed }[33m;[39m
+     [90m 141 |[39m   }[33m,[39m[0m
+
+      at warn (convex/maintenance.ts:138:15)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS convex convex/tests/lifecycle.test.ts
+PASS convex convex/tests/scanCorrections.test.ts
+PASS convex convex/tests/authorization.test.ts
+PASS app src/locales/i18n.test.ts
+PASS convex convex/tests/scanDetail.test.ts
+PASS convex convex/tests/providerSchema.test.ts
+PASS convex convex/tests/historyEntitlement.test.ts
+PASS convex convex/tests/progress.test.ts
+PASS app src/locales/parity.test.ts
+PASS convex convex/tests/estimateValidation.test.ts
+PASS app src/features/dashboard/week-range.test.ts
+PASS app src/domain/nutrition-calculator.test.ts
+PASS app src/features/scan/upload-image.test.ts
+PASS app src/features/subscription/revenuecat-logging.test.ts
+PASS app src/features/outbox/outbox.test.ts
+PASS app src/features/auth/auth-destination.test.ts
+PASS app src/features/subscription/entitlement-error.test.ts
+PASS app src/features/subscription/trial-length.test.ts
+PASS app src/features/onboarding/date-of-birth.test.ts
+PASS app src/features/subscription/subscription-state.test.ts
+PASS app src/features/progress/goal-progress.test.ts
+PASS app src/features/auth/app-access-gate.test.ts
+PASS app src/lib/ingredient-icon.test.ts
+PASS app src/features/progress/history-window.test.ts
+PASS app src/features/onboarding/startup-destination.test.ts
+PASS convex convex/tests/httpRoutes.test.ts
+PASS convex convex/tests/aiProvider.test.ts
+
+Test Suites: 33 passed, 33 total
+Tests:       291 passed, 291 total
+Snapshots:   0 total
+Time:        7.138 s
+Ran all test suites in 2 projects.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

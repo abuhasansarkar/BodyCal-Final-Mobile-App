@@ -11,7 +11,7 @@ BodyCal is an Expo SDK 57 nutrition-tracking application for iOS and Android. Th
 5. Configure the RevenueCat `default` offering, `pro` entitlement, and monthly/annual products.
 6. Start a development build with `npm run start:dev-client`.
 
-Expo Go is not sufficient for native social authentication, RevenueCat, or Android remote notifications. Use EAS development builds on physical devices for those flows.
+Expo Go is not sufficient for native social authentication or RevenueCat. Use EAS development builds on physical devices for those flows.
 
 ## Verification
 
@@ -36,10 +36,10 @@ npx expo export --platform android --output-dir .expo/build-check
 
 - Add real screenshots/source assets to `design/` before visual acceptance. No product-specific visual tokens were invented.
 - Replace starter icon and splash assets after the design audit.
-- Supply Clerk, Convex, RevenueCat, OpenAI, Sentry, analytics, Expo push, and EAS credentials.
+- Supply Clerk, Convex, RevenueCat, OpenAI, Sentry, analytics, and EAS credentials.
 - Supply final support, privacy, and terms URLs and approved localized legal copy.
 - Import reviewed localized food-catalog content.
-- Run the purchase lifecycle matrix, push-notification tests, accessibility/localization QA, and deletion checks on physical iOS and Android devices.
+- Run the purchase lifecycle matrix, local reminder notification tests, accessibility/localization QA, and deletion checks on physical iOS and Android devices.
 - Complete App Store Connect and Play Console metadata, privacy declarations, and reviewer access.
 
 The current screen copy is an implementation baseline. Full eight-language copy coverage remains part of the design/content pass because the supplied `design/` directory has no assets or approved strings.

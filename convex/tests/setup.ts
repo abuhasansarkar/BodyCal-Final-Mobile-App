@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 
 import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { localDateInTimezone } from "../lib/entitlements";
 import schema from "../schema";
 
 /**
@@ -237,8 +238,20 @@ export const ONBOARDING_INPUT = {
   effectiveFrom: "2026-08-13",
 };
 
+/**
+ * Today's date in UTC — the same default the server applies for the
+ * free-history boundary when a test user has no profile timezone. Every
+ * date-dependent fixture derives from this so the entitlement window can
+ * never age it out: hard-coded 2026-08 dates caused the "date rot" that
+ * failed CI once the 7-day free window moved past them.
+ */
+export function todayLocalDate() {
+  return localDateInTimezone("UTC");
+}
+
 export const FOOD_ENTRY = {
-  localDate: "2026-08-13",
+  // Derived from today: a fixed date rots out of the free-history window.
+  localDate: todayLocalDate(),
   timezone: "Europe/Berlin",
   mealType: "lunch" as const,
   source: "manual" as const,

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api } from "../_generated/api";
-import { createUser, FOOD_ENTRY, grantPro, ONBOARDING_INPUT, setupTest } from "./setup";
+import { shiftLocalDate } from "../lib/entitlements";
+import { createUser, FOOD_ENTRY, grantPro, ONBOARDING_INPUT, setupTest, todayLocalDate } from "./setup";
 
 /**
  * Server-side validation and idempotency.
@@ -227,7 +228,8 @@ describe("idempotency", () => {
       normalizedKg: 70,
       displayValue: 70,
       displayUnit: "kg" as const,
-      localDate: "2026-08-13",
+      // Derived from today: a fixed date rots out of the default history window.
+      localDate: todayLocalDate(),
       timezone: "Europe/Berlin",
       clientRequestId: "w-same",
     };
@@ -255,15 +257,18 @@ describe("query limits", () => {
     const t = setupTest();
     const { asUser, subject } = await createUser(t);
     // Pro, so the assertion measures the limit clamp rather than the free-history
-    // clamp — the seeded dates sit outside the free window.
+    // clamp.
     await grantPro(t, subject);
 
+    // Dates derived from today so they always sit inside the default 30-day
+    // history window — fixed 2026-08 dates rotted out of it.
+    const today = todayLocalDate();
     for (let index = 0; index < 5; index += 1) {
       await asUser.mutation(api.weights.create, {
         normalizedKg: 70 + index,
         displayValue: 70 + index,
         displayUnit: "kg",
-        localDate: `2026-08-0${index + 1}`,
+        localDate: shiftLocalDate(today, -index),
         timezone: "Europe/Berlin",
         clientRequestId: `w-${index}`,
       });

@@ -1,6 +1,6 @@
 # BodyCal Production Plan
 
-Last updated: 2026-08-13
+Last updated: 2026-09-20
 
 ## 1. Purpose
 
@@ -106,7 +106,7 @@ design/           Supplied design sources and audit artifacts
 ### Testing
 
 - [x] Domain unit tests for the calculator, unit conversions, and safety caps.
-- [x] Convex tests for authenticated access, unauthenticated rejection, wrong-user rejection, idempotency, query limits, validation bounds, deletion, export, and subscription webhook ordering (48 tests).
+- [x] Convex tests for authenticated access, unauthenticated rejection, wrong-user rejection, idempotency, query limits, validation bounds, deletion, export, and subscription webhook ordering. Full local gate verified 2026-09-20: 33 suites / 291 tests passing across the app and Convex projects.
 - [x] Offline outbox tests for deduplication, attempt caps, expiry, and account-switch clearing.
 - [x] Translation key-parity test across all eight languages.
 - [ ] Device tests for social auth, purchases, camera, and local reminder delivery.
@@ -126,7 +126,7 @@ design/           Supplied design sources and audit artifacts
 - [x] Loss/gain adjustment caps and calorie safety boundaries.
 - [x] Macro calculation and unit conversion helpers.
 - [x] Validated persisted onboarding draft in AsyncStorage (it exceeds SecureStore's Android size ceiling and holds no credentials).
-- [x] Convex schema for users, profiles, goals, catalog, food logs, weights, AI scans, favorites, settings, devices, subscriptions, exports, and deletion jobs.
+- [x] Convex schema for users, profiles, goals, catalog, food logs, weights, AI scans, favorites, settings, subscriptions, exports, and deletion jobs.
 - [x] Shared identity and ownership helpers.
 - [x] Idempotent food and weight mutations, resolved through the `by_user_request` index rather than a per-user scan.
 - [x] AsyncStorage offline outbox and reconnect synchronization.
@@ -333,8 +333,7 @@ Required workflow:
 ### Phase 9 — Notifications
 
 - [x] Local baseline.
-- [x] Implement installation identity and account-bound Expo token registration.
-- [~] Implement token refresh; invalid receipt cleanup still requires the server sender.
+- [x] Remote push deliberately removed for V1: the installation identity, account-bound Expo token registration, and the `pushDevices` table were removed rather than kept as a write-only identifier collection with no sender behind them. Reintroduce them together with a server-side sender.
 - [ ] Add server-driven reminder selection, quiet hours, and deduplication.
 - [ ] Reconcile schedules after timezone, locale, preference, and subscription changes.
 - [ ] Add trial reminder server fallback.
@@ -373,7 +372,7 @@ Required workflow:
 - Webhooks require a secret and idempotent event handling.
 - AI, Clerk, RevenueCat, notification, and Sentry secrets remain server-only.
 - Analytics and crash payloads exclude photos, emails, free text, weights, meal names, calories, nutrition values, and tokens.
-- Account deletion removes stored images, user tables, devices, exports, and Clerk identity through a retry-safe workflow.
+- Account deletion removes stored images, user tables, exports, and Clerk identity through a retry-safe workflow.
 - Historical food logs retain immutable nutrition snapshots.
 - Day-based records store UTC timestamps, local `YYYY-MM-DD`, and the IANA timezone used at creation.
 
@@ -400,7 +399,6 @@ Required workflow:
 - AI entitlement, quota, upload, correction, log, and retention sequence.
 - RevenueCat webhook idempotency and lifecycle transitions.
 - Export and deletion retry behavior.
-- Device registration and cleanup.
 
 ### Device and end-to-end
 
@@ -450,7 +448,6 @@ REVENUECAT_WEBHOOK_SECRET
 AI_PROVIDER
 AI_API_KEY          # or OPENAI_API_KEY; exactly one must be set
 AI_MODEL
-EXPO_ACCESS_TOKEN
 SENTRY_AUTH_TOKEN
 ```
 
