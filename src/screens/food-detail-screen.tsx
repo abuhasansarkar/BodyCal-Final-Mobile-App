@@ -12,11 +12,13 @@ import { FoodThumbnail } from "@/components/food-thumbnail";
 import { IngredientChip } from "@/components/ingredient-chip";
 import { NutritionBreakdownCard } from "@/components/nutrition-breakdown-card";
 import { PrimaryButton } from "@/components/primary-button";
+import { ScreenErrorBoundary } from "@/components/screen-error-boundary";
 import { FieldGroup, SegmentedControl, Stepper } from "@/components/ui/form";
 import { ScreenTitle } from "@/components/ui/section-card";
 import { EmptyState, InlineNotice, ScreenSkeleton } from "@/components/ui/states";
 import { colors } from "@/config/theme";
 import { hasBackendConfiguration } from "@/config/env";
+import { mealTypeForHour } from "@/features/food/food-filter";
 import { enqueueOutbox } from "@/features/outbox/outbox";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId, currentLocalDate, currentTimezone } from "@/lib/local-day";
@@ -42,7 +44,15 @@ export function FoodDetailScreen({ id }: { id?: string }) {
       </AppScreen>
     );
   }
-  return <ConfiguredFoodDetail id={id as Id<"foodCatalog">} />;
+  /*
+    Without a boundary a failed catalog read throws past this screen and into
+    `FatalErrorBoundary`, which replaces the entire app with a restart prompt.
+  */
+  return (
+    <ScreenErrorBoundary scope="foodDetail">
+      <ConfiguredFoodDetail id={id as Id<"foodCatalog">} />
+    </ScreenErrorBoundary>
+  );
 }
 
 /** One line of the per-serving facts table. */
@@ -80,7 +90,12 @@ function ConfiguredFoodDetail({ id }: { id: Id<"foodCatalog"> }) {
   const number = new Intl.NumberFormat(instance.resolvedLanguage, { maximumFractionDigits: 0 });
   const portionCount = new Intl.NumberFormat(instance.resolvedLanguage, { maximumFractionDigits: 1 });
 
-  const [mealType, setMealType] = React.useState<MealType>("lunch");
+  /*
+    Defaulted from the clock rather than pinned to lunch. Every catalog food was
+    filed as lunch unless the user noticed the control, so an evening meal
+    landed in the wrong row of the day and the meal filters mis-sorted it.
+  */
+  const [mealType, setMealType] = React.useState<MealType>(() => mealTypeForHour(new Date().getHours()));
   const [quantity, setQuantity] = React.useState(1);
   const [saving, setSaving] = React.useState(false);
   const [notice, setNotice] = React.useState<{ message: string; tone: "info" | "error" } | null>(null);

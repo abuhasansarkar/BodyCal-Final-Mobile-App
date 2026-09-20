@@ -221,6 +221,39 @@ describe("AI scan gating", () => {
     expect(quota.dailyUsed).toBe(0);
     expect(quota.dailyLimit).toBeGreaterThan(0);
   });
+
+  it("does not grant Pro when RevenueCat reports an unparseable expiry", async () => {
+    const t = setupTest();
+    const { asUser, userId, subject } = await createUser(t, "user_bad_expiry");
+
+    await t.mutation(internal.subscriptions.applyVerification, {
+      customerId: subject,
+      active: true,
+      trial: false,
+      productId: "bodycal_annual",
+      // An upstream or stale-client value that fails server validation.
+      expirationAt: Number.NaN,
+      willRenew: true,
+    });
+
+    // Fail closed: the mirror records expiry rather than an active entitlement.
+    const mirror = await asUser.query(api.subscriptions.getMirror, {});
+    expect(mirror?.state).toBe("expired");
+
+    const storageId = await claimUpload(t, asUser, "mealScan");
+    await expect(
+      t.withIdentity({ subject }).mutation(internal.aiDb.begin, {
+        storageId,
+        requestId: "scan-bad-expiry",
+        locale: "en",
+        provider: "openai",
+        model: "test-model",
+      }),
+    ).rejects.toThrow(/entitlement/i);
+
+    // The invalid row must not leave behind cross-user state.
+    await expect(t.run(async (ctx) => ctx.db.get(userId))).resolves.not.toBeNull();
+  });
 });
 
 /**

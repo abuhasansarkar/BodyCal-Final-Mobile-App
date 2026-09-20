@@ -108,7 +108,17 @@ const revenueCatWebhook = httpAction(async (ctx, request) => {
       : typeof event.entitlement_id === "string"
         ? [event.entitlement_id]
         : [];
-    if (!entitlementIds.includes(PRO_ENTITLEMENT_ID)) {
+    /*
+      Matched case-insensitively, like every other place the app pins `pro`.
+      This was the one exception: `subscription-state.ts` and
+      `subscriptionsActions.ts` both lower-case the key before comparing, so a
+      dashboard entitlement declared as `Pro` granted access on the client and
+      verified through the REST path, while every webhook for it was dropped
+      here as "ignored". The server mirror then never activated and AI scanning
+      stayed locked for a paying subscriber until a REST verification happened
+      to run.
+    */
+    if (!entitlementIds.some((value) => value.toLowerCase() === PRO_ENTITLEMENT_ID)) {
       return new Response("ignored", { status: 200 });
     }
 

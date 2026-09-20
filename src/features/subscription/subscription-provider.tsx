@@ -198,7 +198,10 @@ export function SubscriptionProvider({ children, userId }: PropsWithChildren<{ u
       const purchasedState = deriveSubscriptionState(result.customerInfo);
       applyCustomerInfo(result.customerInfo);
       if (!isProState(purchasedState)) {
-        throw new ProEntitlementMissingError();
+        // Names what the dashboard *did* grant, which is the difference between
+        // "no product attached to the entitlement" and "the entitlement is
+        // spelled differently than the three places this app pins `pro`".
+        throw new ProEntitlementMissingError(Object.keys(result.customerInfo.entitlements.active));
       }
     },
     [annualPackage, applyCustomerInfo, monthlyPackage],

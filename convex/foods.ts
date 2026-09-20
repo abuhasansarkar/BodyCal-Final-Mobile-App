@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { requireCurrentUser } from "./lib/auth";
+import { freeHistoryBoundary } from "./lib/entitlements";
 import {
   assertBoundedString,
   assertEntryNutrition,
@@ -100,24 +101,53 @@ export const searchCatalog = query({
       .collect();
     const favoriteIds = new Set(favorites.map((item) => item.referenceId));
 
+    /*
+      `mealTypes` is an array, so it cannot be a search `filterField` — those
+      compare a whole value for equality, and there is no array-contains. The
+      predicate therefore has to run after the read, which means the read must
+      not already have truncated to `limit`: taking 30 rows and *then* dropping
+      the ones that are not breakfast returned a handful of results and made the
+      rest of the catalog look absent, which is the same defect this function's
+      docstring says was fixed once already, one layer further in.
+
+      The pool is bounded rather than unbounded — a catalog search must not turn
+      into a table scan — so a meal-typed search is exact up to CANDIDATE_POOL
+      ranked matches and truncates beyond it. With a curated catalog that is
+      every match; the ceiling exists so growth degrades gracefully instead of
+      by timeout.
+    */
+    const CANDIDATE_POOL = 200;
+    const readLimit = args.mealType ? Math.min(limit * 8, CANDIDATE_POOL) : limit;
+
     const foods = term
       ? await ctx.db
           .query("foodCatalog")
           .withSearchIndex("search_title", (q) => q.search("searchText", term).eq("active", true))
-          .take(limit)
+          .take(readLimit)
       : await ctx.db
           .query("foodCatalog")
           .withIndex("by_active", (q) => q.eq("active", true))
-          .take(limit);
+          .take(readLimit);
 
-    const filtered = args.mealType
-      ? foods.filter((food) => food.mealTypes.includes(args.mealType!))
+    const mealType = args.mealType;
+    const filtered = mealType
+      ? foods.filter((food) => food.mealTypes.includes(mealType)).slice(0, limit)
       : foods;
 
     return await Promise.all(filtered.map((food) => present(ctx, food, locale, favoriteIds)));
   },
 });
 
+/**
+ * Goal-based catalog suggestions.
+ *
+ * Deliberately without a caller. `foods-screen.tsx` used to render this as a
+ * goal-suggestion section and it was removed on request, so the screen now shows
+ * only the user's own scanned and logged foods. Kept because the catalog, its
+ * localized copy and `foodHeadline.*` are all still in place and re-adding the
+ * section is a product decision rather than a rewrite — this note exists so the
+ * absent caller reads as that decision rather than as an oversight.
+ */
 export const getRecommendations = query({
   args: { goalType: goalTypeValidator, locale: v.string(), limit: v.optional(v.number()) },
   returns: v.array(catalogItem),
@@ -428,13 +458,31 @@ export const getMyScannedAndLoggedFoods = query({
   returns: v.array(userFoodItem),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
-    const limit = boundedLimit(args.limit, 30, 60);
+    /*
+      The Foods tab pages this in blocks of 30 and stops at 150. The ceiling was
+      60, which the screen reached in two taps and then stopped silently — the
+      list simply ended, with nothing to say that older meals existed. It is
+      still a ceiling rather than a cursor because each row resolves a storage
+      URL, so an unbounded read is a real cost; the screen names the ceiling and
+      points at the full history rather than pretending to be complete.
+    */
+    const limit = boundedLimit(args.limit, 30, 150);
 
-    const logs = await ctx.db
-      .query("foodLogs")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(limit);
+    // PLAN §2: free accounts read the last 7 days on every surface. This Foods
+    // reuse list used to read the newest N rows unfiltered, exposing older meal
+    // names/images while every other surface clamped them.
+    const boundary = await freeHistoryBoundary(ctx, user._id);
+    const logs = boundary
+      ? await ctx.db
+          .query("foodLogs")
+          .withIndex("by_user_date", (q) => q.eq("userId", user._id).gte("localDate", boundary))
+          .order("desc")
+          .take(limit)
+      : await ctx.db
+          .query("foodLogs")
+          .withIndex("by_user_created", (q) => q.eq("userId", user._id))
+          .order("desc")
+          .take(limit);
 
     // Identify referenced AI scans without a direct imageStorageId on the log
     const missingScanIds = Array.from(

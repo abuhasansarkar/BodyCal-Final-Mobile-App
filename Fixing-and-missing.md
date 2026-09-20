@@ -171,6 +171,271 @@ again" was actively wrong advice — the next attempt buys nothing and the previ
 one is unaccounted for — so that case now points at Restore instead, in all eight
 languages.
 
-## 6.
+## 6. Full-codebase and process review, 24 Aug 2026 — all findings fixed
+
+A read of the whole tree plus the four gate commands. The gate itself was the
+first finding: `npm test` and `npx expo-doctor` were both failing on `main`, so
+CI was red while `PLAN.md` and this file read green.
+
+### The gate
+
+- **Test fixtures had rotted.** `FREE_HISTORY_DAYS` is a window that moves with
+  the calendar, and `FOOD_ENTRY.localDate` was the literal `2026-08-13`. Eleven
+  days later the fixture sat outside the free window, every gated read clamped it
+  away, and three tests failed reporting an empty array — which reads as a broken
+  query, not an expired fixture. Fixture dates now hang off `localDateOffset()`
+  in `convex/tests/setup.ts`. Tests that deliberately probe *outside* the free
+  window keep their literals and their `grantPro`, because those only ever drift
+  further out.
+- **Thirteen packages behind their SDK 57 patch versions.** `npx expo install
+  --fix`; doctor is 21/21.
+
+### Security and correctness
+
+- **Unmetered RevenueCat calls through `ai.startScan`.** The `aiScan` rate limit
+  lives inside `aiDb.begin`, which runs *after* the entitlement check, and
+  `isEntitlementFresh` returns false for every account with no mirror row — which
+  is every free user. So each `startScan` spent an outbound request to
+  `api.revenuecat.com` before any limiter could refuse it, and the call that
+  eventually threw "Pro entitlement required" had already spent it.
+  `verifyForCurrentUser` now consumes the same per-identity budget as the
+  client-callable `verifyEntitlement`.
+- **A malformed store date granted open-ended Pro.** An unparseable
+  `expires_date` made `active` true and normalized `expirationAt` to `undefined`,
+  which every gate reads as "no expiry". `expires_date: null` legitimately means
+  a non-expiring entitlement and still grants; a date we cannot read is now
+  refused and logged.
+- **The 18–80 age window admitted 17 and 81.** `assertAdultDateOfBirth`
+  subtracted birth years and then allowed a year of slack either side. The slack
+  was covering for year-only arithmetic that `deriveDateOfBirth`'s 1 January
+  convention already makes unnecessary. Now an exact comparison.
+
+### Scale — every item from §3's "open, recorded but not fixed" list
+
+- **`usersDb.collectExport`** `.collect()`ed every row of every user table in one
+  query. Past Convex's read limit that threw, `buildExport` caught it and wrote
+  `export_failed`, and the account with the most data was the one that could
+  never get it out. Now `collectExportHeader` + a cursor-paginated
+  `collectExportPage`, driven by the action.
+- **`maintenance.deleteExpiredExports` and `pruneRateLimits`** read the head of
+  an unindexed table and filtered in JavaScript, so once the head held unexpired
+  rows nothing behind it was ever reached — both reported success and collected
+  nothing. Now indexed (`by_status_expires`, `by_window`) and self-rescheduling,
+  like the two sweeps beside them. `failExport` stamps an expiry so failed jobs
+  are collected too.
+- **`aiDb.readScanUsage`** read every scan of the month and discarded the
+  failures. Failures consume no quota, so nothing bounds how many an account can
+  accumulate — and this runs on the path that starts every scan, so a phone with
+  a bad camera could eventually make its own scanning impossible. Now three
+  bounded reads over `by_user_status_created`, one per billable status.
+- **`foods.searchCatalog`** took `limit` rows and *then* dropped the ones that did
+  not match the meal type, so a filtered search returned whatever fraction of the
+  first page happened to match. `mealTypes` is an array and cannot be a search
+  `filterField`, so the read now over-fetches into a bounded candidate pool
+  before filtering.
+- **`dashboard.getDailyCalorieSeries`** `.collect()`ed a range capped only at ten
+  years, while the progress screen offers "All". Now bounded and read
+  newest-first, so if the bound is ever reached the chart loses its oldest days
+  rather than flat-lining the ones the user is looking at; the partial day the
+  cut falls inside is dropped rather than charted wrong.
+
+### Product
+
+- **`settings.get` had no caller.** The table had a writer and no reader, so its
+  own docstring — that these preferences follow the account across devices —
+  described something that did not happen. Language was worse: nothing ever
+  *wrote* it, so `languageMode`/`language` only held insert defaults. New
+  `providers/settings-sync-provider.tsx` pulls once on sign-in, filling in only
+  what this device has no answer for, then pushes this device's choices back.
+  A device with its own stored language keeps it; an analytics question already
+  answered here is never overwritten by the account's copy.
+- **Rate limits reached the user as "the analysis did not finish".**
+  `describeStartFailure` read `cause.data` only when it was a string, and
+  `consumeRateLimit` is the one error that throws object data — so the object
+  fell through to `cause.message`, matched no branch, and `retryAfterMs` was
+  discarded. Extracted to `features/scan/start-failure.ts` (testable, returns a
+  key rather than translated text), with new copy in all eight languages that
+  says how long to wait.
+- **`aiDb.getScanQuota` had no caller,** so the 10/day and 150/month limits were
+  enforced but invisible and discoverable only by failing. The camera screen now
+  shows the remaining count once it is down to three, reusing the existing notice
+  treatment rather than inventing one.
+
+### Not defects — no change, now documented in place
+
+- `foods.getRecommendations` has no caller because the goal-suggestion section
+  was removed from the foods screen on request. Re-adding it is a product
+  decision, not a repair.
+- `aiDb.getProviderStatus` has no caller because it is an operator tool read from
+  the Convex dashboard. Giving it a screen would put deployment configuration in
+  front of users.
+- `settings.update({ units })` is a redundant mirror: display units live on
+  `userProfiles`, which `profiles.getCurrent` already reads back.
+
+### Process
+
+`PLAN.md` and this file were both green while the gate was red. Status markers
+should not move until the gate has been run in the worktree — the rule AGENTS.md
+already states for checks applies to the markers that report them.
+
+## 7. `settings.get` threw `Unauthenticated` on the welcome screen — fixed
+
+Introduced by §6's own settings-sync work, reported from the device log the same
+evening.
+
+`SettingsSyncProvider` subscribed to `api.settings.get` unconditionally. It sits
+inside `ConvexUserGate`, and that gate returns its children *unwrapped* when
+nobody is signed in — the auth and public routes live under the same provider
+tree — so the query ran with no identity on the very first screen of the app and
+`requireCurrentUser` threw.
+
+`OutboxSyncProvider`, its sibling, already guarded every flush with
+`useConvexAuth().isAuthenticated`. The new provider was the outlier and now
+follows the same pattern: the subscription is `"skip"` until Convex has an
+identity, both effects return early without one, and the pull flag resets on
+sign-out so the next account adopts its own settings rather than inheriting the
+previous one's.
+
+`settings.get` is also tolerant now, matching `users.getCurrent`: no identity, or
+an identity whose `syncFromClerk` has not landed, answers null rather than
+throwing. A client subscribes to this across sign-in and sign-out, and those
+moments are not errors. Nothing is leaked by the distinction — the answer is the
+caller's own settings or nothing at all.
+
+`aiDb.getScanQuota` on the camera screen took the same guard, for the same reason.
+
+Covered by three regressions in `convex/tests/reviewRegressions.test.ts`.
+
+## 8. Progress card rendered `{{percent}}% of goal` — fixed
+
+Reported from a screenshot of the Progress tab.
+
+### The literal placeholder
+
+`progress.pctOfGoal` is defined **twice**. `resources.ts` says `"{{pct}}% of your
+goal"`; `screens/*.ts` says `"{{percent}}% of goal"`. `buildBundle` assigns
+`progress: screens.progress`, replacing the namespace outright rather than
+merging it, so the screens copy is the one that renders and the `resources` copy
+is unreachable. `progress-screen.tsx` passed `{ pct }`.
+
+i18next leaves an unmatched placeholder in place rather than throwing — correct
+at runtime, and the reason this reached a device in all eight languages with
+every test passing. `parity.test.ts` compares which keys *exist*; the key existed
+everywhere and every language agreed. The mismatch was between the call site and
+the bundle, which nothing looked at.
+
+Fixed by passing `percent`, and the dead `progressTranslations` copy now carries
+a comment saying it is superseded and must not be added to.
+
+### The guard
+
+`src/locales/interpolation.test.ts` parses every `t("key", { … })` call in `src/`
+— balanced-brace scan, so nested objects and ternaries are read whole, and
+shorthand `{ percent }` counts — resolves each key against the bundle that
+actually renders, and fails when the string names a placeholder the call site
+does not supply. Verified against the real defect: reintroducing `pct` fails the
+suite in all eight languages with the file and both names.
+
+### Screens that could take down the app
+
+The dashboard had an error boundary written inline. Progress, Profile and Foods
+had none, so a Convex `useQuery` observing a server error threw past them to
+`FatalErrorBoundary` — which replaces the *whole* app with "Something went wrong"
+and offers a restart. One failed profile query should not read as a crash, nor
+cost the user their place in the app.
+
+`components/screen-error-boundary.tsx` generalizes it: a retryable card in place
+of the screen, reporting to Sentry with a `screen` tag rather than swallowing the
+error, and reusing the existing `ErrorState` and `errors.loadFailed`. Applied to
+Progress, Profile and Foods; the dashboard's hand-rolled copy now uses it too and
+keeps its own wording.
+
+### Checked and correct — no change
+
+- All twelve Profile settings routes resolve to real files.
+- `weights.getHistory` orders `desc`, so Profile's `limit: 1` really is the
+  latest entry, not the oldest.
+- The floating gear in the screenshot is the `expo-dev-client` launcher button,
+  not app UI.
+- Content passing under the translucent tab bar is iOS behaviour;
+  `contentInsetAdjustmentBehavior="automatic"` gives the scroll view its inset.
+
+## 9. Foods tab review, 25 Aug 2026 — fixed
+
+A full pass over the Foods tab and the two screens it should lead to. The tab
+rendered a list and nothing else: no route out of it, a search box that searched
+almost nothing, and a "Log Again" button that failed in silence.
+
+### The list led nowhere
+
+`UserScannedFoodCard` was a plain `View`. `/(app)/food/log/[id]` — the screen
+that views, corrects and deletes a logged meal — existed and was reachable from
+Today and from History, but not from the tab dedicated to the user's meals. From
+here a logged meal could not be opened at all. The card is now the press target,
+with a composed accessibility label and a hint.
+
+### The search box only searched what was already on screen
+
+It substring-matched the 40 rows the screen had already loaded. `foods.searchCatalog`,
+its search index, `foodCatalog` and every localized title in it had no caller, so
+`/(app)/food/[id]` — the catalog detail screen — was unreachable in the running
+app, and a search for a food the user had never logged returned "No matches" for
+a catalog that contained it.
+
+Searching now consults three sources under one query: the user's own logged
+meals, their saved custom foods, and the catalog through its search index.
+Matching is accent-insensitive, because "musli" must find "Müsli" in a German
+build. The catalog section appears only while a query is present, so the
+goal-suggestion section that was removed on request stays removed.
+
+### Re-logging failed silently
+
+`catch {}` with a comment saying the user could retry — nothing on screen said
+the write had failed, and there was no offline path, so a re-log made with no
+connection was simply lost. `features/food/use-relog-meal.ts` now carries that
+flow for both screens: an offline attempt is queued for `OutboxSyncProvider`,
+every outcome produces a notice, and one in-flight re-log disables all of them so
+a double tap cannot produce two entries. It stays on the screen afterwards rather
+than jumping to Today — "log again" is an action people repeat.
+
+The photograph is deliberately not copied to the new entry. An image's lifetime
+is bound to the scan that produced it and `foodLogs.remove` reclaims the blob
+with the entry that owns it, so a second entry pointing at the same storage id
+would lose its picture the moment the original was deleted.
+
+### Other defects fixed on the same screens
+
+- **A meal-type filter that matched nothing** showed "No scanned meals found" and
+  offered a camera. The user had meals; the chip did not. It now says so and
+  offers to clear the chip.
+- **`MacroStat` had an `accessibilityLabel` on a `View` with no `accessible`,**
+  so the label was dropped and VoiceOver read the value and the label as two
+  separate elements. Same defect on the streak badge.
+- **Every card name carried `accessibilityRole="header"`,** so screen-reader
+  header navigation walked through forty list items.
+- **The list stopped at 60 entries in silence.** It pages in blocks of 30 to a
+  stated ceiling of 150, names what is on screen, and points at the full history.
+- **`/(app)/food/[id]` and `/(app)/food/log/[id]` had no error boundary,** so a
+  failed read replaced the whole app with a restart prompt.
+- **The catalog detail screen filed every food as lunch** unless the user noticed
+  the meal control. It now defaults from the local hour.
+- **Deleting an entry called `router.back()` unconditionally,** which is a no-op
+  when the screen was opened by deep link and left the user on a deleted entry.
+- **The delete confirmation offered "Yes" and "No",** which forces the reader
+  back to the title to work out which one deletes. Now "Cancel" and "Delete".
+- **The logged-meal screen had no primary action.** Correcting and deleting were
+  in the hero; eating the same thing again meant going back to the tab.
+
+### Still open — product decisions, not defects
+
+- `/(app)/food/search` remains reachable only from the new "Browse the food
+  library" link in the Foods footer. Its favourites, recents and library sections
+  are now largely duplicated by the tab's own search; removing it is a product
+  call, so it is linked rather than deleted.
+- `foods.getRecommendations` still has no caller, for the reason recorded in §6.
+- The design's fifth "Shakes" chip has no equivalent: `MealType` is
+  breakfast/lunch/dinner/snack, so the chip would match nothing.
+
+## 10.
 
 <!-- Add the next issue here. -->

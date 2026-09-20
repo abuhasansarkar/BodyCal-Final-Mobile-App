@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { api, internal } from "../_generated/api";
+import { EXPORT_TABLE_COUNT } from "../usersDb";
 import { claimUpload, createUser, FOOD_ENTRY, ONBOARDING_INPUT, settle, setupTest } from "./setup";
 
 /**
@@ -26,23 +27,47 @@ describe("data export", () => {
       clientRequestId: "w-1",
     });
 
-    const raw = await t.query(internal.usersDb.collectExport, { userId });
-    const data = raw ? (JSON.parse(raw) as Record<string, unknown[]>) : null;
+    const header = await t.query(internal.usersDb.collectExportHeader, { userId });
+    expect(header).not.toBeNull();
 
-    expect(data).not.toBeNull();
-    expect(data?.foodLogs).toHaveLength(1);
-    expect(data?.weightLogs).toHaveLength(1);
-    expect(data?.nutritionGoals).toHaveLength(1);
-    expect(data?.userProfiles).toHaveLength(1);
+    // Walk the export the way `usersActions.buildExport` does, so the assertion
+    // covers the pagination rather than a single collect that no longer exists.
+    const data: Record<string, unknown[]> = {};
+    for (let tableIndex = 0; tableIndex < EXPORT_TABLE_COUNT; tableIndex += 1) {
+      let cursor: string | null = null;
+      const rows: unknown[] = [];
+      do {
+        const page: { table: string; rows: unknown[]; continueCursor: string | null } =
+          await t.query(internal.usersDb.collectExportPage, { userId, tableIndex, cursor });
+        rows.push(...page.rows);
+        data[page.table] = rows;
+        cursor = page.continueCursor;
+      } while (cursor !== null);
+    }
+
+    expect(data.foodLogs).toHaveLength(1);
+    expect(data.weightLogs).toHaveLength(1);
+    expect(data.nutritionGoals).toHaveLength(1);
+    expect(data.userProfiles).toHaveLength(1);
   });
 
-  it("reuses a pending export instead of stacking duplicates", async () => {
+  it("reuses only an unexpired pending export instead of stacking duplicates", async () => {
     const t = setupTest();
     const { asUser } = await createUser(t);
 
     const first = await asUser.mutation(api.users.requestExport, {});
     const second = await asUser.mutation(api.users.requestExport, {});
     expect(second).toBe(first);
+    await settle(t);
+
+    // An expired pending row must not be reused: the new request replaces it.
+    const stale = await asUser.mutation(api.users.requestExport, {});
+    await settle(t);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(stale, { status: "pending", expiresAt: Date.now() - 1, updatedAt: Date.now() });
+    });
+    const replacement = await asUser.mutation(api.users.requestExport, {});
+    expect(replacement).not.toBe(stale);
     await settle(t);
   });
 

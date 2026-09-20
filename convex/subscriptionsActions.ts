@@ -67,10 +67,26 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
   const entitlementKey = Object.keys(entitlements).find((key) => key.toLowerCase() === PRO_ENTITLEMENT_ID);
   const entitlement = entitlementKey ? entitlements[entitlementKey] : undefined;
   const expiresRaw = entitlement?.expires_date;
-  const expirationAt = expiresRaw ? Date.parse(expiresRaw) : undefined;
+  const parsedExpiration = expiresRaw ? Date.parse(expiresRaw) : undefined;
+  /*
+    A date RevenueCat sent but we could not read is not the same as no date at
+    all. `expires_date: null` legitimately means a non-expiring entitlement, and
+    that must keep granting access; an unparseable string means the response is
+    malformed, and this used to treat it as the non-expiring case — `active` went
+    true and the stored `expirationAt` was normalized to `undefined`, which every
+    gate reads as "no expiry". One malformed field bought open-ended Pro until a
+    webhook happened to correct it. It is now refused, and the webhook remains
+    the authority that can grant it back.
+  */
+  const expirationUnreadable = parsedExpiration !== undefined && Number.isNaN(parsedExpiration);
+  const expirationAt = expirationUnreadable ? undefined : parsedExpiration;
+  if (expirationUnreadable) {
+    console.error("[subscription] RevenueCat returned an unreadable expires_date; refusing to grant");
+  }
   const active =
     Boolean(entitlement) &&
-    (expirationAt === undefined || Number.isNaN(expirationAt) || expirationAt > Date.now());
+    !expirationUnreadable &&
+    (expirationAt === undefined || expirationAt > Date.now());
 
   const productId = entitlement?.product_identifier;
   const subscription = productId ? payload.subscriber?.subscriptions?.[productId] : undefined;
@@ -84,7 +100,7 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
     trial,
     productId,
     periodType: subscription?.period_type,
-    expirationAt: expirationAt !== undefined && !Number.isNaN(expirationAt) ? expirationAt : undefined,
+    expirationAt,
     // Only asserted when the store told us the subscription was cancelled.
     willRenew: active ? !unsubscribeDetected : false,
     unsubscribeDetected,
@@ -94,19 +110,34 @@ async function verify(ctx: ActionCtx, clerkUserId: string): Promise<EntitlementR
   return {
     active,
     trial,
-    expirationAt: expirationAt !== undefined && !Number.isNaN(expirationAt) ? expirationAt : undefined,
+    expirationAt,
     productId,
     willRenew: active ? !unsubscribeDetected : false,
   };
 }
 
-/** Internal entry point used by `ai.startScan` when the mirror is stale. */
+/**
+ * Internal entry point used by `ai.startScan` when the mirror is stale.
+ *
+ * Rate limited on the same per-identity budget as the client-callable refresh,
+ * and deliberately so. `startScan`'s own `aiScan` limit lives inside
+ * `aiDb.begin`, which runs *after* this — and `isEntitlementFresh` returns false
+ * for every account with no mirror row at all, which is every free user. So each
+ * `startScan` call made an unmetered outbound request to `api.revenuecat.com`
+ * before any limiter could refuse it, and the call that eventually threw "Pro
+ * entitlement required" had already spent the request. Sharing the budget puts a
+ * ceiling on what one identity can drive at RevenueCat regardless of which entry
+ * point it comes through.
+ */
 export const verifyForCurrentUser = internalAction({
   args: {},
   returns: entitlementResultValidator,
   handler: async (ctx): Promise<EntitlementResult> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Authentication required");
+    await ctx.runMutation(internal.subscriptionsDb.consumeVerificationBudget, {
+      subject: identity.subject,
+    });
     return await verify(ctx, identity.subject);
   },
 });

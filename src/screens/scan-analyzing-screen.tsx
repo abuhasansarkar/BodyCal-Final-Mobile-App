@@ -1,5 +1,4 @@
 import { useAction, useMutation, useQuery } from "convex/react";
-import { ConvexError } from "convex/values";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import React from "react";
@@ -16,44 +15,13 @@ import { hasBackendConfiguration } from "@/config/env";
 import { api } from "@/lib/convex-api";
 import { createClientRequestId } from "@/lib/local-day";
 import { i18n } from "@/locales/i18n";
+import { describeStartFailure } from "@/features/scan/start-failure";
 import { uploadImageToStorage } from "../features/scan/upload-image";
 import { FeatureScreen } from "@/screens/feature-screen";
 import { Pressable, Text, View } from "@/tw";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type Failure = { text: string; showUpgrade: boolean; canRetry: boolean; title?: string };
-
-function describeStartFailure(cause: unknown, t: (key: string) => string): Failure {
-  const data = cause instanceof ConvexError ? cause.data : undefined;
-  const message =
-    typeof data === "string" ? data : cause instanceof Error ? cause.message : String(cause ?? "");
-
-  if (message.includes("entitlement") || message.includes("Pro entitlement")) {
-    return { text: t("scan.errorEntitlement"), showUpgrade: true, canRetry: false };
-  }
-  if (message.includes("fair-use") || message.includes("limit")) {
-    return { text: t("scan.errorQuota"), showUpgrade: false, canRetry: false };
-  }
-  if (message.includes("image_too_large") || message.includes("4 MB")) {
-    return { text: t("scan.errorTooLarge"), showUpgrade: false, canRetry: false };
-  }
-  if (message.includes("image_unreadable")) {
-    return { text: t("scan.errorImageGone"), showUpgrade: false, canRetry: false };
-  }
-  if (message.includes("upload_timeout")) {
-    return { text: t("scan.errorTimeout"), showUpgrade: false, canRetry: true };
-  }
-  if (message.includes("upload_failed") || message.includes("upload_invalid_response")) {
-    return { text: t("scan.errorUpload"), showUpgrade: false, canRetry: true };
-  }
-  if (message.includes("not configured")) {
-    return { text: t("scan.errorUnavailable"), showUpgrade: false, canRetry: false };
-  }
-  if (message.toLowerCase().includes("network")) {
-    return { text: t("scan.errorOffline"), showUpgrade: false, canRetry: true };
-  }
-  return { text: t("scan.errorGeneric"), showUpgrade: false, canRetry: true };
-}
 
 function describeScanFailure(
   category: string | null,
@@ -245,7 +213,12 @@ function ConfiguredAnalyzing({ uri, resumedScanId }: { uri?: string; resumedScan
         setScanId(started.scanId);
         router.setParams({ scanId: started.scanId });
       } catch (cause) {
-        const failure = describeStartFailure(cause, t);
+        const described = describeStartFailure(cause);
+        const failure: Failure = {
+          text: t(described.messageKey, described.messageParams ?? {}),
+          showUpgrade: described.showUpgrade,
+          canRetry: described.canRetry,
+        };
         if (failure.showUpgrade) {
           console.log("[scan] Pro entitlement required for AI meal scan");
         } else {

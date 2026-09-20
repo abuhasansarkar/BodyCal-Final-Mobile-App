@@ -89,12 +89,16 @@ export const requestExport = mutation({
     const user = await requireCurrentUser(ctx);
     await consumeRateLimit(ctx, "export", user._id);
 
-    // Reuse a job that is still running instead of stacking duplicates.
+    // Reuse a job that is still running and has not expired, instead of stacking
+    // duplicates.
     const jobs = await ctx.db
       .query("exportJobs")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
-    const pending = jobs.find((job) => job.status === "pending");
+    const now = Date.now();
+    const pending = jobs.find(
+      (job) => job.status === "pending" && (job.expiresAt === undefined || job.expiresAt > now),
+    );
     if (pending) return pending._id;
 
     for (const job of jobs) {
@@ -102,7 +106,6 @@ export const requestExport = mutation({
       await ctx.db.delete(job._id);
     }
 
-    const now = Date.now();
     const jobId = await ctx.db.insert("exportJobs", {
       userId: user._id,
       status: "pending",

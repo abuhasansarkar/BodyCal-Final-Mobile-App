@@ -297,6 +297,7 @@ Required workflow:
 - [x] Implement search across curated, custom, recent, and favorites.
 - [x] Favorites mutations plus UI: a favourite toggle on catalog rows and a Favourites section in Food search.
 - [x] Add editable portions, meal selection, dates, and quantities.
+- [x] The Foods tab is the search surface: one query covers the user's logged meals, their saved custom foods, and the curated catalog, and its cards open the logged-meal detail screen. `/(app)/food/search` remains as a secondary route reachable from the Foods footer.
 - [ ] Build reviewed food-catalog import/seed pipeline with localized content.
 - [ ] Add food images and attribution/rights records where required.
 - Exit: manual/catalog tracking works online, offline, and after retries without duplicate records.

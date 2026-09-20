@@ -47,15 +47,35 @@ async function readScanUsage(ctx: QueryCtx, userId: Id<"users">) {
   const now = Date.now();
   const startOfMonth = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
 
-  const scans = await ctx.db
-    .query("aiScans")
-    .withIndex("by_user_created", (q) =>
-      q.eq("userId", userId).gte("createdAt", Math.min(startOfMonth, startOfLocalDay)),
-    )
-    .collect();
+  /*
+    Read the billable statuses directly rather than reading everything and
+    discarding failures. A failed scan produced nothing, so it never counts
+    against an allowance — but it was still being *read*, and nothing bounds how
+    many an account can accumulate: failures consume no quota, so the only limit
+    on them is the per-minute rate limit, which permits thousands a day. This
+    query runs on the path that starts every scan, so an account with a bad
+    camera could eventually make its own scanning impossible.
 
-  // A failed scan produced nothing, so it never counts against an allowance.
-  const billable = scans.filter((scan) => scan.status !== "failed");
+    Each range is bounded by the monthly allowance instead. The `+ 1` margin
+    keeps `>=` comparisons against the limits correct at the boundary; nothing
+    reads the counts as an exact total beyond that.
+  */
+  const BILLABLE_STATUSES = ["pending", "processing", "completed"] as const;
+  const since = Math.min(startOfMonth, startOfLocalDay);
+
+  const billable = (
+    await Promise.all(
+      BILLABLE_STATUSES.map((status) =>
+        ctx.db
+          .query("aiScans")
+          .withIndex("by_user_status_created", (q) =>
+            q.eq("userId", userId).eq("status", status).gte("createdAt", since),
+          )
+          .take(MONTHLY_SCAN_LIMIT + 1),
+      ),
+    )
+  ).flat();
+
   const timezone = profile?.timezone ?? "UTC";
   const onLocalDay = (createdAt: number) => {
     try {
@@ -115,6 +135,10 @@ export const getScanQuota = query({
  *
  * Returns no secret — only which variable name supplied a value, and the model
  * in use. Requires an authenticated caller regardless.
+ *
+ * Deliberately without a caller in the app. This is an operator tool, read from
+ * the Convex dashboard when a deployment reports scans failing, and giving it a
+ * screen would put deployment configuration in front of users to no purpose.
  */
 export const getProviderStatus = query({
   args: {},

@@ -21,6 +21,7 @@ import { AnalyticsProvider } from "@/providers/analytics-provider";
 import { ConvexUserGate } from "@/providers/convex-user-gate";
 import { NotificationProvider } from "@/providers/notification-provider";
 import { OutboxSyncProvider } from "@/providers/outbox-sync-provider";
+import { SettingsSyncProvider } from "@/providers/settings-sync-provider";
 
 const convexClient = publicEnv.convexUrl ? new ConvexReactClient(publicEnv.convexUrl) : null;
 
@@ -70,7 +71,9 @@ function AuthenticatedProviders({ children }: PropsWithChildren) {
           one Clerk user can be rendered for the next user. */}
       <SubscriptionProvider key={user?.id ?? "signed-out"} userId={user?.id}>
         <SubscriptionMirrorSync userId={user?.id} />
-        <OutboxSyncProvider>{children}</OutboxSyncProvider>
+        <SettingsSyncProvider>
+          <OutboxSyncProvider>{children}</OutboxSyncProvider>
+        </SettingsSyncProvider>
       </SubscriptionProvider>
     </ConvexUserGate>
   );

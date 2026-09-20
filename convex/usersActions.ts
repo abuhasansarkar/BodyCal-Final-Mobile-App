@@ -4,19 +4,63 @@ import { v } from "convex/values";
 
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
+import { EXPORT_TABLE_COUNT } from "./usersDb";
 
 const EXPORT_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 /** Safety stop so a bug can never spin the deletion loop forever. */
 const MAX_DELETE_BATCHES = 500;
+
+/**
+ * Pages read per table before the walk gives up.
+ *
+ * A safety stop, not a product limit: at `EXPORT_PAGE_SIZE` rows a page this is
+ * two hundred thousand rows in a single table, well past anything a real account
+ * accumulates. Hitting it means a cursor stopped advancing, and failing loudly
+ * beats writing a silently short archive and calling it the user's data.
+ */
+const MAX_EXPORT_PAGES_PER_TABLE = 400;
 
 export const buildExport = internalAction({
   args: { jobId: v.id("exportJobs"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const data = await ctx.runQuery(internal.usersDb.collectExport, { userId: args.userId });
-      if (!data) throw new Error("missing_user");
+      const header = await ctx.runQuery(internal.usersDb.collectExportHeader, {
+        userId: args.userId,
+      });
+      if (!header) throw new Error("missing_user");
 
+      const records: Record<string, unknown> = {
+        exportedAt: new Date().toISOString(),
+        user: header,
+      };
+
+      for (let tableIndex = 0; tableIndex < EXPORT_TABLE_COUNT; tableIndex += 1) {
+        const rows: unknown[] = [];
+        let cursor: string | null = null;
+        let pages = 0;
+
+        for (;;) {
+          // Annotated because `cursor` feeds back into the call that produces it,
+          // which TypeScript cannot resolve on its own.
+          const page: { table: string; rows: unknown[]; continueCursor: string | null } =
+            await ctx.runQuery(internal.usersDb.collectExportPage, {
+              userId: args.userId,
+              tableIndex,
+              cursor,
+            });
+          rows.push(...page.rows);
+          records[page.table] = rows;
+
+          cursor = page.continueCursor;
+          if (cursor === null) break;
+
+          pages += 1;
+          if (pages > MAX_EXPORT_PAGES_PER_TABLE) throw new Error("export_page_limit");
+        }
+      }
+
+      const data = JSON.stringify(records, null, 2);
       const storageId = await ctx.storage.store(
         new Blob([data], { type: "application/json" }),
       );

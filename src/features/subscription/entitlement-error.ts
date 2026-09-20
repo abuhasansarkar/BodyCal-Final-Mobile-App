@@ -12,9 +12,30 @@
  * rule can be tested without loading the store SDK.
  */
 export class ProEntitlementMissingError extends Error {
-  constructor() {
-    super('The store purchase completed, but it is not attached to the RevenueCat entitlement "pro".');
+  /**
+   * The entitlement identifiers RevenueCat actually returned for the purchase.
+   *
+   * Without them the failure is undiagnosable: "not attached to `pro`" reads
+   * identically whether the dashboard granted nothing at all (no product on the
+   * entitlement) or granted something under another name (`Pro`, `premium`, a
+   * leftover test tier). Those need opposite fixes, and the console line this
+   * feeds was the only signal a developer got.
+   *
+   * Entitlement identifiers are dashboard configuration, not subscriber data —
+   * no receipt, price, store account or user id is carried here, so this stays
+   * inside the privacy rule that keeps subscriber detail out of logs.
+   */
+  readonly grantedEntitlements: readonly string[];
+
+  constructor(grantedEntitlements: readonly string[] = []) {
+    super(
+      'The store purchase completed, but it is not attached to the RevenueCat entitlement "pro".' +
+        (grantedEntitlements.length > 0
+          ? ` RevenueCat granted: ${grantedEntitlements.join(", ")}.`
+          : " RevenueCat granted no entitlement for it."),
+    );
     this.name = "ProEntitlementMissingError";
+    this.grantedEntitlements = grantedEntitlements;
   }
 }
 
@@ -29,4 +50,11 @@ export function isProEntitlementMissing(cause: unknown) {
     cause !== null &&
     (cause as { name?: unknown }).name === "ProEntitlementMissingError"
   );
+}
+
+/** The entitlements the store did grant, for the diagnostic log line only. */
+export function grantedEntitlementsOf(cause: unknown): readonly string[] {
+  if (!isProEntitlementMissing(cause)) return [];
+  const granted = (cause as { grantedEntitlements?: unknown }).grantedEntitlements;
+  return Array.isArray(granted) ? granted.filter((value): value is string => typeof value === "string") : [];
 }

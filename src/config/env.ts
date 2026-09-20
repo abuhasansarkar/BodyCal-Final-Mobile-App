@@ -65,6 +65,24 @@ export const missingReleaseEnv = Object.entries(REQUIRED_FOR_RELEASE)
   .map(([name]) => name);
 
 /**
+ * RevenueCat's Test Store keys are prefixed `test_`, and both platform keys
+ * carry the same one because the Test Store is platform-independent. Real keys
+ * are `appl_` (Apple) and `goog_` (Google).
+ *
+ * Purchases made against a Test Store key are simulated: they never reach the
+ * App Store or Play, they renew every few minutes and expire after five
+ * renewals, and RevenueCat's own documentation says never to submit an app
+ * configured with one. Nothing else in this file would have stopped it — a
+ * `test_` key is a non-empty string, so every existing check passes and a
+ * release could ship billing that takes no money.
+ */
+const TEST_STORE_KEY_PREFIX = "test_";
+
+export const usesTestStoreBilling = [publicEnv.revenueCatIosKey, publicEnv.revenueCatAndroidKey]
+  .filter((value): value is string => Boolean(value))
+  .some((value) => value.startsWith(TEST_STORE_KEY_PREFIX));
+
+/**
  * Production builds must not start in an unconfigured state.
  *
  * When configuration is missing the app previously fell back to an ungated
@@ -78,6 +96,13 @@ if (!__DEV__) {
     throw new Error(
       `BodyCal is missing required public configuration: ${missing.join(", ")}. ` +
         "Set these in the EAS build profile before releasing.",
+    );
+  }
+  if (usesTestStoreBilling) {
+    throw new Error(
+      "BodyCal is configured with a RevenueCat Test Store key (test_…). Test Store purchases " +
+        "are simulated and must never ship. Set the platform keys (appl_… / goog_…) in the EAS " +
+        "build profile before releasing.",
     );
   }
 }

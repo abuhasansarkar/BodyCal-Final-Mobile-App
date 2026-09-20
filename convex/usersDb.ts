@@ -7,26 +7,72 @@ import { EXPORTED_TABLES, USER_SCOPED_TABLES } from "./lib/userTables";
 /** Rows cleared per transaction. Deletion resumes until every table is empty. */
 const DELETE_BATCH = 200;
 
-export const collectExport = internalQuery({
+/** Rows read per export page. One query must stay well inside Convex's read limits. */
+const EXPORT_PAGE_SIZE = 500;
+
+/** How many tables an export walks. The action drives the loop; this bounds it. */
+export const EXPORT_TABLE_COUNT = EXPORTED_TABLES.length;
+
+export const collectExportHeader = internalQuery({
   args: { userId: v.id("users") },
-  returns: v.union(v.string(), v.null()),
+  returns: v.union(
+    v.object({
+      email: v.string(),
+      name: v.optional(v.string()),
+      createdAt: v.number(),
+    }),
+    v.null(),
+  ),
   handler: async (ctx, { userId }) => {
     const user = await ctx.db.get(userId);
     if (!user) return null;
+    return { email: user.email, name: user.name, createdAt: user.createdAt };
+  },
+});
 
-    const records: Record<string, unknown> = {
-      exportedAt: new Date().toISOString(),
-      user: { email: user.email, name: user.name, createdAt: user.createdAt },
+/**
+ * One page of one exported table.
+ *
+ * This used to be a single query that `.collect()`ed every row of every
+ * user-scoped table at once. A Convex query is bounded — a few thousand
+ * documents, a few megabytes — so a heavy account did not get a large export,
+ * it got no export: the query threw, `buildExport`'s catch wrote
+ * `errorCategory: "export_failed"`, and the privacy screen reported a failure
+ * with no way to tell "we could not read your data" from "you have too much of
+ * it". Paginating means the account that most needs its data out is the one that
+ * can still get it.
+ *
+ * Addressed by index rather than by name so the argument stays a plain number:
+ * the caller walks `0 … EXPORT_TABLE_COUNT - 1`, and adding a table to
+ * `EXPORTED_TABLES` extends the walk with no validator to keep in step.
+ */
+export const collectExportPage = internalQuery({
+  args: {
+    userId: v.id("users"),
+    tableIndex: v.number(),
+    cursor: v.union(v.string(), v.null()),
+  },
+  returns: v.object({
+    table: v.string(),
+    // Heterogeneous across eleven tables, and re-serialized verbatim into the
+    // archive. Narrowing it here would mean restating every table's shape.
+    rows: v.array(v.any()),
+    continueCursor: v.union(v.string(), v.null()),
+  }),
+  handler: async (ctx, args) => {
+    const table = EXPORTED_TABLES[args.tableIndex];
+    if (!table) throw new Error("unknown_export_table");
+
+    const result = await ctx.db
+      .query(table)
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .paginate({ cursor: args.cursor, numItems: EXPORT_PAGE_SIZE });
+
+    return {
+      table,
+      rows: result.page,
+      continueCursor: result.isDone ? null : result.continueCursor,
     };
-
-    for (const table of EXPORTED_TABLES) {
-      records[table] = await ctx.db
-        .query(table)
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
-    }
-
-    return JSON.stringify(records, null, 2);
   },
 });
 
@@ -46,16 +92,28 @@ export const completeExport = internalMutation({
   },
 });
 
+/**
+ * A failed job is stamped with an expiry as well as a status.
+ *
+ * It holds no archive, but it does hold a user id, and it is what the privacy
+ * screen reads to explain that an export did not finish. `expiresAt` is what
+ * `maintenance.deleteExpiredExports` ranges over, so without one the row sat
+ * outside every sweep and was never collected.
+ */
+const FAILED_EXPORT_TTL_MS = 24 * 60 * 60 * 1_000;
+
 export const failExport = internalMutation({
   args: { jobId: v.id("exportJobs"), errorCategory: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
     if (!job) return null;
+    const now = Date.now();
     await ctx.db.patch(args.jobId, {
       status: "failed",
       errorCategory: args.errorCategory,
-      updatedAt: Date.now(),
+      expiresAt: now + FAILED_EXPORT_TTL_MS,
+      updatedAt: now,
     });
     return null;
   },
