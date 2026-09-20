@@ -334,7 +334,7 @@ export const applyVerification = internalMutation({
       .unique();
     if (!user) return null;
 
-    const state: MirrorState = !args.active
+    let state: MirrorState = !args.active
       ? "expired"
       : args.billingIssueDetected
         ? "billingIssueActive"
@@ -343,6 +343,18 @@ export const applyVerification = internalMutation({
           : args.unsubscribeDetected || args.willRenew === false
             ? "cancelledActive"
             : "active";
+
+    // Fail closed when the store's expiry is unreadable or already in the past.
+    // RevenueCat can report `active: true` alongside a malformed or stale
+    // `expires_date`; trusting that combination would grant open-ended Pro.
+    // `expirationAt` may be `undefined` (non-expiring entitlement) — that is
+    // fine and must not be confused with a bad value.
+    if (
+      args.expirationAt !== undefined &&
+      (!Number.isFinite(args.expirationAt) || args.expirationAt <= Date.now())
+    ) {
+      state = "expired";
+    }
 
     const existing = await ctx.db
       .query("subscriptionMirror")

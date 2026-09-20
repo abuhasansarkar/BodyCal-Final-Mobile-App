@@ -1,0 +1,7 @@
+
+> bodycal@1.0.0 lint
+> expo lint
+
+env: load .env.local
+env: export CONVEX_DEPLOYMENT EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY EXPO_PUBLIC_CONVEX_SITE_URL EXPO_PUBLIC_CONVEX_URL
+EXIT_CODE=0  

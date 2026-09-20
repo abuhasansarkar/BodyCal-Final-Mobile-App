@@ -1,35 +1,30 @@
 
-> bodycal@1.0.0 test
-> jest --runInBand --forceExit
+> bodycal@1.0.0 test:convex
+> jest --selectProjects convex --runInBand --forceExit
+
+Running one project: convex
+FAIL convex convex/tests/subscription.test.ts
+  ● AI scan gating › does not grant Pro when RevenueCat reports an unparseable expiry
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "expired"
+    Received: "active"
+
+    [0m [90m 239 |[39m     [90m// Fail closed: the mirror records expiry rather than an active entitlement.[39m
+     [90m 240 |[39m     [36mconst[39m mirror [33m=[39m [36mawait[39m asUser[33m.[39mquery(api[33m.[39msubscriptions[33m.[39mgetMirror[33m,[39m {})[33m;[39m
+    [31m[1m>[22m[39m[90m 241 |[39m     expect(mirror[33m?[39m[33m.[39mstate)[33m.[39mtoBe([32m"expired"[39m)[33m;[39m
+     [90m     |[39m                           [31m[1m^[22m[39m
+     [90m 242 |[39m
+     [90m 243 |[39m     [36mconst[39m storageId [33m=[39m [36mawait[39m claimUpload(t[33m,[39m asUser[33m,[39m [32m"mealScan"[39m)[33m;[39m
+     [90m 244 |[39m     [36mawait[39m expect([0m
+
+      at Object.toBe (convex/tests/subscription.test.ts:241:27)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
 
 PASS convex convex/tests/reviewRegressions.test.ts
-PASS convex convex/tests/foodsScreen.test.ts
-PASS app src/locales/interpolation.test.ts
-PASS app src/features/food/food-filter.test.ts
-PASS app src/features/scan/start-failure.test.ts
-PASS app src/features/subscription/purchase-cancellation.test.ts
-PASS app src/providers/analytics.test.ts
 PASS convex convex/tests/validation.test.ts
-PASS app src/features/notifications/scheduler.test.ts
-  ● Console
-
-    console.warn
-      expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Learn more at https://docs.expo.dev/develop/development-builds/introduction/.
-
-    [0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m [33m*[39m [36mas[39m [33mNotifications[39m [36mfrom[39m [32m"expo-notifications"[39m[33m;[39m
-     [90m   |[39m [31m[1m^[22m[39m
-     [90m 2 |[39m [36mimport[39m { [33mPlatform[39m } [36mfrom[39m [32m"react-native"[39m[33m;[39m
-     [90m 3 |[39m
-     [90m 4 |[39m [90m/**[39m[0m
-
-      at warn (node_modules/expo-notifications/src/warnOfExpoGoPushUsage.ts:14:15)
-      at addPushTokenListener (node_modules/expo-notifications/src/TokenEmitter.ts:44:24)
-      at Object.<anonymous> (node_modules/expo-notifications/src/DevicePushTokenAutoRegistration.fx.ts:104:23)
-      at Object.require (node_modules/expo-notifications/src/getExpoPushTokenAsync.ts:5:1)
-      at Object.require (node_modules/expo-notifications/src/index.ts:16:1)
-      at Object.require (src/features/notifications/scheduler.ts:1:1)
-      at Object.require (src/features/notifications/scheduler.test.ts:3:1)
-
 PASS convex convex/tests/scanLifecycle.test.ts
   ● Console
 
@@ -225,6 +220,11 @@ PASS convex convex/tests/scanLifecycle.test.ts
       at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
       at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
 
+PASS convex convex/tests/lifecycle.test.ts
+PASS convex convex/tests/scanCorrections.test.ts
+PASS convex convex/tests/foodsScreen.test.ts
+PASS convex convex/tests/authorization.test.ts
+PASS convex convex/tests/httpRoutes.test.ts
 PASS convex convex/tests/auditRegressions.test.ts
   ● Console
 
@@ -306,80 +306,17 @@ PASS convex convex/tests/auditRegressions.test.ts
       at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
       at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
 
-FAIL convex convex/tests/subscription.test.ts
-  ● AI scan gating › does not grant Pro when RevenueCat reports an unparseable expiry
-
-    expect(received).toBe(expected) // Object.is equality
-
-    Expected: "expired"
-    Received: "active"
-
-    [0m [90m 239 |[39m     [90m// Fail closed: the mirror records expiry rather than an active entitlement.[39m
-     [90m 240 |[39m     [36mconst[39m mirror [33m=[39m [36mawait[39m asUser[33m.[39mquery(api[33m.[39msubscriptions[33m.[39mgetMirror[33m,[39m {})[33m;[39m
-    [31m[1m>[22m[39m[90m 241 |[39m     expect(mirror[33m?[39m[33m.[39mstate)[33m.[39mtoBe([32m"expired"[39m)[33m;[39m
-     [90m     |[39m                           [31m[1m^[22m[39m
-     [90m 242 |[39m
-     [90m 243 |[39m     [36mconst[39m storageId [33m=[39m [36mawait[39m claimUpload(t[33m,[39m asUser[33m,[39m [32m"mealScan"[39m)[33m;[39m
-     [90m 244 |[39m     [36mawait[39m expect([0m
-
-      at Object.toBe (convex/tests/subscription.test.ts:241:27)
-      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
-      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
-
-PASS convex convex/tests/scanCorrections.test.ts
-PASS convex convex/tests/lifecycle.test.ts
-PASS convex convex/tests/authorization.test.ts
-PASS convex convex/tests/providerSchema.test.ts
 PASS convex convex/tests/scanDetail.test.ts
-PASS convex convex/tests/estimateValidation.test.ts
-PASS app src/locales/i18n.test.ts
-PASS convex convex/tests/progress.test.ts
 PASS convex convex/tests/historyEntitlement.test.ts
-PASS app src/features/scan/upload-image.test.ts
-PASS app src/locales/parity.test.ts
-PASS app src/domain/nutrition-calculator.test.ts
-PASS app src/features/subscription/revenuecat-logging.test.ts
-PASS app src/features/outbox/outbox.test.ts
-PASS app src/features/dashboard/week-range.test.ts
-PASS app src/features/subscription/subscription-state.test.ts
-PASS app src/features/auth/app-access-gate.test.ts
-PASS app src/features/subscription/entitlement-error.test.ts
-PASS app src/features/progress/goal-progress.test.ts
-PASS app src/lib/ingredient-icon.test.ts
-PASS app src/features/auth/auth-destination.test.ts
-PASS app src/features/subscription/trial-length.test.ts
-PASS app src/features/onboarding/date-of-birth.test.ts
-PASS app src/features/progress/history-window.test.ts
-PASS app src/features/onboarding/startup-destination.test.ts
-PASS convex convex/tests/httpRoutes.test.ts
+PASS convex convex/tests/progress.test.ts
+PASS convex convex/tests/estimateValidation.test.ts
+PASS convex convex/tests/providerSchema.test.ts
 PASS convex convex/tests/aiProvider.test.ts
 
-Summary of all failing tests
-FAIL convex/tests/subscription.test.ts
-  ● AI scan gating › does not grant Pro when RevenueCat reports an unparseable expiry
-
-    expect(received).toBe(expected) // Object.is equality
-
-    Expected: "expired"
-    Received: "active"
-
-    [0m [90m 239 |[39m     [90m// Fail closed: the mirror records expiry rather than an active entitlement.[39m
-     [90m 240 |[39m     [36mconst[39m mirror [33m=[39m [36mawait[39m asUser[33m.[39mquery(api[33m.[39msubscriptions[33m.[39mgetMirror[33m,[39m {})[33m;[39m
-    [31m[1m>[22m[39m[90m 241 |[39m     expect(mirror[33m?[39m[33m.[39mstate)[33m.[39mtoBe([32m"expired"[39m)[33m;[39m
-     [90m     |[39m                           [31m[1m^[22m[39m
-     [90m 242 |[39m
-     [90m 243 |[39m     [36mconst[39m storageId [33m=[39m [36mawait[39m claimUpload(t[33m,[39m asUser[33m,[39m [32m"mealScan"[39m)[33m;[39m
-     [90m 244 |[39m     [36mawait[39m expect([0m
-
-      at Object.toBe (convex/tests/subscription.test.ts:241:27)
-      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
-      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
-
-
-Test Suites: 1 failed, 38 passed, 39 total
-Tests:       1 failed, 372 passed, 373 total
+Test Suites: 1 failed, 15 passed, 16 total
+Tests:       1 failed, 152 passed, 153 total
 Snapshots:   0 total
-Time:        12.674 s
-Ran all test suites in 2 projects.
+Time:        3.965 s, estimated 7 s
+Ran all test suites.
 Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
 EXIT_CODE=0 
